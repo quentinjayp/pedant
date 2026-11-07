@@ -135,14 +135,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun loadTutor(): Tutor {
         val model = checkNotNull(store.gemmaModel) { "Gemma model file is missing" }
         if (!diagnostics.gpuCrashed) {
-            diagnostics.step = "Loading Gemma on the GPU"
+            diagnostics.step = "Loading Gemma on the GPU (${diagnostics.memorySummary()})"
             try {
                 return Tutor(getApplication(), model, useGpu = true)
             } catch (_: Throwable) {
                 diagnostics.gpuCrashed = true
             }
         }
-        diagnostics.step = "Loading Gemma on the CPU"
+        diagnostics.step = "Loading Gemma on the CPU (${diagnostics.memorySummary()})"
         return Tutor(getApplication(), model, useGpu = false)
     }
 

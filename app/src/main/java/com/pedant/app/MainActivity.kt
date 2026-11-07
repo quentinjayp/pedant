@@ -78,7 +78,7 @@ class MainActivity : ComponentActivity() {
                     Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                         when (vm.screen) {
                             Screen.Setup -> SetupScreen(vm)
-                            Screen.Loading -> LoadingScreen("Loading the models…")
+                            Screen.Loading -> LoadingScreen("Loading the models…\nThe first time can take a minute or two.")
                             Screen.Crashed -> CrashScreen(vm)
                             Screen.PickLanguage -> LanguageScreen(vm)
                             Screen.Conversation -> ConversationScreen(vm)

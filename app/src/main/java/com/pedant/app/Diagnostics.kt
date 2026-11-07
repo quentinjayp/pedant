@@ -32,6 +32,14 @@ class Diagnostics(private val context: Context) {
         }
     }
 
+    /** Free memory right now, for crash reports. */
+    fun memorySummary(): String {
+        val am = context.getSystemService(ActivityManager::class.java) ?: return ""
+        val info = ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
+        return "free ${info.availMem / 1_000_000} MB of ${info.totalMem / 1_000_000} MB" +
+            if (info.lowMemory) ", low memory" else ""
+    }
+
     /** The step in progress, saved synchronously so it survives a native crash. */
     var step: String?
         get() = prefs.getString("step", null)
@@ -71,7 +79,8 @@ class Diagnostics(private val context: Context) {
                 appendLine("Closed at: $time")
                 appendLine("Reason: ${reasonName(it.reason)}")
                 it.description?.let { d -> appendLine("Details: $d") }
-                appendLine("Memory used: ${it.pss / 1024} MB")
+                appendLine("Memory used: ${it.pss / 1024} MB (resident ${it.rss / 1024} MB)")
+                appendLine("Status code: ${it.status}")
             }
             javaTrace?.let { appendLine(); append(it.take(4000)) }
         }
@@ -85,16 +94,7 @@ class Diagnostics(private val context: Context) {
     private fun lastExitInfo(): ApplicationExitInfo? {
         val am = context.getSystemService(ActivityManager::class.java) ?: return null
         val info = am.getHistoricalProcessExitReasons(context.packageName, 0, 1).firstOrNull() ?: return null
-        if (info.timestamp <= prefs.getLong("lastExitSeen", 0)) return null
-        val crashReasons = setOf(
-            ApplicationExitInfo.REASON_CRASH,
-            ApplicationExitInfo.REASON_CRASH_NATIVE,
-            ApplicationExitInfo.REASON_ANR,
-            ApplicationExitInfo.REASON_LOW_MEMORY,
-            ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE,
-            ApplicationExitInfo.REASON_SIGNALED,
-        )
-        return info.takeIf { it.reason in crashReasons }
+        return info.takeIf { it.timestamp > prefs.getLong("lastExitSeen", 0) }
     }
 
     private fun reasonName(reason: Int) = when (reason) {
@@ -103,7 +103,14 @@ class Diagnostics(private val context: Context) {
         ApplicationExitInfo.REASON_ANR -> "app stopped responding"
         ApplicationExitInfo.REASON_LOW_MEMORY -> "out of memory (closed by Android)"
         ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "used too many resources"
-        ApplicationExitInfo.REASON_SIGNALED -> "killed by the system"
+        ApplicationExitInfo.REASON_SIGNALED -> "killed by a signal"
+        ApplicationExitInfo.REASON_EXIT_SELF -> "the app (or a library inside it) exited by itself"
+        ApplicationExitInfo.REASON_USER_REQUESTED -> "closed by the user (swiped away or force stopped)"
+        ApplicationExitInfo.REASON_USER_STOPPED -> "stopped by the user"
+        ApplicationExitInfo.REASON_DEPENDENCY_DIED -> "a system service it depended on stopped"
+        ApplicationExitInfo.REASON_FREEZER -> "frozen and closed by the system"
+        ApplicationExitInfo.REASON_PACKAGE_UPDATED -> "app was updated"
+        ApplicationExitInfo.REASON_OTHER -> "closed by the system (other)"
         else -> "code $reason"
     }
 }
