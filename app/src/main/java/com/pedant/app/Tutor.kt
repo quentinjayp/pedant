@@ -17,23 +17,17 @@ import java.io.File
 data class TutorTurn(val correction: String?, val reply: String)
 
 /** Gemma 4 E4B acting as a conversation partner that corrects grammar in English. */
-class Tutor(context: Context, modelFile: File) {
+class Tutor(context: Context, modelFile: File, useGpu: Boolean) {
 
-    private val engine: Engine = createEngine(context, modelFile)
+    private val engine: Engine = Engine(
+        EngineConfig(
+            modelPath = modelFile.path,
+            backend = if (useGpu) Backend.GPU() else Backend.CPU(),
+            maxNumTokens = 4096,
+            cacheDir = context.cacheDir.path,
+        ),
+    ).also { it.initialize() }
     private var conversation: Conversation? = null
-
-    private fun createEngine(context: Context, modelFile: File): Engine {
-        fun build(backend: Backend) = Engine(
-            EngineConfig(
-                modelPath = modelFile.path,
-                backend = backend,
-                maxNumTokens = 4096,
-                cacheDir = context.cacheDir.path,
-            ),
-        ).also { it.initialize() }
-        // The GPU is much faster; fall back to the CPU on phones where it isn't available.
-        return runCatching { build(Backend.GPU()) }.getOrElse { build(Backend.CPU()) }
-    }
 
     fun startConversation(language: Language) {
         conversation?.close()

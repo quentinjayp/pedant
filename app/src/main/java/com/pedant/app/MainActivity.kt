@@ -48,6 +48,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -56,6 +62,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Diagnostics(this).installCrashHandler()
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme()) {
                 Surface(Modifier.fillMaxSize()) {
@@ -72,6 +79,7 @@ class MainActivity : ComponentActivity() {
                         when (vm.screen) {
                             Screen.Setup -> SetupScreen(vm)
                             Screen.Loading -> LoadingScreen("Loading the models…")
+                            Screen.Crashed -> CrashScreen(vm)
                             Screen.PickLanguage -> LanguageScreen(vm)
                             Screen.Conversation -> ConversationScreen(vm)
                         }
@@ -115,6 +123,35 @@ private fun ProgressBlock(p: Progress) {
     LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.height(8.dp))
     Text("%.2f of %.2f GB · %s".format(p.done / 1e9, p.total / 1e9, p.label), fontSize = 13.sp)
+}
+
+@Composable
+private fun CrashScreen(vm: AppViewModel) {
+    val clipboard = LocalClipboardManager.current
+    val report = vm.crashReport ?: ""
+    Column(Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState())) {
+        Text("Pedant closed unexpectedly", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text("Here's what happened. Copy it and send it so it can be fixed.")
+        Spacer(Modifier.height(16.dp))
+        SelectionContainer {
+            Text(
+                report,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(12.dp),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(onClick = { clipboard.setText(AnnotatedString(report)) }) { Text("Copy report") }
+            Button(onClick = vm::dismissCrash) { Text("Try again") }
+        }
+    }
 }
 
 @Composable

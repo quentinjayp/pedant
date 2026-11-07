@@ -39,14 +39,19 @@ class MicRecorder {
         )
         recording = true
         thread = Thread {
-            val chunk = ByteArray(minSize)
-            record.startRecording()
-            while (recording) {
-                val n = record.read(chunk, 0, chunk.size)
-                if (n > 0) synchronized(buffer) { buffer.write(chunk, 0, n) }
+            try {
+                val chunk = ByteArray(minSize)
+                record.startRecording()
+                while (recording) {
+                    val n = record.read(chunk, 0, chunk.size)
+                    if (n > 0) synchronized(buffer) { buffer.write(chunk, 0, n) }
+                }
+                record.stop()
+            } catch (_: Exception) {
+                // The microphone was unavailable; an empty recording is returned.
+            } finally {
+                record.release()
             }
-            record.stop()
-            record.release()
         }.also { it.start() }
     }
 
