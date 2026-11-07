@@ -66,14 +66,17 @@ jobs:
             list "$r" | jq -r '.[] | select(.type=="file") | .path' | grep -E 'onnx|tokens' || echo "MISSING $r"
           done
 
-          echo "== Piper voices"
-          voices=$(grep -oE '"[a-z]{2}_[A-Z]{2}-[A-Za-z0-9_]+-(low|medium|high)"' app/src/main/java/com/pedant/app/Languages.kt | tr -d '"')
-          for v in $voices; do
-            files=$(list "csukuangfj/vits-piper-$v" | jq -r '.[] | select(.type=="file") | .path' || true)
-            if echo "$files" | grep -qx "$v.onnx" && echo "$files" | grep -qx tokens.txt && echo "$files" | grep -q '^espeak-ng-data/'; then
-              echo "OK $v"
-            else
-              echo "MISSING $v"; fail=1
-            fi
-          done
+          echo "== Piper voices (each language needs at least one)"
+          while read -r line; do
+            lang=$(echo "$line" | grep -oE 'Language\("[a-z]+", "[^"]+"' | cut -d'"' -f4)
+            ok=""
+            for v in $(echo "$line" | grep -oE '"[a-z]{2}_[A-Z]{2}-[A-Za-z0-9_]+-(low|medium|high)"' | tr -d '"'); do
+              files=$(list "csukuangfj/vits-piper-$v" 2>/dev/null | jq -r '.[] | select(.type=="file") | .path' || true)
+              if echo "$files" | grep -qx "$v.onnx" && echo "$files" | grep -qx tokens.txt && echo "$files" | grep -q '^espeak-ng-data/'; then
+                ok=$v; break
+              fi
+              echo "  missing $v"
+            done
+            if [ -n "$ok" ]; then echo "OK $lang: $ok"; else echo "NO VOICE $lang"; fail=1; fi
+          done < <(grep -E '^\s+Language\(' app/src/main/java/com/pedant/app/Languages.kt)
           exit $fail

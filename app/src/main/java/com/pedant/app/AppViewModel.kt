@@ -92,15 +92,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         error = null
         viewModelScope.launch {
             try {
-                if (!store.voiceReady(lang.piperVoice)) {
-                    store.downloadVoice(lang) { done, total, label -> progress = Progress(done, total, label) }
-                    progress = null
-                }
+                val voice = store.installedVoice(lang)
+                    ?: store.downloadVoice(lang) { done, total, label -> progress = Progress(done, total, label) }
+                progress = null
                 withContext(Dispatchers.Default) {
-                    if (ttsVoice != lang.piperVoice) {
+                    if (ttsVoice != voice) {
                         tts?.release()
-                        tts = TextToSpeech(store, lang.piperVoice)
-                        ttsVoice = lang.piperVoice
+                        tts = TextToSpeech(store, voice)
+                        ttsVoice = voice
                     }
                     checkNotNull(tutor).startConversation(lang)
                 }

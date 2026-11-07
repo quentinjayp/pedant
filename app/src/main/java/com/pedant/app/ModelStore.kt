@@ -40,8 +40,11 @@ class ModelStore(context: Context) {
 
     fun coreReady() = File(gemmaDir, readyMarker).exists() && File(asrDir, readyMarker).exists()
 
-    fun voiceReady(voice: String) =
-        File(voiceDir(voice), readyMarker).exists() && File(espeakDir, readyMarker).exists()
+    /** The voice already downloaded for [language], if any. */
+    fun installedVoice(language: Language): String? =
+        language.piperVoices.firstOrNull { voice ->
+            File(voiceDir(voice), readyMarker).exists() && File(espeakDir, readyMarker).exists()
+        }
 
     /** Downloads Gemma and the speech recognizer. [onProgress] gets (bytes done, bytes total, label). */
     suspend fun downloadCore(onProgress: (Long, Long, String) -> Unit) = withContext(Dispatchers.IO) {
@@ -59,14 +62,18 @@ class ModelStore(context: Context) {
         File(asrDir, readyMarker).createNewFile()
     }
 
-    /** Downloads the Piper voice for [language], plus espeak-ng's data the first time. */
-    suspend fun downloadVoice(language: Language, onProgress: (Long, Long, String) -> Unit) =
+    /**
+     * Downloads the first available Piper voice for [language], plus espeak-ng's data the first
+     * time, and returns the voice's name.
+     */
+    suspend fun downloadVoice(language: Language, onProgress: (Long, Long, String) -> Unit): String =
         withContext(Dispatchers.IO) {
-            val repo = "csukuangfj/vits-piper-${language.piperVoice}"
-            val files = listRepo(repo)
+            val (voice, files) = language.piperVoices.firstNotNullOfOrNull { v ->
+                runCatching { v to listRepo("csukuangfj/vits-piper-$v") }.getOrNull()
+            } ?: throw IOException("No voice found for ${language.englishName}")
             val jobs = mutableListOf<Pair<HfFile, File>>()
-            files.filter { it.path == "${language.piperVoice}.onnx" || it.path == "tokens.txt" }
-                .forEach { jobs += it to File(voiceDir(language.piperVoice), it.path) }
+            files.filter { it.path == "$voice.onnx" || it.path == "tokens.txt" }
+                .forEach { jobs += it to File(voiceDir(voice), it.path) }
             val needEspeak = !File(espeakDir, readyMarker).exists()
             if (needEspeak) {
                 files.filter { it.path.startsWith("espeak-ng-data/") }
@@ -74,7 +81,8 @@ class ModelStore(context: Context) {
             }
             downloadAll(jobs, onProgress)
             if (needEspeak) File(espeakDir, readyMarker).createNewFile()
-            File(voiceDir(language.piperVoice), readyMarker).createNewFile()
+            File(voiceDir(voice), readyMarker).createNewFile()
+            voice
         }
 
     private suspend fun downloadAll(jobs: List<Pair<HfFile, File>>, onProgress: (Long, Long, String) -> Unit) {
