@@ -14,11 +14,15 @@ import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
+import com.k2fsa.sherpa.onnx.OfflineZipformerCtcModelConfig
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-private const val SAMPLE_RATE = 16_000
+const val SAMPLE_RATE = 16_000
+
+/** Audio as floats in [-1, 1] at [sampleRate]. */
+class Audio(val samples: FloatArray, val sampleRate: Int)
 
 /** Records 16 kHz mono audio from the microphone while the talk button is held. */
 class MicRecorder {
@@ -91,6 +95,40 @@ class SpeechToText(store: ModelStore) {
     fun release() = recognizer.release()
 }
 
+/**
+ * ZIPA: hears the sounds (IPA phonemes) that were actually spoken, without knowing any words.
+ * Returns ZIPA's tokens, with "▁" between words.
+ */
+class SoundRecognizer(store: ModelStore) {
+    private val recognizer = OfflineRecognizer(
+        config = OfflineRecognizerConfig(
+            modelConfig = OfflineModelConfig(
+                zipformerCtc = OfflineZipformerCtcModelConfig(model = store.zipaModel.path),
+                tokens = store.zipaTokens.path,
+                numThreads = 4,
+            ),
+        ),
+    )
+
+    fun sounds(audio: Audio): List<String> {
+        if (audio.samples.size < audio.sampleRate / 4) return emptyList()
+        val stream = recognizer.createStream()
+        stream.acceptWaveform(audio.samples, audio.sampleRate)
+        recognizer.decode(stream)
+        val tokens = recognizer.getResult(stream).tokens.map { it.trim() }.filter { it.isNotEmpty() }
+        stream.release()
+        return tokens
+    }
+
+    fun release() = recognizer.release()
+
+    companion object {
+        /** Readable form of ZIPA's tokens, with spaces between words. */
+        fun display(tokens: List<String>) =
+            tokens.joinToString("") { if (it == "▁") " " else it }.trim().replace(Regex("\\s+"), " ")
+    }
+}
+
 /** Text-to-speech with a Piper voice (espeak-ng turns the text into sounds first). */
 class TextToSpeech(store: ModelStore, voice: String) {
     private val tts = OfflineTts(
@@ -109,7 +147,16 @@ class TextToSpeech(store: ModelStore, voice: String) {
     /** Speaks [text] and returns once playback has finished. */
     fun speak(text: String) {
         if (text.isBlank()) return
-        val audio = tts.generate(text, sid = 0, speed = 1.0f)
+        play(synthesize(text))
+    }
+
+    fun synthesize(text: String, speed: Float = 1.0f): Audio {
+        val generated = tts.generate(text, sid = 0, speed = speed)
+        return Audio(generated.samples, generated.sampleRate)
+    }
+
+    /** Plays [audio] and returns once playback has finished. */
+    fun play(audio: Audio) {
         if (audio.samples.isEmpty()) return
         val track = AudioTrack.Builder()
             .setAudioAttributes(

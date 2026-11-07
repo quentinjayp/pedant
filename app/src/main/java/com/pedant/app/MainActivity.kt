@@ -30,6 +30,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
@@ -42,6 +44,10 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -101,8 +107,9 @@ private fun SetupScreen(vm: AppViewModel) {
         Text("Pedant", fontSize = 32.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
         Text(
-            "Pedant runs entirely on your phone. First it needs to download the language model " +
-                "(Gemma 4 E4B) and the speech recognizer, about 4 GB in total. Use Wi-Fi and keep the app open.",
+            "Pedant runs entirely on your phone. First it needs to download its models: Gemma 4 E4B, " +
+                "the speech recognizer and ZIPA (about 4.3 GB in total; anything already downloaded is " +
+                "skipped). Use Wi-Fi and keep the app open.",
         )
         Spacer(Modifier.height(24.dp))
         val p = vm.progress
@@ -214,8 +221,17 @@ private fun LanguageScreen(vm: AppViewModel) {
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(16.dp),
         )
+        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Mode.entries.forEach { m ->
+                FilterChip(
+                    selected = vm.mode == m,
+                    onClick = { vm.mode = m },
+                    label = { Text(m.title) },
+                )
+            }
+        }
         Text(
-            "Pick a language. Pedant replies in that language and explains your mistakes in English.",
+            vm.mode.description + " Then pick a language.",
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         vm.progress?.let {
@@ -276,11 +292,19 @@ private fun ConversationScreen(vm: AppViewModel) {
             item { Spacer(Modifier.height(4.dp)) }
             itemsIndexed(vm.chat) { _, item ->
                 when (item) {
-                    is ChatItem.User -> Bubble(item.text, mine = true)
+                    is ChatItem.User -> Bubble(item.text, mine = true, detail = item.sounds?.let { "/$it/" })
                     is ChatItem.Tutor -> Column {
                         item.correction?.let { CorrectionCard(it) }
-                        if (item.reply.isNotEmpty()) Bubble(item.reply, mine = false)
+                        if (item.reply.isNotEmpty()) Bubble(item.reply, mine = false, detail = item.english)
                     }
+                    is ChatItem.Say -> SayCard(item)
+                    is ChatItem.Attempt -> AttemptCard(item)
+                    is ChatItem.Note -> Text(
+                        item.text,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }
@@ -289,8 +313,10 @@ private fun ConversationScreen(vm: AppViewModel) {
             Modifier.fillMaxWidth().padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(vm.busy.label, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(12.dp))
+            Text(vm.hint, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            LearningControls(vm)
+            Spacer(Modifier.height(8.dp))
             val listening = vm.busy == Busy.Listening
             val enabled = vm.busy == Busy.Idle || listening
             Box(
@@ -333,11 +359,10 @@ private fun ConversationScreen(vm: AppViewModel) {
 }
 
 @Composable
-private fun Bubble(text: String, mine: Boolean) {
+private fun Bubble(text: String, mine: Boolean, detail: String? = null) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
-        Text(
-            text,
-            modifier = Modifier
+        Column(
+            Modifier
                 .widthIn(max = 300.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(
@@ -345,8 +370,90 @@ private fun Bubble(text: String, mine: Boolean) {
                     else MaterialTheme.colorScheme.surfaceVariant,
                 )
                 .padding(12.dp),
-            fontSize = 17.sp,
+        ) {
+            Text(text, fontSize = 17.sp)
+            detail?.takeIf { it.isNotBlank() }?.let {
+                Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/** Learning mode: the phrase to say. */
+@Composable
+private fun SayCard(item: ChatItem.Say) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(12.dp),
+    ) {
+        Text("Say:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Text(item.phrase.ifEmpty { "…" }, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        Text("“${item.english}”", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Learning mode: how one try at the phrase went. */
+@Composable
+private fun AttemptCard(item: ChatItem.Attempt) {
+    val r = item.result
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (r.passed) MaterialTheme.colorScheme.primaryContainer
+                else MaterialTheme.colorScheme.errorContainer,
+            )
+            .padding(12.dp),
+    ) {
+        Text(
+            if (r.passed) "Correct!" else "Not quite. Listen and try again.",
+            fontWeight = FontWeight.Bold,
         )
+        Text("Heard: ${item.heard.ifEmpty { "(nothing)" }}", fontSize = 14.sp)
+        Text("Sounds: /${item.sounds}/", fontSize = 13.sp)
+        Text(
+            "Words ${(r.wordScore * 100).toInt()}% · Sounds ${(r.soundScore * 100).toInt()}%",
+            fontSize = 13.sp,
+        )
+        if (!r.passed) {
+            if (r.missedWords.isNotEmpty()) {
+                Text("Missed or wrong words: ${r.missedWords.joinToString(", ")}", fontSize = 14.sp)
+            }
+            r.soundIssues.forEach { issue ->
+                Text("“${issue.word}”: expected /${issue.expected}/, heard /${issue.heard}/", fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+/** Learning mode: the English text box, or Hear again / Skip while practising a phrase. */
+@Composable
+private fun LearningControls(vm: AppViewModel) {
+    if (vm.mode != Mode.Learning || vm.busy != Busy.Idle) return
+    if (vm.drillPhrase == null) {
+        var text by remember { mutableStateOf("") }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = { Text("Type in English") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(
+                onClick = { vm.submitEnglish(text); text = "" },
+                enabled = text.isNotBlank(),
+            ) { Text("Send") }
+        }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            TextButton(onClick = vm::hearAgain) { Text("Hear it again") }
+            if (vm.drillAttempts >= 3) TextButton(onClick = vm::skip) { Text("Skip") }
+        }
     }
 }
 

@@ -26,19 +26,22 @@ class ModelStore(context: Context) {
 
     private val gemmaDir = File(root, "gemma")
     private val asrDir = File(root, "asr")
+    private val zipaDir = File(root, "zipa")
     private val espeakDir = File(root, "espeak-ng-data")
     private fun voiceDir(voice: String) = File(root, "piper/$voice")
 
     val gemmaModel: File? get() = gemmaDir.listFiles { f -> f.name.endsWith(".litertlm") }?.firstOrNull()
     val asrModel get() = File(asrDir, "model.int8.onnx")
     val asrTokens get() = File(asrDir, "tokens.txt")
+    val zipaModel get() = File(zipaDir, "model.int8.onnx")
+    val zipaTokens get() = File(zipaDir, "tokens.txt")
     val espeakData get() = espeakDir
     fun voiceModel(voice: String) = File(voiceDir(voice), "$voice.onnx")
     fun voiceTokens(voice: String) = File(voiceDir(voice), "tokens.txt")
 
     private val readyMarker = ".complete"
 
-    fun coreReady() = File(gemmaDir, readyMarker).exists() && File(asrDir, readyMarker).exists()
+    fun coreReady() = listOf(gemmaDir, asrDir, zipaDir).all { File(it, readyMarker).exists() }
 
     /** The voice already downloaded for [language], if any. */
     fun installedVoice(language: Language): String? =
@@ -46,7 +49,10 @@ class ModelStore(context: Context) {
             File(voiceDir(voice), readyMarker).exists() && File(espeakDir, readyMarker).exists()
         }
 
-    /** Downloads Gemma and the speech recognizer. [onProgress] gets (bytes done, bytes total, label). */
+    /**
+     * Downloads Gemma, the speech recognizer and ZIPA, skipping any already downloaded.
+     * [onProgress] gets (bytes done, bytes total, label).
+     */
     suspend fun downloadCore(onProgress: (Long, Long, String) -> Unit) = withContext(Dispatchers.IO) {
         val gemmaFiles = listRepo(GEMMA_REPO).filter { it.path.endsWith(".litertlm") }
         val gemma = pickGemmaFile(gemmaFiles)
@@ -54,12 +60,13 @@ class ModelStore(context: Context) {
         val asrRepo = ASR_REPOS.firstNotNullOfOrNull { repo -> runCatching { repo to listRepo(repo) }.getOrNull() }
             ?: throw IOException("Speech recognizer repository not found on Hugging Face")
         val asrFiles = asrRepo.second.filter { it.path == "model.int8.onnx" || it.path == "tokens.txt" }
+        val zipaFiles = listRepo(ZIPA_REPO).filter { it.path == "model.int8.onnx" || it.path == "tokens.txt" }
 
         val jobs = listOf(gemma to File(gemmaDir, gemma.path.substringAfterLast('/'))) +
-            asrFiles.map { it to File(asrDir, it.path) }
-        downloadAll(jobs, onProgress)
-        File(gemmaDir, readyMarker).createNewFile()
-        File(asrDir, readyMarker).createNewFile()
+            asrFiles.map { it to File(asrDir, it.path) } +
+            zipaFiles.map { it to File(zipaDir, it.path) }
+        downloadAll(jobs.filterNot { (file, dest) -> dest.exists() && dest.length() == file.size }, onProgress)
+        listOf(gemmaDir, asrDir, zipaDir).forEach { File(it, readyMarker).createNewFile() }
     }
 
     /**
@@ -180,6 +187,7 @@ class ModelStore(context: Context) {
 
     companion object {
         const val GEMMA_REPO = "litert-community/gemma-4-E4B-it-litert-lm"
+        const val ZIPA_REPO = "anyspeech/zipa-large-crctc-500k"
         val ASR_REPOS = listOf(
             "csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12",
             "csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12",
