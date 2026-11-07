@@ -80,3 +80,40 @@ jobs:
             if [ -n "$ok" ]; then echo "OK $lang: $ok"; else echo "NO VOICE $lang"; fail=1; fi
           done < <(grep -E '^\s+Language\(' app/src/main/java/com/pedant/app/Languages.kt)
           exit $fail
+
+  check-zipa:
+    # Confirms ZIPA's pronunciation model runs in sherpa-onnx, the speech library the app uses.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run ZIPA through sherpa-onnx
+        run: |
+          set -eux
+          repo=anyspeech/zipa-large-crctc-500k
+          curl -fsS "https://huggingface.co/api/models/$repo/tree/main?recursive=true" \
+            | jq -r '.[] | select(.type=="file") | "\(.path) \(.lfs.size // .size)"' | tee files.txt
+          model=$(awk '{print $1}' files.txt | grep -E 'int8.*\.onnx$|\.int8\.onnx$' | grep -viE 'encoder|decoder|joiner' | head -1)
+          curl -fsSL -o model.onnx "https://huggingface.co/$repo/resolve/main/$model"
+          curl -fsSL -o sample.wav https://raw.githubusercontent.com/lingjzhu/zipa/main/sample.wav
+          curl -fsSL -o tokens.txt https://raw.githubusercontent.com/lingjzhu/zipa/main/ipa_simplified/tokens.txt
+          pip install sherpa-onnx==1.13.8 onnx soundfile numpy
+          python - <<'PY'
+          import onnx
+          m = onnx.load("model.onnx")
+          print("inputs", [i.name for i in m.graph.input], "outputs", [o.name for o in m.graph.output])
+          print("metadata", {p.key: p.value for p in m.metadata_props})
+          import sherpa_onnx, soundfile as sf
+          rec = sherpa_onnx.OfflineRecognizer.from_zipformer_ctc(
+              model="model.onnx", tokens="tokens.txt", num_threads=2, debug=False)
+          audio, sr = sf.read("sample.wav", dtype="float32")
+          if audio.ndim > 1:
+              audio = audio[:, 0]
+          s = rec.create_stream()
+          s.accept_waveform(sr, audio)
+          rec.decode_stream(s)
+          print("TEXT:", s.result.text)
+          print("TOKENS:", s.result.tokens)
+          PY
