@@ -1,0 +1,79 @@
+name: Android build
+
+on:
+  push:
+    branches: [claude/offline-ai-language-app-v3widq, main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Download sherpa-onnx Android library
+        run: |
+          mkdir -p app/libs
+          curl -fsSL -o app/libs/sherpa-onnx-1.13.8.aar \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
+
+      - name: Build APK
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk pedant.apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: pedant.apk
+          body: |
+            Debug build from commit ${{ github.sha }}.
+            Install pedant.apk on an Android phone (allow installs from unknown sources).
+
+  check-models:
+    # Confirms every model file the app downloads exists on Hugging Face.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Hugging Face model files
+        run: |
+          set -u
+          fail=0
+          list() { curl -fsS "https://huggingface.co/api/models/$1/tree/main?recursive=true"; }
+
+          echo "== Gemma"
+          list litert-community/gemma-4-E4B-it-litert-lm | jq -r '.[] | select(.type=="file") | "\(.path) \(.lfs.size // .size)"' || fail=1
+
+          echo "== Speech recognizer"
+          for r in csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12 \
+                   csukuangfj/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12; do
+            echo "-- $r"
+            list "$r" | jq -r '.[] | select(.type=="file") | .path' | grep -E 'onnx|tokens' || echo "MISSING $r"
+          done
+
+          echo "== Piper voices"
+          voices=$(grep -oE '"[a-z]{2}_[A-Z]{2}-[A-Za-z0-9_]+-(low|medium|high)"' app/src/main/java/com/pedant/app/Languages.kt | tr -d '"')
+          for v in $voices; do
+            files=$(list "csukuangfj/vits-piper-$v" | jq -r '.[] | select(.type=="file") | .path' || true)
+            if echo "$files" | grep -qx "$v.onnx" && echo "$files" | grep -qx tokens.txt && echo "$files" | grep -q '^espeak-ng-data/'; then
+              echo "OK $v"
+            else
+              echo "MISSING $v"; fail=1
+            fi
+          done
+          exit $fail
