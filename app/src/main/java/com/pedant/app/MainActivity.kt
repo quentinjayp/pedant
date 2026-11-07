@@ -135,6 +135,12 @@ private fun ChooseBackendScreen(vm: AppViewModel) {
         Text("Load Gemma", fontSize = 24.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(8.dp))
         Text("Choose where Gemma runs. The GPU is about twice as fast; the CPU is the safer fallback.")
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Memory now: ${vm.memorySummary()}. The GPU needs about 3 GB free; closing other apps helps.",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Spacer(Modifier.height(24.dp))
         BackendOption("GPU", vm.lastResult(gpu = true)) { vm.loadModels(useGpu = true) }
         Spacer(Modifier.height(16.dp))

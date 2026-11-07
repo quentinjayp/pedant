@@ -67,6 +67,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** How the last attempt to load Gemma on each backend went, shown on the choice screen. */
     fun lastResult(gpu: Boolean): String? = diagnostics.lastLoadResult(gpu)
 
+    /** Free memory right now, shown before choosing where Gemma runs. */
+    fun memorySummary(): String = diagnostics.memorySummary()
+
     init {
         diagnostics.step?.let { unfinished ->
             if (unfinished.startsWith(GPU_STEP)) diagnostics.recordLoad(gpu = true, "crashed while loading")
@@ -126,11 +129,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.Default) {
+                    // Gemma first: it needs the most memory, so it loads while the most is free.
+                    if (tutor == null) tutor = loadTutor(useGpu)
                     if (stt == null) {
-                        diagnostics.step = "Loading the speech recognizer"
+                        diagnostics.step = "Loading the speech recognizer (${diagnostics.memorySummary()})"
                         stt = SpeechToText(store)
                     }
-                    if (tutor == null) tutor = loadTutor(useGpu)
                     diagnostics.step = null
                 }
                 screen = Screen.PickLanguage

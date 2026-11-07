@@ -23,7 +23,7 @@ class Tutor(context: Context, modelFile: File, useGpu: Boolean) {
         EngineConfig(
             modelPath = modelFile.path,
             backend = if (useGpu) Backend.GPU() else Backend.CPU(),
-            maxNumTokens = 4096,
+            maxNumTokens = 2048,
             cacheDir = context.cacheDir.path,
         ),
     ).also { it.initialize() }
