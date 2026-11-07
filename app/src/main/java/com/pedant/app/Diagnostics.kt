@@ -47,12 +47,13 @@ class Diagnostics(private val context: Context) {
             prefs.edit().putString("step", value).commit()
         }
 
-    /** True once the GPU has crashed while loading Gemma, so the CPU is used from then on. */
-    var gpuCrashed: Boolean
-        get() = prefs.getBoolean("gpuCrashed", false)
-        set(value) {
-            prefs.edit().putBoolean("gpuCrashed", value).commit()
-        }
+    /** Remembers how loading Gemma on the GPU or CPU went, with the time it happened. */
+    fun recordLoad(gpu: Boolean, result: String) {
+        val time = SimpleDateFormat("MMM d HH:mm", Locale.US).format(Date())
+        prefs.edit().putString(if (gpu) "lastGpu" else "lastCpu", "$result ($time)").commit()
+    }
+
+    fun lastLoadResult(gpu: Boolean): String? = prefs.getString(if (gpu) "lastGpu" else "lastCpu", null)
 
     /**
      * A description of the last crash if the previous run ended in one, else null.

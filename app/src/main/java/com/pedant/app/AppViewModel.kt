@@ -17,6 +17,7 @@ sealed interface Screen {
     data object Setup : Screen
     data object Loading : Screen
     data object Crashed : Screen
+    data object ChooseBackend : Screen
     data object PickLanguage : Screen
     data object Conversation : Screen
 }
@@ -58,22 +59,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var busy by mutableStateOf(Busy.Idle)
         private set
+    /** "GPU" or "CPU": where Gemma is running, once loaded. */
+    var backend by mutableStateOf<String?>(null)
+        private set
     val chat = mutableStateListOf<ChatItem>()
 
+    /** How the last attempt to load Gemma on each backend went, shown on the choice screen. */
+    fun lastResult(gpu: Boolean): String? = diagnostics.lastLoadResult(gpu)
+
     init {
-        if (diagnostics.step?.contains("GPU") == true) diagnostics.gpuCrashed = true
+        diagnostics.step?.let { unfinished ->
+            if (unfinished.startsWith(GPU_STEP)) diagnostics.recordLoad(gpu = true, "crashed while loading")
+            if (unfinished.startsWith(CPU_STEP)) diagnostics.recordLoad(gpu = false, "crashed while loading")
+        }
         crashReport = diagnostics.takeCrashReport()
-        when {
-            // After a crash, wait for the user instead of loading the models straight away,
-            // so a model that crashes on load can't trap the app in a crash loop.
-            crashReport != null -> screen = Screen.Crashed
-            store.coreReady() -> loadModels()
+        screen = when {
+            crashReport != null -> Screen.Crashed
+            store.coreReady() -> Screen.ChooseBackend
+            else -> Screen.Setup
         }
     }
 
     fun dismissCrash() {
         crashReport = null
-        if (store.coreReady()) loadModels() else screen = Screen.Setup
+        screen = if (store.coreReady()) Screen.ChooseBackend else Screen.Setup
     }
 
     fun downloadCore() {
@@ -81,7 +90,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 withProgress { report -> store.downloadCore(report) }
-                loadModels()
+                screen = Screen.ChooseBackend
             } catch (e: Exception) {
                 progress = null
                 error = "Download failed: ${e.message}"
@@ -110,7 +119,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun loadModels() {
+    /** Loads the speech recognizer and Gemma, with Gemma on the GPU or the CPU. */
+    fun loadModels(useGpu: Boolean) {
+        error = null
         screen = Screen.Loading
         viewModelScope.launch {
             try {
@@ -119,31 +130,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         diagnostics.step = "Loading the speech recognizer"
                         stt = SpeechToText(store)
                     }
-                    if (tutor == null) tutor = loadTutor()
+                    if (tutor == null) tutor = loadTutor(useGpu)
                     diagnostics.step = null
                 }
                 screen = Screen.PickLanguage
             } catch (e: Throwable) {
                 diagnostics.step = null
                 error = "Could not load the models: ${e.message}"
-                screen = Screen.Setup
+                screen = Screen.ChooseBackend
             }
         }
     }
 
-    /** Loads Gemma on the GPU (much faster), or on the CPU if the GPU failed before. */
-    private fun loadTutor(): Tutor {
+    private fun loadTutor(useGpu: Boolean): Tutor {
         val model = checkNotNull(store.gemmaModel) { "Gemma model file is missing" }
-        if (!diagnostics.gpuCrashed) {
-            diagnostics.step = "Loading Gemma on the GPU (${diagnostics.memorySummary()})"
-            try {
-                return Tutor(getApplication(), model, useGpu = true)
-            } catch (_: Throwable) {
-                diagnostics.gpuCrashed = true
-            }
+        diagnostics.step = "${if (useGpu) GPU_STEP else CPU_STEP} (${diagnostics.memorySummary()})"
+        val start = System.currentTimeMillis()
+        try {
+            val loaded = Tutor(getApplication(), model, useGpu)
+            val seconds = (System.currentTimeMillis() - start) / 1000
+            diagnostics.recordLoad(useGpu, "worked, loaded in $seconds s")
+            backend = if (useGpu) "GPU" else "CPU"
+            return loaded
+        } catch (e: Throwable) {
+            diagnostics.recordLoad(useGpu, "failed: ${e.message}")
+            throw e
         }
-        diagnostics.step = "Loading Gemma on the CPU (${diagnostics.memorySummary()})"
-        return Tutor(getApplication(), model, useGpu = false)
     }
 
     fun pickLanguage(lang: Language) {
@@ -231,6 +243,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             diagnostics.step = null
             busy = Busy.Idle
         }
+    }
+
+    companion object {
+        private const val GPU_STEP = "Loading Gemma on the GPU"
+        private const val CPU_STEP = "Loading Gemma on the CPU"
     }
 
     override fun onCleared() {
