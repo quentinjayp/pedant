@@ -298,7 +298,12 @@ private fun ConversationScreen(vm: AppViewModel) {
                         if (item.reply.isNotEmpty()) Bubble(item.reply, mine = false, detail = item.english)
                     }
                     is ChatItem.Say -> SayCard(item)
-                    is ChatItem.Attempt -> AttemptCard(item, enabled = vm.busy == Busy.Idle, onSay = vm::sayWord)
+                    is ChatItem.Attempt -> AttemptCard(
+                        item,
+                        enabled = vm.busy == Busy.Idle,
+                        onSay = vm::sayWord,
+                        onSaySounds = vm::saySounds,
+                    )
                     is ChatItem.Note -> Text(
                         item.text,
                         fontSize = 13.sp,
@@ -397,7 +402,12 @@ private fun SayCard(item: ChatItem.Say) {
 
 /** Learning mode: how one try at the phrase went, with buttons to hear each problem word. */
 @Composable
-private fun AttemptCard(item: ChatItem.Attempt, enabled: Boolean, onSay: (String) -> Unit) {
+private fun AttemptCard(
+    item: ChatItem.Attempt,
+    enabled: Boolean,
+    onSay: (String) -> Unit,
+    onSaySounds: (String) -> Unit,
+) {
     val r = item.result
     Column(
         Modifier
@@ -419,20 +429,24 @@ private fun AttemptCard(item: ChatItem.Attempt, enabled: Boolean, onSay: (String
             "Words ${(r.wordScore * 100).toInt()}% · Sounds ${(r.soundScore * 100).toInt()}%",
             fontSize = 13.sp,
         )
-        r.issues.forEach { issue -> IssueRow(issue, enabled, onSay) }
+        r.issues.forEach { issue -> IssueRow(issue, enabled, onSay, onSaySounds) }
     }
 }
 
-/** One problem word: what was expected and heard, with Piper saying each version. */
+/**
+ * One problem word: what was expected and what was heard, with Piper saying the correct word,
+ * the word Omnilingual heard instead, and the sounds ZIPA heard.
+ */
 @Composable
-private fun IssueRow(issue: WordIssue, enabled: Boolean, onSay: (String) -> Unit) {
+private fun IssueRow(issue: WordIssue, enabled: Boolean, onSay: (String) -> Unit, onSaySounds: (String) -> Unit) {
     HorizontalDivider(Modifier.padding(vertical = 6.dp))
     val heardWord = issue.heardWord
+    val wordDiffers = heardWord != null && Matching.normalize(heardWord) != Matching.normalize(issue.word)
     Text(
         when {
             heardWord == null -> "“${issue.word}”: not heard"
-            Matching.normalize(heardWord) == Matching.normalize(issue.word) -> "“${issue.word}”: word right, sounds off"
-            else -> "“${issue.word}”: heard “$heardWord”"
+            wordDiffers -> "“${issue.word}”: heard “$heardWord”"
+            else -> "“${issue.word}”: word right, sounds off"
         },
         fontSize = 14.sp,
         fontWeight = FontWeight.SemiBold,
@@ -440,9 +454,15 @@ private fun IssueRow(issue: WordIssue, enabled: Boolean, onSay: (String) -> Unit
     if (issue.expectedSounds != null) {
         Text("Expected /${issue.expectedSounds}/ · heard /${issue.heardSounds}/", fontSize = 13.sp)
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         TextButton(onClick = { onSay(issue.word) }, enabled = enabled) { Text("▶ Correct") }
-        TextButton(onClick = { heardWord?.let(onSay) }, enabled = enabled && heardWord != null) { Text("▶ Heard") }
+        if (wordDiffers) {
+            TextButton(onClick = { onSay(heardWord!!) }, enabled = enabled) { Text("▶ Heard word") }
+        }
+        val heardSounds = issue.heardSounds
+        if (heardSounds != null && heardSounds != "—") {
+            TextButton(onClick = { onSaySounds(heardSounds) }, enabled = enabled) { Text("▶ Heard sounds") }
+        }
     }
 }
 

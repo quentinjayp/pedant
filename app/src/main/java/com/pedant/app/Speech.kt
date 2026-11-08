@@ -16,6 +16,7 @@ import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineZipformerCtcModelConfig
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -123,6 +124,13 @@ class SoundRecognizer(store: ModelStore) {
     fun release() = recognizer.release()
 
     companion object {
+        /**
+         * Splits displayed IPA back into ZIPA symbols: each base character, with any combining
+         * marks (such as the nasal ◌̃) kept as their own symbols, as ZIPA and Piper both use them.
+         */
+        fun symbols(text: String): List<String> =
+            text.filter { !it.isWhitespace() && it != '/' && it != '—' }.map { it.toString() }
+
         /** Readable form of ZIPA's tokens, with spaces between words. */
         fun display(tokens: List<String>) =
             tokens.joinToString("") { if (it == "▁") " " else it }.trim().replace(Regex("\\s+"), " ")
@@ -130,7 +138,16 @@ class SoundRecognizer(store: ModelStore) {
 }
 
 /** Text-to-speech with a Piper voice (espeak-ng turns the text into sounds first). */
-class TextToSpeech(store: ModelStore, voice: String) {
+class TextToSpeech(store: ModelStore, voice: String, private val workDir: File) {
+    private val modelPath = store.voiceModel(voice).path
+    private val tokensPath = store.voiceTokens(voice).path
+
+    /** The sounds (IPA symbols) this voice can say. */
+    private val voiceSymbols: Set<String> = File(tokensPath).readLines()
+        .filter { it.isNotEmpty() }
+        .map { line -> line.substringBeforeLast(' ').ifEmpty { " " } }
+        .toSet()
+
     private val tts = OfflineTts(
         config = OfflineTtsConfig(
             model = OfflineTtsModelConfig(
@@ -183,5 +200,42 @@ class TextToSpeech(store: ModelStore, voice: String) {
         track.release()
     }
 
+    /**
+     * Says raw sounds (ZIPA's IPA symbols) with this voice, so you hear exactly what was heard.
+     * Piper normally gets its sounds from espeak-ng; here a one-word lexicon maps a made-up word to
+     * the sounds, and a second copy of the voice is loaded without espeak-ng so it uses the lexicon.
+     */
+    fun speakSounds(sounds: List<String>) {
+        val symbols = sounds.map { ZIPA_TO_PIPER[it] ?: it }.filter { it in voiceSymbols && it != " " }
+        if (symbols.isEmpty()) return
+        // Piper expects a start mark, a pad after every sound and an end mark.
+        val ids = buildList {
+            add("^"); add("_")
+            symbols.forEach { add(it); add("_") }
+            add("$")
+        }
+        val lexicon = File(workDir, "sounds-lexicon.txt")
+        lexicon.writeText("zz ${ids.joinToString(" ")}\n")
+        val raw = OfflineTts(
+            config = OfflineTtsConfig(
+                model = OfflineTtsModelConfig(
+                    vits = OfflineTtsVitsModelConfig(model = modelPath, tokens = tokensPath, lexicon = lexicon.path),
+                    numThreads = 2,
+                ),
+            ),
+        )
+        try {
+            val generated = raw.generate("zz", sid = 0, speed = 1.0f)
+            play(Audio(generated.samples, generated.sampleRate))
+        } finally {
+            raw.release()
+        }
+    }
+
     fun release() = tts.release()
+
+    companion object {
+        /** ZIPA symbols written differently in Piper's IPA. */
+        private val ZIPA_TO_PIPER = mapOf("g" to "ɡ")
+    }
 }

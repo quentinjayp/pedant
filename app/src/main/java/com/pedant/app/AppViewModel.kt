@@ -205,7 +205,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     if (ttsVoice != voice) {
                         diagnostics.step = "Loading the $voice voice"
                         tts?.release()
-                        tts = TextToSpeech(store, voice)
+                        tts = TextToSpeech(store, voice, getApplication<Application>().cacheDir)
                         ttsVoice = voice
                     }
                     diagnostics.step = "Starting a ${lang.englishName} ${mode.title} session"
@@ -293,6 +293,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 withContext(Dispatchers.Default) { tts?.speak(text) }
+            } finally {
+                busy = Busy.Idle
+            }
+        }
+    }
+
+    /** Has Piper say raw sounds, e.g. the sounds ZIPA heard. [sounds] is the displayed IPA text. */
+    fun saySounds(sounds: String) {
+        if (busy != Busy.Idle || sounds.isBlank()) return
+        busy = Busy.Speaking
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.Default) { tts?.speakSounds(SoundRecognizer.symbols(sounds)) }
+            } catch (e: Throwable) {
+                chat += ChatItem.Note("Couldn't play those sounds: ${e.message}")
             } finally {
                 busy = Busy.Idle
             }
