@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
@@ -59,6 +60,12 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -230,6 +237,8 @@ private fun ConversationScreen(vm: AppViewModel) {
         if (vm.chat.isNotEmpty()) listState.animateScrollToItem(vm.chat.size - 1)
     }
 
+    vm.lookup?.let { WordBubble(it, onHear = vm::hearWord, onClose = vm::closeLookup) }
+
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
@@ -254,12 +263,20 @@ private fun ConversationScreen(vm: AppViewModel) {
             item { Spacer(Modifier.height(4.dp)) }
             itemsIndexed(vm.chat) { _, item ->
                 when (item) {
-                    is ChatItem.User -> Bubble(item.text, mine = true, detail = item.sounds?.let { "/$it/" })
+                    // In Learning mode the learner's lines are English, so only Conversation mode's are tappable.
+                    is ChatItem.User -> Bubble(
+                        item.text,
+                        mine = true,
+                        detail = item.sounds?.let { "/$it/" },
+                        onWord = if (vm.mode == Mode.Conversation) vm::lookUp else null,
+                    )
                     is ChatItem.Tutor -> Column {
                         item.correction?.let { CorrectionCard(it) }
-                        if (item.reply.isNotEmpty()) Bubble(item.reply, mine = false, detail = item.english)
+                        if (item.reply.isNotEmpty()) {
+                            Bubble(item.reply, mine = false, detail = item.english, onWord = vm::lookUp)
+                        }
                     }
-                    is ChatItem.Say -> SayCard(item)
+                    is ChatItem.Say -> SayCard(item, onWord = vm::lookUp)
                     is ChatItem.Attempt -> AttemptCard(
                         item,
                         enabled = vm.busy == Busy.Idle,
@@ -326,7 +343,12 @@ private fun ConversationScreen(vm: AppViewModel) {
 }
 
 @Composable
-private fun Bubble(text: String, mine: Boolean, detail: String? = null) {
+private fun Bubble(
+    text: String,
+    mine: Boolean,
+    detail: String? = null,
+    onWord: ((word: String, sentence: String) -> Unit)? = null,
+) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
         Column(
             Modifier
@@ -338,7 +360,7 @@ private fun Bubble(text: String, mine: Boolean, detail: String? = null) {
                 )
                 .padding(12.dp),
         ) {
-            Text(text, fontSize = 17.sp)
+            if (onWord != null) TappableText(text, fontSize = 17.sp, onWord = onWord) else Text(text, fontSize = 17.sp)
             detail?.takeIf { it.isNotBlank() }?.let {
                 Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -348,7 +370,7 @@ private fun Bubble(text: String, mine: Boolean, detail: String? = null) {
 
 /** Learning mode: the phrase to say. */
 @Composable
-private fun SayCard(item: ChatItem.Say) {
+private fun SayCard(item: ChatItem.Say, onWord: (word: String, sentence: String) -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -357,7 +379,11 @@ private fun SayCard(item: ChatItem.Say) {
             .padding(12.dp),
     ) {
         Text("Say:", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        Text(item.phrase.ifEmpty { "…" }, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        if (item.phrase.isEmpty()) {
+            Text("…", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        } else {
+            TappableText(item.phrase, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, onWord = onWord)
+        }
         Text("“${item.english}”", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -426,6 +452,70 @@ private fun IssueRow(issue: WordIssue, enabled: Boolean, onSay: (String) -> Unit
             TextButton(onClick = { onSaySounds(heardSounds) }, enabled = enabled) { Text("▶ Heard sounds") }
         }
     }
+}
+
+/**
+ * Text whose words can be tapped. Each tap reports the word and the whole text (its sentence).
+ * Languages written without spaces (such as Chinese) are tappable character by character.
+ */
+@Composable
+private fun TappableText(
+    text: String,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+    fontWeight: FontWeight? = null,
+    onWord: (word: String, sentence: String) -> Unit,
+) {
+    val linkStyle = TextLinkStyles(style = SpanStyle(textDecoration = TextDecoration.None))
+    val annotated = buildAnnotatedString {
+        var last = 0
+        for (match in WORD_PATTERN.findAll(text)) {
+            append(text.substring(last, match.range.first))
+            val pieces = if (match.value.any { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN }) {
+                match.value.map { it.toString() }
+            } else {
+                listOf(match.value)
+            }
+            for (piece in pieces) {
+                withLink(LinkAnnotation.Clickable(piece, linkStyle) { onWord(piece, text) }) { append(piece) }
+            }
+            last = match.range.last + 1
+        }
+        append(text.substring(last))
+    }
+    Text(annotated, fontSize = fontSize, fontWeight = fontWeight)
+}
+
+private val WORD_PATTERN = Regex("[\\p{L}\\p{M}\\p{N}'’-]+")
+
+/** The bubble for a tapped word: meaning, pronunciation guide and Normal/Slow playback. */
+@Composable
+private fun WordBubble(lookup: WordLookup, onHear: (String, Boolean) -> Unit, onClose: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onClose,
+        confirmButton = { TextButton(onClick = onClose) { Text("Close") } },
+        title = { Text(lookup.word) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                when {
+                    lookup.meaning != null -> Text(lookup.meaning, fontSize = 16.sp)
+                    lookup.loading -> Text("Looking up the meaning…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                lookup.soundsLike?.let { Text("Sounds like: $it", fontSize = 15.sp) }
+                lookup.sounds?.let { Text("Sounds (IPA): /$it/", fontSize = 14.sp) }
+                lookup.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 14.sp) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Hear it:", fontSize = 14.sp)
+                    TextButton(onClick = { onHear(lookup.word, false) }) { Text("Normal") }
+                    TextButton(onClick = { onHear(lookup.word, true) }) { Text("Slow") }
+                }
+                Text(
+                    "From: ${lookup.sentence}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+    )
 }
 
 /** Learning mode: the English text box, or Hear again / Skip while practising a phrase. */

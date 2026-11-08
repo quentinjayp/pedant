@@ -67,6 +67,18 @@ class Tutor(context: Context, modelFile: File) {
         }
     }
 
+    /**
+     * Looks up [word] as used in [sentence], in a separate short conversation so the main one is
+     * left untouched. Returns the raw answer; see [parseLookup].
+     */
+    fun lookUp(language: Language, word: String, sentence: String): String =
+        engine.createConversation(
+            ConversationConfig(
+                systemInstruction = Contents.of(lookupPrompt(language)),
+                samplerConfig = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0),
+            ),
+        ).use { it.sendMessage(Message.user("Word: $word\nSentence: $sentence")).toString() }
+
     fun close() {
         conversation?.close()
         engine.close()
@@ -117,6 +129,20 @@ class Tutor(context: Context, modelFile: File) {
             For [TRANSLATE]:
             SAY: <the ${language.englishName} translation only>
         """.trimIndent()
+
+        private fun lookupPrompt(language: Language) = """
+            You explain ${language.englishName} words to an English-speaking learner.
+            You get a word and the sentence it appears in. Answer in exactly this format and nothing else:
+            MEANING: <a short English definition of the word as used in this sentence, with its part of speech>
+            SOUNDS LIKE: <an English-style respelling of how to say the word, with the stressed syllable in capitals>
+        """.trimIndent()
+
+        /** Splits a lookup answer into (meaning, sounds-like respelling). */
+        fun parseLookup(raw: String): Pair<String?, String?> {
+            val meaning = raw.substringAfter("MEANING:", "").substringBefore("SOUNDS LIKE:").trim()
+            val soundsLike = raw.substringAfter("SOUNDS LIKE:", "").trim().lines().firstOrNull()?.trim()
+            return meaning.ifEmpty { null } to soundsLike?.ifEmpty { null }
+        }
 
         private val LABELS = listOf("CORRECTION:", "REPLY:", "ENGLISH:", "SAY:")
 

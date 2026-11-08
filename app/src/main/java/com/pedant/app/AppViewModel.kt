@@ -30,7 +30,19 @@ enum class Busy(val label: String) {
     Thinking("Thinking…"),
     Speaking("Speaking…"),
     Preparing("Preparing the phrase…"),
+    LookingUp("Looking up the word…"),
 }
+
+/** A tapped word: its meaning in context and how to say it. Null fields are still loading. */
+data class WordLookup(
+    val word: String,
+    val sentence: String,
+    val meaning: String? = null,
+    val soundsLike: String? = null,
+    val sounds: String? = null,
+    val error: String? = null,
+    val loading: Boolean = true,
+)
 
 sealed interface ChatItem {
     /** What the learner said or typed; [sounds] is what ZIPA heard, when they spoke. */
@@ -82,6 +94,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var drillAttempts by mutableStateOf(0)
         private set
     val chat = mutableStateListOf<ChatItem>()
+    /** The word bubble being shown, if any. */
+    var lookup by mutableStateOf<WordLookup?>(null)
+        private set
+    private val lookupCache = mutableMapOf<Pair<String, String>, WordLookup>()
 
     /** What to do next, shown above the talk button. */
     val hint: String
@@ -262,6 +278,62 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     val voice = tts ?: return@withContext
                     val audio = if (!slow) d.audio else d.slowAudio ?: voice.synthesize(d.phrase, SLOW_SPEED).also { d.slowAudio = it }
                     voice.play(audio)
+                }
+            } finally {
+                busy = Busy.Idle
+            }
+        }
+    }
+
+    /**
+     * Opens the bubble for a tapped [word] from [sentence]: its meaning in that sentence and a
+     * pronunciation guide from Gemma, and its sounds from ZIPA listening to Piper say it.
+     */
+    fun lookUp(word: String, sentence: String) {
+        val lang = language ?: return
+        val key = word.lowercase() to sentence
+        lookupCache[key]?.let { lookup = it; return }
+        lookup = WordLookup(word, sentence)
+        if (busy != Busy.Idle) {
+            lookup = WordLookup(word, sentence, error = "Wait until the app is done speaking or thinking.", loading = false)
+            return
+        }
+        busy = Busy.LookingUp
+        viewModelScope.launch {
+            var result = WordLookup(word, sentence)
+            try {
+                val sounds = withContext(Dispatchers.Default) {
+                    SoundRecognizer.display(checkNotNull(zipa).sounds(checkNotNull(tts).synthesize(word)))
+                }
+                result = result.copy(sounds = sounds)
+                lookup = result
+                val (meaning, soundsLike) = withContext(Dispatchers.Default) {
+                    Tutor.parseLookup(checkNotNull(tutor).lookUp(lang, word, sentence))
+                }
+                result = result.copy(meaning = meaning, soundsLike = soundsLike, loading = false)
+                lookupCache[key] = result
+            } catch (e: Throwable) {
+                result = result.copy(error = "Couldn't look this up: ${e.message}", loading = false)
+            } finally {
+                if (lookup?.word == word && lookup?.sentence == sentence) lookup = result
+                busy = Busy.Idle
+            }
+        }
+    }
+
+    fun closeLookup() {
+        lookup = null
+    }
+
+    /** Has Piper say [word], slowly if [slow]. */
+    fun hearWord(word: String, slow: Boolean) {
+        if (busy != Busy.Idle || word.isBlank()) return
+        busy = Busy.Speaking
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.Default) {
+                    val voice = tts ?: return@withContext
+                    voice.play(voice.synthesize(word, if (slow) SLOW_SPEED else 1.0f))
                 }
             } finally {
                 busy = Busy.Idle
