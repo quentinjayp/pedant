@@ -179,12 +179,27 @@ def segment(phrase_sounds, isolated):
 
 
 def check(target, transcript, ref_words, heard_sounds):
+    """Returns (word score, sound score, per-word: (heard by Omnilingual, sound error ratio))."""
     tw = [normalize(w) for w in words(target)]
     hw = [normalize(w) for w in words(transcript)]
-    word_score = score(align(tw, hw, word_cost, lambda _: 1.0), len(tw))
+    word_steps = align(tw, hw, word_cost, lambda _: 1.0)
+    word_score = score(word_steps, len(tw))
+    word_ok = [False] * len(tw)
+    for r, h, c in word_steps:
+        if r is not None and h is not None and c == 0:
+            word_ok[r] = True
     ref = [s for _, ss in ref_words for s in ss]
-    sound_score = score(align(ref, heard_sounds, sound_cost, sound_indel), sum(sound_indel(s) for s in ref))
-    return word_score, sound_score
+    ref_word_of = [w for w, (_, ss) in enumerate(ref_words) for _ in ss]
+    sound_steps = align(ref, heard_sounds, sound_cost, sound_indel)
+    sound_score = score(sound_steps, sum(sound_indel(s) for s in ref))
+    cost = [0.0] * len(ref_words)
+    last = 0
+    for r, h, c in sound_steps:
+        if r is not None:
+            last = ref_word_of[r]
+        cost[last] += c
+    ratios = [cost[w] / max(1, len(ss)) for w, (_, ss) in enumerate(ref_words)]
+    return word_score, sound_score, list(zip(word_ok, ratios))
 
 
 # ---- Models -----------------------------------------------------------------------------------
@@ -244,8 +259,8 @@ for lang, cfg in LANGS.items():
             for kind, text in cases:
                 a = engine.generate(text, sid=sid, speed=1.0)
                 transcript = recognize(asr, a).text
-                ws, ss = check(phrase, transcript, ref_words, sounds(a))
-                rows.append((lang, kind, voice, sid, ws, ss))
+                ws, ss, per_word = check(phrase, transcript, ref_words, sounds(a))
+                rows.append((lang, kind, voice, sid, ws, ss, per_word))
                 print(f"{lang} {kind:18} {voice}#{sid:<2} words {ws:.2f} sounds {ss:.2f} | {transcript}", flush=True)
 
 print("\n== Summary (min / mean / max) ==")
@@ -260,3 +275,26 @@ for wt in [0.6, 0.7, 0.8]:
         pass_ok = sum(r[4] >= wt and r[5] >= st for r in ok) / len(ok)
         pass_bad = sum(r[4] >= wt and r[5] >= st for r in bad) / len(bad)
         print(f"words>={wt} sounds>={st}: correct pass {pass_ok:.0%}, wrong pass {pass_bad:.0%}")
+
+print("\n== Per-word rule: a word is right if Omnilingual heard it OR its sound error ratio <= limit ==")
+for limit in [0.3, 0.4, 0.5, 0.6]:
+    for allowed in [0, 1]:
+        def passes(r):
+            bad = sum(1 for heard, ratio in r[6] if not (heard or ratio <= limit))
+            return bad <= (allowed if len(r[6]) >= 5 else 0)
+        ok = [r for r in rows if r[1] == "correct"]
+        for kind in ["swap one word", "drop one word", "different sentence"]:
+            pass
+        bad_rows = [r for r in rows if r[1] != "correct"]
+        by_kind = {k: sum(passes(r) for r in rows if r[1] == k) / max(1, sum(r[1] == k for r in rows))
+                   for k in ["swap one word", "drop one word", "different sentence"]}
+        print(f"limit {limit} allow {allowed} bad word(s) in 5+ word phrases: correct pass "
+              f"{sum(passes(r) for r in ok) / len(ok):.0%}, wrong pass {sum(passes(r) for r in bad_rows) / len(bad_rows):.0%} "
+              + ", ".join(f"{k} {v:.0%}" for k, v in by_kind.items()))
+
+print("\n== Correct attempts that fail the per-word rule (limit 0.4, allow 0) ==")
+for r in rows:
+    if r[1] == "correct":
+        bad = [i for i, (heard, ratio) in enumerate(r[6]) if not (heard or ratio <= 0.4)]
+        if bad:
+            print(r[0], r[2], r[3], "bad word indexes", bad)
