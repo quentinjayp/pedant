@@ -86,7 +86,6 @@ class MainActivity : ComponentActivity() {
                             Screen.Setup -> SetupScreen(vm)
                             Screen.Loading -> LoadingScreen("Loading the models…\nThe first time can take a minute or two.")
                             Screen.Crashed -> CrashScreen(vm)
-                            Screen.ChooseBackend -> ChooseBackendScreen(vm)
                             Screen.PickLanguage -> LanguageScreen(vm)
                             Screen.Conversation -> ConversationScreen(vm)
                         }
@@ -131,43 +130,6 @@ private fun ProgressBlock(p: Progress) {
     LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.height(8.dp))
     Text("%.2f of %.2f GB · %s".format(p.done / 1e9, p.total / 1e9, p.label), fontSize = 13.sp)
-}
-
-@Composable
-private fun ChooseBackendScreen(vm: AppViewModel) {
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Text("Load Gemma", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text("Choose where Gemma runs.")
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Memory now: ${vm.memorySummary()}.",
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(24.dp))
-        BackendOption("GPU", vm.lastResult(gpu = true)) { vm.loadModels(useGpu = true) }
-        Spacer(Modifier.height(16.dp))
-        BackendOption("CPU", vm.lastResult(gpu = false)) { vm.loadModels(useGpu = false) }
-        vm.error?.let {
-            Spacer(Modifier.height(16.dp))
-            Text(it, color = MaterialTheme.colorScheme.error)
-        }
-    }
-}
-
-@Composable
-private fun BackendOption(name: String, lastResult: String?, onClick: () -> Unit) {
-    Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) { Text("Load on the $name") }
-    Text(
-        "Last time: ${lastResult ?: "not tried yet"}",
-        fontSize = 13.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 4.dp),
-    )
 }
 
 @Composable
@@ -275,7 +237,7 @@ private fun ConversationScreen(vm: AppViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
-                vm.language?.let { "${it.englishName} · ${it.nativeName} · ${vm.backend ?: ""}" } ?: "",
+                vm.language?.let { "${it.englishName} · ${it.nativeName}" } ?: "",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(start = 8.dp),

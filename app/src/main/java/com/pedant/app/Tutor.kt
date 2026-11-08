@@ -30,12 +30,13 @@ data class TutorTurn(
 )
 
 /** Gemma 4 E4B acting as a conversation partner that corrects grammar in English. */
-class Tutor(context: Context, modelFile: File, useGpu: Boolean) {
+class Tutor(context: Context, modelFile: File) {
 
+    // The CPU loads faster and responds better than the GPU.
     private val engine: Engine = Engine(
         EngineConfig(
             modelPath = modelFile.path,
-            backend = if (useGpu) Backend.GPU() else Backend.CPU(),
+            backend = Backend.CPU(),
             maxNumTokens = 2048,
             cacheDir = context.cacheDir.path,
         ),
