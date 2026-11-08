@@ -33,6 +33,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.CircularProgressIndicator
@@ -286,9 +288,12 @@ private fun ConversationScreen(vm: AppViewModel) {
                         Bubble(
                             item.text,
                             mine = true,
-                            detail = item.sounds?.let { "/$it/" } ?: if (editable) "Long-press to edit" else null,
+                            detail = item.sounds?.let { "/$it/" },
                             onWord = if (vm.mode == Mode.Conversation) vm::lookUp else null,
-                            onLongPress = if (editable) ({ editing = index to item.text }) else null,
+                            menu = if (!editable) null else listOf(
+                                "Edit" to { editing = index to item.text },
+                                "Delete" to { vm.deleteEnglish(index) },
+                            ),
                         )
                     }
                     is ChatItem.Tutor -> Column {
@@ -370,26 +375,35 @@ private fun Bubble(
     mine: Boolean,
     detail: String? = null,
     onWord: ((word: String, sentence: String) -> Unit)? = null,
-    onLongPress: (() -> Unit)? = null,
+    /** Actions offered in a menu when the bubble is long-pressed. */
+    menu: List<Pair<String, () -> Unit>>? = null,
 ) {
+    var menuOpen by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
-        Column(
-            Modifier
-                .widthIn(max = 300.dp)
-                .then(
-                    if (onLongPress != null) Modifier.combinedClickable(onClick = {}, onLongClick = onLongPress)
-                    else Modifier,
-                )
-                .clip(RoundedCornerShape(16.dp))
-                .background(
-                    if (mine) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceVariant,
-                )
-                .padding(12.dp),
-        ) {
-            if (onWord != null) TappableText(text, fontSize = 17.sp, onWord = onWord) else Text(text, fontSize = 17.sp)
-            detail?.takeIf { it.isNotBlank() }?.let {
-                Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box {
+            Column(
+                Modifier
+                    .widthIn(max = 300.dp)
+                    .then(
+                        if (menu != null) Modifier.combinedClickable(onClick = {}, onLongClick = { menuOpen = true })
+                        else Modifier,
+                    )
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        if (mine) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceVariant,
+                    )
+                    .padding(12.dp),
+            ) {
+                if (onWord != null) TappableText(text, fontSize = 17.sp, onWord = onWord) else Text(text, fontSize = 17.sp)
+                detail?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            DropdownMenu(expanded = menuOpen && menu != null, onDismissRequest = { menuOpen = false }) {
+                menu?.forEach { (label, action) ->
+                    DropdownMenuItem(text = { Text(label) }, onClick = { menuOpen = false; action() })
+                }
             }
         }
     }

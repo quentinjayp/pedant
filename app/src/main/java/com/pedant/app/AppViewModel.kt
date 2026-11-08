@@ -398,6 +398,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Learning mode: removes the English line at [index] and its phrase, to say something else. */
+    fun deleteEnglish(index: Int) {
+        if (busy != Busy.Idle || index != editableIndex) return
+        while (chat.size > index) chat.removeAt(chat.lastIndex)
+        setDrill(null)
+        editableIndex = null
+    }
+
     /** Learning mode: moves on without getting the phrase right (offered after a few tries). */
     fun skip() {
         val d = drill ?: return
