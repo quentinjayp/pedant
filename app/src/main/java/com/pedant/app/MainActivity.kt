@@ -298,7 +298,7 @@ private fun ConversationScreen(vm: AppViewModel) {
                         if (item.reply.isNotEmpty()) Bubble(item.reply, mine = false, detail = item.english)
                     }
                     is ChatItem.Say -> SayCard(item)
-                    is ChatItem.Attempt -> AttemptCard(item)
+                    is ChatItem.Attempt -> AttemptCard(item, enabled = vm.busy == Busy.Idle, onSay = vm::sayWord)
                     is ChatItem.Note -> Text(
                         item.text,
                         fontSize = 13.sp,
@@ -395,9 +395,9 @@ private fun SayCard(item: ChatItem.Say) {
     }
 }
 
-/** Learning mode: how one try at the phrase went. */
+/** Learning mode: how one try at the phrase went, with buttons to hear each problem word. */
 @Composable
-private fun AttemptCard(item: ChatItem.Attempt) {
+private fun AttemptCard(item: ChatItem.Attempt, enabled: Boolean, onSay: (String) -> Unit) {
     val r = item.result
     Column(
         Modifier
@@ -419,14 +419,30 @@ private fun AttemptCard(item: ChatItem.Attempt) {
             "Words ${(r.wordScore * 100).toInt()}% · Sounds ${(r.soundScore * 100).toInt()}%",
             fontSize = 13.sp,
         )
-        if (!r.passed) {
-            if (r.missedWords.isNotEmpty()) {
-                Text("Missed or wrong words: ${r.missedWords.joinToString(", ")}", fontSize = 14.sp)
-            }
-            r.soundIssues.forEach { issue ->
-                Text("“${issue.word}”: expected /${issue.expected}/, heard /${issue.heard}/", fontSize = 14.sp)
-            }
-        }
+        r.issues.forEach { issue -> IssueRow(issue, enabled, onSay) }
+    }
+}
+
+/** One problem word: what was expected and heard, with Piper saying each version. */
+@Composable
+private fun IssueRow(issue: WordIssue, enabled: Boolean, onSay: (String) -> Unit) {
+    HorizontalDivider(Modifier.padding(vertical = 6.dp))
+    val heardWord = issue.heardWord
+    Text(
+        when {
+            heardWord == null -> "“${issue.word}”: not heard"
+            Matching.normalize(heardWord) == Matching.normalize(issue.word) -> "“${issue.word}”: word right, sounds off"
+            else -> "“${issue.word}”: heard “$heardWord”"
+        },
+        fontSize = 14.sp,
+        fontWeight = FontWeight.SemiBold,
+    )
+    if (issue.expectedSounds != null) {
+        Text("Expected /${issue.expectedSounds}/ · heard /${issue.heardSounds}/", fontSize = 13.sp)
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(onClick = { onSay(issue.word) }, enabled = enabled) { Text("▶ Correct") }
+        TextButton(onClick = { heardWord?.let(onSay) }, enabled = enabled && heardWord != null) { Text("▶ Heard") }
     }
 }
 

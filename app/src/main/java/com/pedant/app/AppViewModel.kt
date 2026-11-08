@@ -286,6 +286,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Has Piper say [text], e.g. a correct word or the word that was heard instead. */
+    fun sayWord(text: String) {
+        if (busy != Busy.Idle || text.isBlank()) return
+        busy = Busy.Speaking
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.Default) { tts?.speak(text) }
+            } finally {
+                busy = Busy.Idle
+            }
+        }
+    }
+
     /** Learning mode: moves on without getting the phrase right (offered after a few tries). */
     fun skip() {
         val d = drill ?: return
