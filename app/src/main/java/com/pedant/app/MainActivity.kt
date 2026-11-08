@@ -60,6 +60,12 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -466,6 +472,7 @@ private fun TappableText(
     onWord: (word: String, sentence: String) -> Unit,
 ) {
     val linkStyle = TextLinkStyles(style = SpanStyle(textDecoration = TextDecoration.None))
+    val wordRanges = mutableListOf<IntRange>()
     val annotated = buildAnnotatedString {
         var last = 0
         for (match in WORD_PATTERN.findAll(text)) {
@@ -476,13 +483,44 @@ private fun TappableText(
                 listOf(match.value)
             }
             for (piece in pieces) {
+                val start = length
                 withLink(LinkAnnotation.Clickable(piece, linkStyle) { onWord(piece, text) }) { append(piece) }
+                wordRanges += start until length
             }
             last = match.range.last + 1
         }
         append(text.substring(last))
     }
-    Text(annotated, fontSize = fontSize, fontWeight = fontWeight)
+    // A dotted underline under each tappable word, so it's clear they can be tapped.
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    val color = LocalContentColor.current.copy(alpha = 0.6f)
+    val density = LocalDensity.current
+    Text(
+        annotated,
+        fontSize = fontSize,
+        fontWeight = fontWeight,
+        onTextLayout = { layout = it },
+        modifier = Modifier.drawBehind {
+            val l = layout ?: return@drawBehind
+            if (l.layoutInput.text.text != annotated.text) return@drawBehind
+            val stroke = with(density) { 1.5.dp.toPx() }
+            val dots = PathEffect.dashPathEffect(floatArrayOf(stroke, stroke * 2))
+            for (range in wordRanges) {
+                if (range.isEmpty()) continue
+                val line = l.getLineForOffset(range.first)
+                val left = l.getHorizontalPosition(range.first, usePrimaryDirection = true)
+                val right = l.getHorizontalPosition(range.last + 1, usePrimaryDirection = true)
+                val y = l.getLineBottom(line) - stroke
+                drawLine(
+                    color = color,
+                    start = Offset(minOf(left, right), y),
+                    end = Offset(maxOf(left, right), y),
+                    strokeWidth = stroke,
+                    pathEffect = dots,
+                )
+            }
+        },
+    )
 }
 
 private val WORD_PATTERN = Regex("[\\p{L}\\p{M}\\p{N}'’-]+")
