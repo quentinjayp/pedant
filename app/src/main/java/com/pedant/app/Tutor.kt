@@ -9,6 +9,7 @@ import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.SamplerConfig
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.io.File
@@ -67,17 +68,46 @@ class Tutor(context: Context, modelFile: File) {
         }
     }
 
+    /** The lookup conversation in progress, so it can be stopped. */
+    @Volatile private var lookupConversation: Conversation? = null
+
+    /** Looks up one [word] as used in [sentence]. Returns the raw answer; see [parseLookup]. */
+    suspend fun lookUp(language: Language, word: String, sentence: String): String =
+        ask(lookupPrompt(language), "Word: $word\nSentence: $sentence")
+
+    /** Explains every word of [sentence] at once. Returns the raw answer; see [parseSentenceLookup]. */
+    suspend fun lookUpSentence(language: Language, sentence: String): String =
+        ask(sentenceLookupPrompt(language), sentence)
+
     /**
-     * Looks up [word] as used in [sentence], in a separate short conversation so the main one is
-     * left untouched. Returns the raw answer; see [parseLookup].
+     * Asks a one-off question in its own short conversation, so the main one is left untouched.
+     * Stops early if the coroutine is cancelled.
      */
-    fun lookUp(language: Language, word: String, sentence: String): String =
-        engine.createConversation(
+    private suspend fun ask(instruction: String, question: String): String {
+        val conv = engine.createConversation(
             ConversationConfig(
-                systemInstruction = Contents.of(lookupPrompt(language)),
+                systemInstruction = Contents.of(instruction),
                 samplerConfig = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0),
             ),
-        ).use { it.sendMessage(Message.user("Word: $word\nSentence: $sentence")).toString() }
+        )
+        lookupConversation = conv
+        try {
+            val answer = StringBuilder()
+            conv.sendMessageAsync(Message.user(question)).collect { answer.append(it.toString()) }
+            return answer.toString()
+        } catch (e: CancellationException) {
+            conv.cancelProcess()
+            throw e
+        } finally {
+            lookupConversation = null
+            conv.close()
+        }
+    }
+
+    /** Stops a lookup in progress so the main conversation can use Gemma. */
+    fun cancelLookup() {
+        lookupConversation?.cancelProcess()
+    }
 
     fun close() {
         conversation?.close()
@@ -136,6 +166,21 @@ class Tutor(context: Context, modelFile: File) {
             MEANING: <a short English definition of the word as used in this sentence, with its part of speech>
             SOUNDS LIKE: <an English-style respelling of how to say the word, with the stressed syllable in capitals>
         """.trimIndent()
+
+        private fun sentenceLookupPrompt(language: Language) = """
+            You explain ${language.englishName} words to an English-speaking learner.
+            You get a ${language.englishName} sentence. For every word in it, in order, write one line in
+            exactly this format and nothing else:
+            word | short English meaning of the word as used in this sentence, with its part of speech | English-style respelling of how to say it, stressed syllable in capitals
+        """.trimIndent()
+
+        /** Splits a sentence lookup into word (lower case) → (meaning, sounds-like respelling). */
+        fun parseSentenceLookup(raw: String): Map<String, Pair<String, String?>> =
+            raw.lines().mapNotNull { line ->
+                val parts = line.split('|').map { it.trim().trim('*', '-', '•').trim() }
+                if (parts.size < 2 || parts[0].isEmpty() || parts[1].isEmpty()) null
+                else parts[0].lowercase() to (parts[1] to parts.getOrNull(2)?.ifEmpty { null })
+            }.toMap()
 
         /** Splits a lookup answer into (meaning, sounds-like respelling). */
         fun parseLookup(raw: String): Pair<String?, String?> {

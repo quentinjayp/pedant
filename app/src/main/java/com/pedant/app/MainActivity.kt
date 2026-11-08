@@ -247,7 +247,7 @@ private fun ConversationScreen(vm: AppViewModel) {
         if (vm.chat.isNotEmpty()) listState.animateScrollToItem(vm.chat.size - 1)
     }
 
-    vm.lookup?.let { WordBubble(it, onHear = vm::hearWord, onClose = vm::closeLookup) }
+    vm.lookup?.let { WordBubble(it, appBusy = vm.busy != Busy.Idle, onHear = vm::hearWord, onClose = vm::closeLookup) }
     var editing by remember { mutableStateOf<Pair<Int, String>?>(null) }
     editing?.let { (index, original) ->
         EditLineDialog(
@@ -512,12 +512,7 @@ private fun TappableText(
         var last = 0
         for (match in WORD_PATTERN.findAll(text)) {
             append(text.substring(last, match.range.first))
-            val pieces = if (match.value.any { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN }) {
-                match.value.map { it.toString() }
-            } else {
-                listOf(match.value)
-            }
-            for (piece in pieces) {
+            for (piece in splitWord(match.value)) {
                 val start = length
                 withLink(LinkAnnotation.Clickable(piece, linkStyle) { onWord(piece, text) }) { append(piece) }
                 wordRanges += start until length
@@ -558,11 +553,14 @@ private fun TappableText(
     )
 }
 
-private val WORD_PATTERN = Regex("[\\p{L}\\p{M}\\p{N}'’-]+")
-
 /** The bubble for a tapped word: meaning, pronunciation guide and Normal/Slow playback. */
 @Composable
-private fun WordBubble(lookup: WordLookup, onHear: (String, Boolean) -> Unit, onClose: () -> Unit) {
+private fun WordBubble(
+    lookup: WordLookup,
+    appBusy: Boolean,
+    onHear: (String, Boolean) -> Unit,
+    onClose: () -> Unit,
+) {
     AlertDialog(
         onDismissRequest = onClose,
         confirmButton = { TextButton(onClick = onClose) { Text("Close") } },
@@ -571,7 +569,10 @@ private fun WordBubble(lookup: WordLookup, onHear: (String, Boolean) -> Unit, on
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 when {
                     lookup.meaning != null -> Text(lookup.meaning, fontSize = 16.sp)
-                    lookup.loading -> Text("Looking up the meaning…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    lookup.loading -> Text(
+                        if (appBusy) "Will look this up once the app is free…" else "Looking up the meaning…",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
                 lookup.soundsLike?.let { Text("Sounds like: $it", fontSize = 15.sp) }
                 lookup.sounds?.let { Text("Sounds (IPA): /$it/", fontSize = 14.sp) }

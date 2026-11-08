@@ -7,7 +7,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -30,7 +34,6 @@ enum class Busy(val label: String) {
     Thinking("Thinking…"),
     Speaking("Speaking…"),
     Preparing("Preparing the phrase…"),
-    LookingUp("Looking up the word…"),
 }
 
 /** A tapped word: its meaning in context and how to say it. Null fields are still loading. */
@@ -116,6 +119,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
 
     init {
+        viewModelScope.launch { snapshotFlow { busy }.collect { if (it == Busy.Idle) startBackground() } }
         crashReport = diagnostics.takeCrashReport()
         when {
             crashReport != null -> screen = Screen.Crashed
@@ -211,6 +215,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     checkNotNull(tutor).startConversation(lang, mode)
                     diagnostics.step = null
                 }
+                pauseBackground()
+                pendingSentences.clear()
+                pendingWord = null
                 language = lang
                 chat.clear()
                 setDrill(null)
@@ -233,6 +240,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (busy != Busy.Idle) return
         busy = Busy.Listening
         recorder.start()
+        viewModelScope.launch { pauseBackground() }
     }
 
     fun stopTalking() {
@@ -281,6 +289,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         busy = Busy.Speaking
         viewModelScope.launch {
             try {
+                pauseBackground()
                 withContext(Dispatchers.Default) {
                     val voice = tts ?: return@withContext
                     val audio = if (!slow) d.audio else d.slowAudio ?: voice.synthesize(d.phrase, SLOW_SPEED).also { d.slowAudio = it }
@@ -292,40 +301,115 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // Word meanings are worked out in the background, a whole sentence at a time, as soon as a
+    // phrase or reply appears. The background work only runs while the app is idle: it stops when
+    // the learner starts talking or the app needs Gemma or Piper, and picks up again afterwards.
+    private val pendingSentences = ArrayDeque<String>()
+    private val doneSentences = mutableSetOf<String>()
+    /** A tapped word the sentence lookup didn't cover, to look up on its own. */
+    private var pendingWord: Pair<String, String>? = null
+    private val triedAlone = mutableSetOf<Pair<String, String>>()
+    private var backgroundJob: Job? = null
+
+    /** Queues [sentence]'s words to be explained in the background; [first] puts it at the front. */
+    private fun queueLookups(sentence: String, first: Boolean = false) {
+        if (sentence.isBlank() || sentence in doneSentences) return
+        pendingSentences.remove(sentence)
+        if (first) pendingSentences.addFirst(sentence) else pendingSentences.addLast(sentence)
+        startBackground()
+    }
+
+    private fun startBackground() {
+        if (backgroundJob?.isActive == true || busy != Busy.Idle) return
+        if (pendingSentences.isEmpty() && pendingWord == null) return
+        val lang = language ?: return
+        backgroundJob = viewModelScope.launch {
+            while (true) {
+                val word = pendingWord
+                if (word != null) {
+                    lookUpAlone(lang, word.first, word.second)
+                    pendingWord = null
+                    continue
+                }
+                val sentence = pendingSentences.firstOrNull() ?: break
+                lookUpSentence(lang, sentence)
+                pendingSentences.remove(sentence)
+                doneSentences += sentence
+            }
+        }
+    }
+
+    /** Stops the background lookups; they resume the next time the app is idle. */
+    private suspend fun pauseBackground() {
+        val job = backgroundJob ?: return
+        tutor?.cancelLookup()
+        job.cancelAndJoin()
+        backgroundJob = null
+    }
+
+    /** Works out the meaning and sounds of every word in [sentence] and stores them. */
+    private suspend fun lookUpSentence(lang: Language, sentence: String) {
+        val words = tappableWords(sentence).distinctBy { it.lowercase() }
+        // Sounds first: quick, and they don't need Gemma.
+        val sounds = withContext(Dispatchers.Default) {
+            words.associateWith { w -> SoundRecognizer.display(checkNotNull(zipa).sounds(checkNotNull(tts).synthesize(w))) }
+        }
+        val meanings = try {
+            Tutor.parseSentenceLookup(checkNotNull(tutor).lookUpSentence(lang, sentence))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            emptyMap()
+        }
+        for (w in words) {
+            val m = meanings[w.lowercase()]
+            lookupCache[w.lowercase() to sentence] =
+                WordLookup(w, sentence, meaning = m?.first, soundsLike = m?.second, sounds = sounds[w], loading = false)
+        }
+        refreshOpenLookup()
+    }
+
+    /** Looks up one word on its own, for a tapped word the sentence lookup missed. */
+    private suspend fun lookUpAlone(lang: Language, word: String, sentence: String) {
+        val key = word.lowercase() to sentence
+        triedAlone += key
+        val sounds = lookupCache[key]?.sounds ?: withContext(Dispatchers.Default) {
+            SoundRecognizer.display(checkNotNull(zipa).sounds(checkNotNull(tts).synthesize(word)))
+        }
+        val result = try {
+            val (meaning, soundsLike) = Tutor.parseLookup(checkNotNull(tutor).lookUp(lang, word, sentence))
+            WordLookup(word, sentence, meaning, soundsLike, sounds, loading = false)
+        } catch (e: CancellationException) {
+            triedAlone -= key
+            throw e
+        } catch (e: Throwable) {
+            WordLookup(word, sentence, sounds = sounds, error = "Couldn't look this up: ${e.message}", loading = false)
+        }
+        lookupCache[key] = result
+        refreshOpenLookup()
+    }
+
+    /** Updates the open bubble once its word has been looked up. */
+    private fun refreshOpenLookup() {
+        val open = lookup ?: return
+        val key = open.word.lowercase() to open.sentence
+        val found = lookupCache[key] ?: return
+        if (found.meaning == null && found.error == null && key !in triedAlone) {
+            lookup = found.copy(loading = true)
+            pendingWord = open.word to open.sentence
+        } else {
+            lookup = found
+        }
+    }
+
     /**
      * Opens the bubble for a tapped [word] from [sentence]: its meaning in that sentence and a
      * pronunciation guide from Gemma, and its sounds from ZIPA listening to Piper say it.
      */
     fun lookUp(word: String, sentence: String) {
-        val lang = language ?: return
-        val key = word.lowercase() to sentence
-        lookupCache[key]?.let { lookup = it; return }
         lookup = WordLookup(word, sentence)
-        if (busy != Busy.Idle) {
-            lookup = WordLookup(word, sentence, error = "Wait until the app is done speaking or thinking.", loading = false)
-            return
-        }
-        busy = Busy.LookingUp
-        viewModelScope.launch {
-            var result = WordLookup(word, sentence)
-            try {
-                val sounds = withContext(Dispatchers.Default) {
-                    SoundRecognizer.display(checkNotNull(zipa).sounds(checkNotNull(tts).synthesize(word)))
-                }
-                result = result.copy(sounds = sounds)
-                lookup = result
-                val (meaning, soundsLike) = withContext(Dispatchers.Default) {
-                    Tutor.parseLookup(checkNotNull(tutor).lookUp(lang, word, sentence))
-                }
-                result = result.copy(meaning = meaning, soundsLike = soundsLike, loading = false)
-                lookupCache[key] = result
-            } catch (e: Throwable) {
-                result = result.copy(error = "Couldn't look this up: ${e.message}", loading = false)
-            } finally {
-                if (lookup?.word == word && lookup?.sentence == sentence) lookup = result
-                busy = Busy.Idle
-            }
-        }
+        if (sentence in doneSentences) refreshOpenLookup() else queueLookups(sentence, first = true)
+        startBackground()
     }
 
     fun closeLookup() {
@@ -338,6 +422,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         busy = Busy.Speaking
         viewModelScope.launch {
             try {
+                pauseBackground()
                 withContext(Dispatchers.Default) {
                     val voice = tts ?: return@withContext
                     voice.play(voice.synthesize(word, if (slow) SLOW_SPEED else 1.0f))
@@ -354,6 +439,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         busy = Busy.Speaking
         viewModelScope.launch {
             try {
+                pauseBackground()
                 withContext(Dispatchers.Default) { tts?.speak(text) }
             } finally {
                 busy = Busy.Idle
@@ -367,6 +453,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         busy = Busy.Speaking
         viewModelScope.launch {
             try {
+                pauseBackground()
                 withContext(Dispatchers.Default) { tts?.speakSounds(SoundRecognizer.symbols(sounds)) }
             } catch (e: Throwable) {
                 chat += ChatItem.Note("Couldn't play those sounds: ${e.message}")
@@ -436,6 +523,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Learning mode: translates what the learner wants to say and starts drilling it. */
     private suspend fun translate(english: String, addLine: Boolean = true) {
+        pauseBackground()
         if (addLine) {
             chat += ChatItem.User(english)
             editableIndex = chat.lastIndex
@@ -468,6 +556,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             Matching.segmentReference(recognizer.sounds(audio), isolated)
         }
         setDrill(Drill(phrase, audio, refWords))
+        queueLookups(phrase)
     }
 
     private suspend fun checkAttempt(d: Drill, audio: Audio) {
@@ -501,6 +590,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Sends [message] to the tutor, shows the answer as it streams in and speaks the reply. */
     private suspend fun runTurn(message: String) {
+        pauseBackground()
         busy = Busy.Thinking
         val index = chat.size
         chat += ChatItem.Tutor(null, "")
@@ -514,6 +604,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             busy = Busy.Speaking
             diagnostics.step = "Speaking the reply with Piper"
             withContext(Dispatchers.Default) { tts?.speak(latest.reply) }
+            queueLookups(latest.reply)
         } catch (e: Throwable) {
             chat[index] = ChatItem.Tutor(null, "(Something went wrong: ${e.message})")
         } finally {
