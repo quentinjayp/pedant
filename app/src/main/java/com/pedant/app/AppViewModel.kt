@@ -349,7 +349,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun checkAttempt(d: Drill, audio: Audio) {
         val (transcript, sounds) = hear(audio)
-        val result = Matching.check(d.phrase, transcript, d.refWords, sounds)
+        var result = Matching.check(d.phrase, transcript, d.refWords, sounds)
+        if (!result.passed && transcript.isNotBlank()) {
+            // Sound-alike check: Piper says what Omnilingual heard and ZIPA listens, so a word
+            // spelled differently but pronounced the same (like "sava" for "Ça va") still counts.
+            val transcriptSounds = withContext(Dispatchers.Default) {
+                checkNotNull(zipa).sounds(checkNotNull(tts).synthesize(transcript))
+            }
+            result = Matching.check(d.phrase, transcript, d.refWords, sounds, transcriptSounds)
+        }
         chat += ChatItem.Attempt(transcript, SoundRecognizer.display(sounds), result)
         if (result.passed) {
             setDrill(null)

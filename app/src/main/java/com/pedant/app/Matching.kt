@@ -51,7 +51,18 @@ object Matching {
     /** A word counts as right if its spelling is at least this close (e.g. "toa" for "toi"). */
     private const val CLOSE_WORD = 0.66
 
-    fun check(target: String, transcript: String, refWords: List<RefWord>, heardSounds: List<String>): AttemptResult {
+    /**
+     * [heardSounds] are the sounds ZIPA heard in the learner's recording. [transcriptSounds], if
+     * given, are the sounds of Piper saying what Omnilingual heard: a word spelled differently but
+     * pronounced the same (a sound-alike, like "sa" or "sava" for "Ça va") then still counts.
+     */
+    fun check(
+        target: String,
+        transcript: String,
+        refWords: List<RefWord>,
+        heardSounds: List<String>,
+        transcriptSounds: List<String>? = null,
+    ): AttemptResult {
         val targetWords = words(target)
         val heardWords = words(transcript)
         // Languages written without spaces (such as Chinese) are compared character by character.
@@ -84,10 +95,13 @@ object Matching {
             )
         }
         // Both recognizers slip now and then on correct speech, but rarely on the same word, so a
-        // word only counts as wrong when neither heard it right.
+        // word only counts as wrong when neither heard it right, and what Omnilingual heard
+        // doesn't sound like it either.
+        val soundAlike = transcriptSounds?.let { compareSounds(refWords, it) }
         val wrong = targetWords.indices.filter { i ->
             val soundRatio = sounds.words.getOrNull(i)?.ratio ?: 1.0
-            wordWrong[i] && soundRatio > WORD_SOUND_LIMIT
+            val alikeRatio = soundAlike?.words?.getOrNull(i)?.ratio ?: 1.0
+            wordWrong[i] && soundRatio > WORD_SOUND_LIMIT && alikeRatio > WORD_SOUND_LIMIT
         }
         return AttemptResult(
             wordScore = wordScore,

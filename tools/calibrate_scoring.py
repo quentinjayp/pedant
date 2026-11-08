@@ -180,6 +180,18 @@ def segment(phrase_sounds, isolated):
             for k, (w, iso) in enumerate(isolated)]
 
 
+def word_ratios(ref_words, heard):
+    ref = [s for _, ss in ref_words for s in ss]
+    ref_word_of = [w for w, (_, ss) in enumerate(ref_words) for _ in ss]
+    cost = [0.0] * len(ref_words)
+    last = 0
+    for r, h, c in align(ref, heard, sound_cost, sound_indel):
+        if r is not None:
+            last = ref_word_of[r]
+        cost[last] += c
+    return [cost[w] / max(1, len(ss)) for w, (_, ss) in enumerate(ref_words)]
+
+
 def check(target, transcript, ref_words, heard_sounds):
     """Returns (word score, sound score, per-word: (heard by Omnilingual, sound error ratio))."""
     tw = [normalize(w) for w in words(target)]
@@ -264,6 +276,10 @@ for lang, cfg in LANGS.items():
                 a = engine.generate(text, sid=sid, speed=1.0)
                 transcript = recognize(asr, a).text
                 ws, ss, per_word = check(phrase, transcript, ref_words, sounds(a))
+                # Sound-alike check: the reference voice says what Omnilingual heard.
+                alike = word_ratios(ref_words, sounds(ref_tts.generate(transcript, sid=0, speed=1.0))) \
+                    if transcript.strip() else [1.0] * len(per_word)
+                per_word = [(heard, min(ratio, alike_ratio)) for (heard, ratio), alike_ratio in zip(per_word, alike)]
                 rows.append((lang, kind, voice, sid, ws, ss, per_word))
                 print(f"{lang} {kind:18} {voice}#{sid:<2} words {ws:.2f} sounds {ss:.2f} | {transcript}", flush=True)
 
