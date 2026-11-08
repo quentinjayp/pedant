@@ -94,6 +94,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var drillAttempts by mutableStateOf(0)
         private set
     val chat = mutableStateListOf<ChatItem>()
+    /**
+     * Learning mode: the chat index of the English line whose phrase is being practised. It can be
+     * edited (long press) until the phrase is said or skipped.
+     */
+    var editableIndex by mutableStateOf<Int?>(null)
+        private set
+
     /** The word bubble being shown, if any. */
     var lookup by mutableStateOf<WordLookup?>(null)
         private set
@@ -369,12 +376,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Learning mode: replaces the English line at [index] with [text] (e.g. to fix a typo) and
+     * translates it again, replacing the phrase being practised.
+     */
+    fun editEnglish(index: Int, text: String) {
+        val english = text.trim()
+        if (busy != Busy.Idle || index != editableIndex || english.isEmpty()) return
+        while (chat.size > index + 1) chat.removeAt(chat.lastIndex)
+        chat[index] = ChatItem.User(english)
+        setDrill(null)
+        viewModelScope.launch {
+            try {
+                translate(english, addLine = false)
+            } catch (e: Throwable) {
+                chat += ChatItem.Note("Something went wrong: ${e.message}")
+            } finally {
+                diagnostics.step = null
+                busy = Busy.Idle
+            }
+        }
+    }
+
     /** Learning mode: moves on without getting the phrase right (offered after a few tries). */
     fun skip() {
         val d = drill ?: return
         if (busy != Busy.Idle) return
         chat += ChatItem.Note("Skipped")
         setDrill(null)
+        editableIndex = null
         viewModelScope.launch { runTurn(Tutor.learningSaid(d.phrase)) }
     }
 
@@ -397,8 +427,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Learning mode: translates what the learner wants to say and starts drilling it. */
-    private suspend fun translate(english: String) {
-        chat += ChatItem.User(english)
+    private suspend fun translate(english: String, addLine: Boolean = true) {
+        if (addLine) {
+            chat += ChatItem.User(english)
+            editableIndex = chat.lastIndex
+        }
         busy = Busy.Thinking
         val index = chat.size
         chat += ChatItem.Say(english, "")
@@ -443,6 +476,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         chat += ChatItem.Attempt(transcript, SoundRecognizer.display(sounds), result)
         if (result.passed) {
             setDrill(null)
+            editableIndex = null
             runTurn(Tutor.learningSaid(d.phrase))
         } else {
             drillAttempts++

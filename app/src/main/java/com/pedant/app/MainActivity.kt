@@ -8,7 +8,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -244,6 +246,14 @@ private fun ConversationScreen(vm: AppViewModel) {
     }
 
     vm.lookup?.let { WordBubble(it, onHear = vm::hearWord, onClose = vm::closeLookup) }
+    var editing by remember { mutableStateOf<Pair<Int, String>?>(null) }
+    editing?.let { (index, original) ->
+        EditLineDialog(
+            original,
+            onSave = { vm.editEnglish(index, it); editing = null },
+            onCancel = { editing = null },
+        )
+    }
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -267,15 +277,20 @@ private fun ConversationScreen(vm: AppViewModel) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item { Spacer(Modifier.height(4.dp)) }
-            itemsIndexed(vm.chat) { _, item ->
+            itemsIndexed(vm.chat) { index, item ->
                 when (item) {
-                    // In Learning mode the learner's lines are English, so only Conversation mode's are tappable.
-                    is ChatItem.User -> Bubble(
-                        item.text,
-                        mine = true,
-                        detail = item.sounds?.let { "/$it/" },
-                        onWord = if (vm.mode == Mode.Conversation) vm::lookUp else null,
-                    )
+                    // In Learning mode the learner's lines are English, so only Conversation mode's are
+                    // tappable; the line being practised can be long-pressed to edit it instead.
+                    is ChatItem.User -> {
+                        val editable = index == vm.editableIndex && vm.busy == Busy.Idle
+                        Bubble(
+                            item.text,
+                            mine = true,
+                            detail = item.sounds?.let { "/$it/" } ?: if (editable) "Long-press to edit" else null,
+                            onWord = if (vm.mode == Mode.Conversation) vm::lookUp else null,
+                            onLongPress = if (editable) ({ editing = index to item.text }) else null,
+                        )
+                    }
                     is ChatItem.Tutor -> Column {
                         item.correction?.let { CorrectionCard(it) }
                         if (item.reply.isNotEmpty()) {
@@ -348,17 +363,23 @@ private fun ConversationScreen(vm: AppViewModel) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun Bubble(
     text: String,
     mine: Boolean,
     detail: String? = null,
     onWord: ((word: String, sentence: String) -> Unit)? = null,
+    onLongPress: (() -> Unit)? = null,
 ) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
         Column(
             Modifier
                 .widthIn(max = 300.dp)
+                .then(
+                    if (onLongPress != null) Modifier.combinedClickable(onClick = {}, onLongClick = onLongPress)
+                    else Modifier,
+                )
                 .clip(RoundedCornerShape(16.dp))
                 .background(
                     if (mine) MaterialTheme.colorScheme.primaryContainer
@@ -553,6 +574,25 @@ private fun WordBubble(lookup: WordLookup, onHear: (String, Boolean) -> Unit, on
                 )
             }
         },
+    )
+}
+
+/** Learning mode: edits the English line being practised; saving translates it again. */
+@Composable
+private fun EditLineDialog(original: String, onSave: (String) -> Unit, onCancel: () -> Unit) {
+    var text by remember { mutableStateOf(original) }
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = { Text("Edit what you said") },
+        text = {
+            OutlinedTextField(value = text, onValueChange = { text = it }, modifier = Modifier.fillMaxWidth())
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(text) }, enabled = text.isNotBlank() && text.trim() != original) {
+                Text("Translate again")
+            }
+        },
+        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
     )
 }
 
