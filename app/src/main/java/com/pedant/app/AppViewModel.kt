@@ -364,9 +364,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         busy = Busy.Speaking
         withContext(Dispatchers.Default) { voice.play(audio) }
         busy = Busy.Preparing
-        // Expected sounds, word by word: Piper says each word and ZIPA listens to it.
+        // Expected sounds: ZIPA listens to Piper saying the whole phrase (the audio you hear). Each
+        // word said on its own only guides where the word boundaries fall.
         val refWords = withContext(Dispatchers.Default) {
-            Matching.words(phrase).map { w -> RefWord(w, checkNotNull(zipa).sounds(voice.synthesize(w))) }
+            val recognizer = checkNotNull(zipa)
+            val isolated = Matching.words(phrase).map { w -> RefWord(w, recognizer.sounds(voice.synthesize(w))) }
+            Matching.segmentReference(recognizer.sounds(audio), isolated)
         }
         setDrill(Drill(phrase, audio, refWords))
     }

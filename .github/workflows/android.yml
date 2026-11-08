@@ -117,3 +117,31 @@ jobs:
           print("TEXT:", s.result.text)
           print("TOKENS:", s.result.tokens)
           PY
+
+  calibrate-scoring:
+    # Scores other Piper voices saying correct and wrong phrases, to set Learning mode's pass marks.
+    # Runs on manual dispatch, or on pushes whose commit message contains [calibrate].
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[calibrate]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download models
+        run: |
+          set -eu
+          mkdir -p models/zipa && cd models
+          for v in fr_FR-siwis-medium fr_FR-tom-medium fr_FR-upmc-medium fr_FR-gilles-low \
+                   es_ES-davefx-medium es_ES-sharvard-medium es_MX-ald-medium es_MX-claude-high \
+                   de_DE-thorsten-medium de_DE-thorsten_emotional-medium de_DE-kerstin-low de_DE-eva_k-x_low \
+                   en_US-lessac-medium en_US-amy-medium en_US-ryan-medium en_GB-alan-medium; do
+            curl -fsSL https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-$v.tar.bz2 | tar xj
+          done
+          curl -fsSL https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12.tar.bz2 | tar xj
+          curl -fsSL -o zipa/model.int8.onnx https://huggingface.co/anyspeech/zipa-large-crctc-500k/resolve/main/model.int8.onnx
+          curl -fsSL -o zipa/tokens.txt https://huggingface.co/anyspeech/zipa-large-crctc-500k/resolve/main/tokens.txt
+      - name: Score learner voices
+        run: |
+          pip install sherpa-onnx==1.13.8
+          python tools/calibrate_scoring.py models

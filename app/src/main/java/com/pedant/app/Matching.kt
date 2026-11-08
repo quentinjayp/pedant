@@ -24,12 +24,20 @@ data class WordIssue(
 
 private data class SoundIssue(val expected: String, val heard: String)
 
-/** A word of the target phrase and the sounds ZIPA heard when Piper said it. */
+/** A word of the target phrase and its expected sounds. */
 data class RefWord(val word: String, val sounds: List<String>)
 
+/**
+ * Scores an attempt at a phrase. Both recognizers make small mistakes even on perfect speech, so
+ * near misses get partial credit: close spellings of a word, and sounds that are close to each
+ * other (similar vowels, the various r sounds, voiced/unvoiced pairs, stress and length marks).
+ */
 object Matching {
-    const val PASS_WORDS = 0.8
-    const val PASS_SOUNDS = 0.7
+    const val PASS_WORDS = 0.7
+    const val PASS_SOUNDS = 0.6
+
+    /** A word counts as right if its spelling is at least this close (e.g. "toa" for "toi"). */
+    private const val CLOSE_WORD = 0.66
 
     fun check(target: String, transcript: String, refWords: List<RefWord>, heardSounds: List<String>): AttemptResult {
         val targetWords = words(target)
@@ -39,23 +47,16 @@ object Matching {
         val targetUnits = if (spaced) targetWords.map(::normalize) else chars(target)
         val heardUnits = if (spaced) heardWords.map(::normalize) else chars(transcript)
 
-        val wordOps = align(targetUnits, heardUnits)
-        val wordHits = wordOps.count { it is Op.Same }
-        val wordScore = if (targetUnits.isEmpty()) 0.0 else wordHits.toDouble() / targetUnits.size
+        val wordSteps = align(targetUnits, heardUnits, ::wordCost, indel = { 1.0 })
+        val wordScore = score(wordSteps, targetUnits.size)
 
-        // For each target word, what was heard in its place.
+        // For each target word, what was heard in its place and whether it counts as wrong.
         val heardFor = arrayOfNulls<String>(targetUnits.size)
         val wordWrong = BooleanArray(targetUnits.size)
-        for (op in wordOps) {
-            when (op) {
-                is Op.Same -> heardFor[op.ref] = if (spaced) heardWords[op.hyp] else heardUnits[op.hyp]
-                is Op.Different -> {
-                    heardFor[op.ref] = if (spaced) heardWords[op.hyp] else heardUnits[op.hyp]
-                    wordWrong[op.ref] = true
-                }
-                is Op.RefOnly -> wordWrong[op.ref] = true
-                is Op.HypOnly -> {}
-            }
+        for (step in wordSteps) {
+            val r = step.ref ?: continue
+            step.hyp?.let { h -> heardFor[r] = if (spaced) heardWords[h] else heardUnits[h] }
+            if (step.cost > 0) wordWrong[r] = true
         }
 
         val (soundScore, soundIssues) = compareSounds(refWords, heardSounds)
@@ -77,6 +78,26 @@ object Matching {
         )
     }
 
+    /**
+     * Splits the sounds ZIPA heard in the whole phrase ([phraseSounds], the reference) into words.
+     * Each word said on its own ([isolated]) is only a guide to where the word boundaries fall,
+     * because single words are sometimes mispronounced when said out of context.
+     */
+    fun segmentReference(phraseSounds: List<String>, isolated: List<RefWord>): List<RefWord> {
+        if (isolated.size <= 1) return listOf(RefWord(isolated.firstOrNull()?.word ?: "", phraseSounds))
+        val guide = isolated.flatMap { it.sounds }
+        val guideWord = isolated.flatMapIndexed { w, word -> List(word.sounds.size) { w } }
+        val wordOf = IntArray(phraseSounds.size)
+        var current = 0
+        for (step in align(phraseSounds, guide, ::soundCost, ::soundIndel)) {
+            step.hyp?.let { current = guideWord[it] }
+            step.ref?.let { wordOf[it] = current }
+        }
+        return isolated.mapIndexed { w, word ->
+            RefWord(word.word, phraseSounds.filterIndexed { i, _ -> wordOf[i] == w })
+        }
+    }
+
     /** Lower-cases and strips punctuation and accents so only the words themselves are compared. */
     fun normalize(text: String): String {
         val noAccents = Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD)
@@ -96,73 +117,107 @@ object Matching {
         val refWordOf = refWords.flatMapIndexed { w, word -> List(word.sounds.size) { w } }
         if (refPhones.isEmpty()) return 0.0 to emptyMap()
 
-        val ops = align(refPhones, heardSounds)
-        val errors = ops.count { it !is Op.Same }
-        val score = (1.0 - errors.toDouble() / refPhones.size).coerceIn(0.0, 1.0)
+        val steps = align(refPhones, heardSounds, ::soundCost, ::soundIndel)
+        val score = score(steps, refPhones.sumOf { soundIndel(it) })
 
-        // Per word: expected sounds, heard sounds and error count. Extra sounds count against
-        // the word before them.
+        // Per word: expected sounds, heard sounds and error cost. Extra sounds count against the
+        // word before them.
         val expected = Array(refWords.size) { StringBuilder() }
         val heard = Array(refWords.size) { StringBuilder() }
-        val wordErrors = IntArray(refWords.size)
+        val wordCost = DoubleArray(refWords.size)
         var lastWord = 0
-        for (op in ops) {
-            when (op) {
-                is Op.Same -> {
-                    lastWord = refWordOf[op.ref]
-                    expected[lastWord].append(refPhones[op.ref]); heard[lastWord].append(heardSounds[op.hyp])
-                }
-                is Op.Different -> {
-                    lastWord = refWordOf[op.ref]
-                    expected[lastWord].append(refPhones[op.ref]); heard[lastWord].append(heardSounds[op.hyp])
-                    wordErrors[lastWord]++
-                }
-                is Op.RefOnly -> {
-                    lastWord = refWordOf[op.ref]
-                    expected[lastWord].append(refPhones[op.ref])
-                    wordErrors[lastWord]++
-                }
-                is Op.HypOnly -> {
-                    heard[lastWord].append(heardSounds[op.hyp])
-                    wordErrors[lastWord]++
-                }
-            }
+        for (step in steps) {
+            step.ref?.let { lastWord = refWordOf[it]; expected[lastWord].append(refPhones[it]) }
+            step.hyp?.let { heard[lastWord].append(heardSounds[it]) }
+            wordCost[lastWord] += step.cost
         }
         val issues = refWords.indices
-            .filter { w -> wordErrors[w].toDouble() / refWords[w].sounds.size.coerceAtLeast(1) > 0.3 }
+            .filter { w -> wordCost[w] / refWords[w].sounds.size.coerceAtLeast(1) > 0.4 }
             .associateWith { w -> SoundIssue(expected[w].toString(), heard[w].toString().ifEmpty { "—" }) }
         return score to issues
     }
 
-    private sealed interface Op {
-        data class Same(val ref: Int, val hyp: Int) : Op
-        data class Different(val ref: Int, val hyp: Int) : Op
-        data class RefOnly(val ref: Int) : Op
-        data class HypOnly(val hyp: Int) : Op
+    private fun score(steps: List<Step>, total: Double): Double =
+        if (total <= 0) 0.0 else (1.0 - steps.sumOf { it.cost } / total).coerceIn(0.0, 1.0)
+
+    private fun score(steps: List<Step>, total: Int) = score(steps, total.toDouble())
+
+    /** Cost of hearing word [b] for word [a]: none if the spelling is close, otherwise up to 1. */
+    private fun wordCost(a: String, b: String): Double {
+        if (a == b) return 0.0
+        val distance = align(a.map { it.toString() }, b.map { it.toString() }, { x, y -> if (x == y) 0.0 else 1.0 }, { 1.0 })
+            .sumOf { it.cost }
+        val similarity = 1.0 - distance / maxOf(a.length, b.length)
+        return if (similarity >= CLOSE_WORD) 0.0 else 1.0 - similarity
     }
 
-    /** Lines up two sequences with the fewest changes (edit distance) and lists the steps. */
-    private fun align(ref: List<String>, hyp: List<String>): List<Op> {
-        val d = Array(ref.size + 1) { IntArray(hyp.size + 1) }
-        for (i in 0..ref.size) d[i][0] = i
-        for (j in 0..hyp.size) d[0][j] = j
+    /** Marks that change a sound only slightly: stress, length, nasal, rhotic, tie bars and the like. */
+    private fun isMark(s: String) =
+        s.isNotEmpty() && s.all { Character.getType(it) == Character.NON_SPACING_MARK.toInt() || it in "ˈˌːˑ˞ʰʲʷ" }
+
+    private fun soundIndel(s: String) = if (isMark(s)) 0.3 else 1.0
+
+    private val CLOSE_SOUNDS: List<Set<String>> = listOf(
+        setOf("i", "ɪ", "y", "ʏ", "j"),
+        setOf("e", "ɛ", "ə", "ɘ", "œ", "ø", "ɜ", "æ"),
+        setOf("a", "ɑ", "æ", "ɐ", "ʌ"),
+        setOf("o", "ɔ", "ɒ", "ʌ", "ɤ"),
+        setOf("u", "ʊ", "ɯ", "w"),
+        setOf("r", "ʁ", "ɹ", "ʀ", "ɾ", "ɻ", "χ", "ʀ"),
+        setOf("g", "ɡ"),
+        setOf("ʃ", "ʂ", "ɕ"),
+        setOf("ʒ", "ʐ", "ʑ"),
+        setOf("n", "ŋ", "ɲ"),
+        setOf("l", "ɫ", "ʎ"),
+    )
+    private val VOICING_PAIRS = listOf("p" to "b", "t" to "d", "k" to "g", "k" to "ɡ", "s" to "z", "f" to "v", "ʃ" to "ʒ", "θ" to "ð")
+        .flatMap { (a, b) -> listOf(a to b, b to a) }.toSet()
+
+    /** Cost of hearing sound [b] for sound [a]: 0 if equal, small for close sounds, 1 otherwise. */
+    private fun soundCost(a: String, b: String): Double = when {
+        a == b -> 0.0
+        isMark(a) || isMark(b) -> 0.3
+        CLOSE_SOUNDS.any { a in it && b in it } -> 0.35
+        (a to b) in VOICING_PAIRS -> 0.5
+        else -> 1.0
+    }
+
+    /** One step of an alignment: a pair, a reference item alone, or a heard item alone. */
+    private data class Step(val ref: Int?, val hyp: Int?, val cost: Double)
+
+    /** Lines up two sequences at the lowest total cost (weighted edit distance) and lists the steps. */
+    private fun align(
+        ref: List<String>,
+        hyp: List<String>,
+        sub: (String, String) -> Double,
+        indel: (String) -> Double,
+    ): List<Step> {
+        val d = Array(ref.size + 1) { DoubleArray(hyp.size + 1) }
+        for (i in 1..ref.size) d[i][0] = d[i - 1][0] + indel(ref[i - 1])
+        for (j in 1..hyp.size) d[0][j] = d[0][j - 1] + indel(hyp[j - 1])
         for (i in 1..ref.size) for (j in 1..hyp.size) {
-            val sub = d[i - 1][j - 1] + if (ref[i - 1] == hyp[j - 1]) 0 else 1
-            d[i][j] = minOf(sub, d[i - 1][j] + 1, d[i][j - 1] + 1)
+            d[i][j] = minOf(
+                d[i - 1][j - 1] + sub(ref[i - 1], hyp[j - 1]),
+                d[i - 1][j] + indel(ref[i - 1]),
+                d[i][j - 1] + indel(hyp[j - 1]),
+            )
         }
-        val ops = ArrayDeque<Op>()
+        val steps = ArrayDeque<Step>()
         var i = ref.size
         var j = hyp.size
         while (i > 0 || j > 0) {
-            when {
-                i > 0 && j > 0 && d[i][j] == d[i - 1][j - 1] + if (ref[i - 1] == hyp[j - 1]) 0 else 1 -> {
-                    ops.addFirst(if (ref[i - 1] == hyp[j - 1]) Op.Same(i - 1, j - 1) else Op.Different(i - 1, j - 1))
-                    i--; j--
+            if (i > 0 && j > 0) {
+                val c = sub(ref[i - 1], hyp[j - 1])
+                if (d[i][j] == d[i - 1][j - 1] + c) {
+                    steps.addFirst(Step(i - 1, j - 1, c)); i--; j--; continue
                 }
-                i > 0 && d[i][j] == d[i - 1][j] + 1 -> { ops.addFirst(Op.RefOnly(i - 1)); i-- }
-                else -> { ops.addFirst(Op.HypOnly(j - 1)); j-- }
+            }
+            if (i > 0 && d[i][j] == d[i - 1][j] + indel(ref[i - 1])) {
+                steps.addFirst(Step(i - 1, null, indel(ref[i - 1]))); i--
+            } else {
+                steps.addFirst(Step(null, j - 1, indel(hyp[j - 1]))); j--
             }
         }
-        return ops.toList()
+        return steps.toList()
     }
 }
