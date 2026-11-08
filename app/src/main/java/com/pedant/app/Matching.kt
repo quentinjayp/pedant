@@ -116,7 +116,9 @@ object Matching {
             step.ref?.let { wordOf[it] = current }
         }
         return isolated.mapIndexed { w, word ->
-            RefWord(word.word, phraseSounds.filterIndexed { i, _ -> wordOf[i] == w })
+            // If no sounds of the phrase landed on this word, use the word said on its own.
+            val sounds = phraseSounds.filterIndexed { i, _ -> wordOf[i] == w }
+            RefWord(word.word, sounds.ifEmpty { word.sounds })
         }
     }
 

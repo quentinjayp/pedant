@@ -22,6 +22,7 @@ LANGS = {
         "learners": [("fr_FR-tom-medium", 0), ("fr_FR-upmc-medium", 0), ("fr_FR-upmc-medium", 1), ("fr_FR-gilles-low", 0)],
         "phrases": [
             "Je vais bien, et toi ?",
+            "Ça va, et toi ?",
             "Je voudrais un café, s'il vous plaît.",
             "Où est la gare ?",
             "J'aime beaucoup cette ville.",
@@ -175,7 +176,8 @@ def segment(phrase_sounds, isolated):
             cur = guide_word[h]
         if r is not None:
             word_of[r] = cur
-    return [(w, [s for i, s in enumerate(phrase_sounds) if word_of[i] == k]) for k, (w, _) in enumerate(isolated)]
+    return [(w, [s for i, s in enumerate(phrase_sounds) if word_of[i] == k] or iso)
+            for k, (w, iso) in enumerate(isolated)]
 
 
 def check(target, transcript, ref_words, heard_sounds):
@@ -228,10 +230,12 @@ def recognize(rec, audio):
 
 
 class Padded:
-    """Audio padded with silence to at least one second, as the app does before ZIPA."""
+    """Audio with silence before and after, padded to at least a second, as the app does before ZIPA."""
     def __init__(self, audio):
         self.sample_rate = audio.sample_rate
-        self.samples = list(audio.samples) + [0.0] * max(0, audio.sample_rate - len(audio.samples))
+        margin = audio.sample_rate // 4
+        samples = [0.0] * margin + list(audio.samples) + [0.0] * margin
+        self.samples = samples + [0.0] * max(0, audio.sample_rate - len(samples))
 
 
 def sounds(audio):

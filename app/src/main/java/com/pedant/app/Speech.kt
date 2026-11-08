@@ -113,9 +113,11 @@ class SoundRecognizer(store: ModelStore) {
 
     fun sounds(audio: Audio): List<String> {
         if (audio.samples.isEmpty()) return emptyList()
-        // ZIPA fails on very short clips (a short word said on its own), so pad them with silence.
-        val minSamples = audio.sampleRate
-        val samples = if (audio.samples.size >= minSamples) audio.samples else audio.samples.copyOf(minSamples)
+        // ZIPA misses sounds right at the start of a clip with no lead-in (as in Piper's audio) and
+        // fails on very short clips, so add silence before and after, and pad to at least a second.
+        val margin = audio.sampleRate / 4
+        val length = maxOf(audio.samples.size + 2 * margin, audio.sampleRate)
+        val samples = FloatArray(length).also { audio.samples.copyInto(it, destinationOffset = margin) }
         val stream = recognizer.createStream()
         stream.acceptWaveform(samples, audio.sampleRate)
         recognizer.decode(stream)
