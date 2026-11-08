@@ -448,8 +448,10 @@ private fun LearningControls(vm: AppViewModel) {
             ) { Text("Send") }
         }
     } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TextButton(onClick = vm::hearAgain) { Text("Hear it again") }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Hear it again:", fontSize = 14.sp)
+            TextButton(onClick = { vm.hearAgain(slow = false) }) { Text("Normal") }
+            TextButton(onClick = { vm.hearAgain(slow = true) }) { Text("Slow") }
             if (vm.drillAttempts >= 3) TextButton(onClick = vm::skip) { Text("Skip") }
         }
     }

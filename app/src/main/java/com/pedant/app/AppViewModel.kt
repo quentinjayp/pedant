@@ -44,7 +44,10 @@ sealed interface ChatItem {
 }
 
 /** Learning mode: the phrase being practised, its audio and its expected sounds per word. */
-private class Drill(val phrase: String, val audio: Audio, val refWords: List<RefWord>)
+private class Drill(val phrase: String, val audio: Audio, val refWords: List<RefWord>) {
+    /** The phrase said slowly, made the first time it's asked for. */
+    var slowAudio: Audio? = null
+}
 
 data class Progress(val done: Long, val total: Long, val label: String)
 
@@ -249,13 +252,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Learning mode: plays the phrase again. */
-    fun hearAgain() {
+    fun hearAgain(slow: Boolean) {
         val d = drill ?: return
         if (busy != Busy.Idle) return
         busy = Busy.Speaking
         viewModelScope.launch {
-            withContext(Dispatchers.Default) { tts?.play(d.audio) }
-            busy = Busy.Idle
+            try {
+                withContext(Dispatchers.Default) {
+                    val voice = tts ?: return@withContext
+                    val audio = if (!slow) d.audio else d.slowAudio ?: voice.synthesize(d.phrase, SLOW_SPEED).also { d.slowAudio = it }
+                    voice.play(audio)
+                }
+            } finally {
+                busy = Busy.Idle
+            }
         }
     }
 
@@ -396,6 +406,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             diagnostics.step = null
             busy = Busy.Idle
         }
+    }
+
+    companion object {
+        /** Speaking rate for "Slow": a bit over half normal speed, still natural-sounding. */
+        private const val SLOW_SPEED = 0.6f
     }
 
     override fun onCleared() {
