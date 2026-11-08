@@ -22,7 +22,10 @@ data class WordIssue(
     val heardSounds: String? = null,
 )
 
-private data class SoundIssue(val expected: String, val heard: String)
+/** Per word: expected and heard sounds, and the share of the expected sounds that went wrong. */
+private data class WordSounds(val expected: String, val heard: String, val ratio: Double)
+
+private data class SoundComparison(val score: Double, val words: List<WordSounds>)
 
 /** A word of the target phrase and its expected sounds. */
 data class RefWord(val word: String, val sounds: List<String>)
@@ -33,6 +36,15 @@ data class RefWord(val word: String, val sounds: List<String>)
  * other (similar vowels, the various r sounds, voiced/unvoiced pairs, stress and length marks).
  */
 object Matching {
+    /**
+     * A word counts as said right if Omnilingual heard it, or if ZIPA heard its sounds with at
+     * most this error ratio. The phrase passes when every word is right. Set with
+     * tools/calibrate_scoring.py: other Piper voices saying the phrases passed 93% of the time,
+     * and phrases with a word swapped or dropped passed about 40% of the time.
+     */
+    const val WORD_SOUND_LIMIT = 0.5
+
+    /** For languages written without spaces, where words can't be checked one by one. */
     const val PASS_WORDS = 0.7
     const val PASS_SOUNDS = 0.6
 
@@ -59,22 +71,32 @@ object Matching {
             if (step.cost > 0) wordWrong[r] = true
         }
 
-        val (soundScore, soundIssues) = compareSounds(refWords, heardSounds)
-        val issues = if (spaced) {
-            targetWords.indices.mapNotNull { i ->
-                val sound = soundIssues[i]
-                if (!wordWrong[i] && sound == null) null
-                else WordIssue(targetWords[i], heardFor[i], sound?.expected, sound?.heard)
-            }
-        } else {
-            targetUnits.indices.filter { wordWrong[it] }.map { WordIssue(targetUnits[it], heardFor[it]) } +
-                soundIssues.values.map { WordIssue(target, transcript.ifEmpty { null }, it.expected, it.heard) }
+        val sounds = compareSounds(refWords, heardSounds)
+        if (!spaced) {
+            val issues = targetUnits.indices.filter { wordWrong[it] }.map { WordIssue(targetUnits[it], heardFor[it]) } +
+                sounds.words.filter { it.ratio > WORD_SOUND_LIMIT }
+                    .map { WordIssue(target, transcript.ifEmpty { null }, it.expected, it.heard) }
+            return AttemptResult(
+                wordScore = wordScore,
+                soundScore = sounds.score,
+                passed = wordScore >= PASS_WORDS && sounds.score >= PASS_SOUNDS,
+                issues = issues.take(6),
+            )
+        }
+        // Both recognizers slip now and then on correct speech, but rarely on the same word, so a
+        // word only counts as wrong when neither heard it right.
+        val wrong = targetWords.indices.filter { i ->
+            val soundRatio = sounds.words.getOrNull(i)?.ratio ?: 1.0
+            wordWrong[i] && soundRatio > WORD_SOUND_LIMIT
         }
         return AttemptResult(
             wordScore = wordScore,
-            soundScore = soundScore,
-            passed = wordScore >= PASS_WORDS && soundScore >= PASS_SOUNDS,
-            issues = issues.take(6),
+            soundScore = sounds.score,
+            passed = targetWords.isNotEmpty() && wrong.isEmpty(),
+            issues = wrong.map { i ->
+                val sound = sounds.words.getOrNull(i)
+                WordIssue(targetWords[i], heardFor[i], sound?.expected, sound?.heard)
+            }.take(6),
         )
     }
 
@@ -111,17 +133,16 @@ object Matching {
 
     private fun chars(text: String): List<String> = normalize(text).filter { it != ' ' }.map { it.toString() }
 
-    /** Overall sound score, and the words whose sounds differed noticeably, keyed by word index. */
-    private fun compareSounds(refWords: List<RefWord>, heardSounds: List<String>): Pair<Double, Map<Int, SoundIssue>> {
+    /** Overall sound score, and for each word its expected sounds, heard sounds and error ratio. */
+    private fun compareSounds(refWords: List<RefWord>, heardSounds: List<String>): SoundComparison {
         val refPhones = refWords.flatMap { it.sounds }
         val refWordOf = refWords.flatMapIndexed { w, word -> List(word.sounds.size) { w } }
-        if (refPhones.isEmpty()) return 0.0 to emptyMap()
+        if (refPhones.isEmpty()) return SoundComparison(0.0, refWords.map { WordSounds("", "", 1.0) })
 
         val steps = align(refPhones, heardSounds, ::soundCost, ::soundIndel)
         val score = score(steps, refPhones.sumOf { soundIndel(it) })
 
-        // Per word: expected sounds, heard sounds and error cost. Extra sounds count against the
-        // word before them.
+        // Extra sounds count against the word before them.
         val expected = Array(refWords.size) { StringBuilder() }
         val heard = Array(refWords.size) { StringBuilder() }
         val wordCost = DoubleArray(refWords.size)
@@ -131,10 +152,16 @@ object Matching {
             step.hyp?.let { heard[lastWord].append(heardSounds[it]) }
             wordCost[lastWord] += step.cost
         }
-        val issues = refWords.indices
-            .filter { w -> wordCost[w] / refWords[w].sounds.size.coerceAtLeast(1) > 0.4 }
-            .associateWith { w -> SoundIssue(expected[w].toString(), heard[w].toString().ifEmpty { "—" }) }
-        return score to issues
+        return SoundComparison(
+            score,
+            refWords.indices.map { w ->
+                WordSounds(
+                    expected = expected[w].toString(),
+                    heard = heard[w].toString().ifEmpty { "—" },
+                    ratio = wordCost[w] / refWords[w].sounds.size.coerceAtLeast(1),
+                )
+            },
+        )
     }
 
     private fun score(steps: List<Step>, total: Double): Double =
