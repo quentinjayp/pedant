@@ -212,8 +212,15 @@ def recognize(rec, audio):
     return s.result
 
 
+class Padded:
+    """Audio padded with silence to at least one second, as the app does before ZIPA."""
+    def __init__(self, audio):
+        self.sample_rate = audio.sample_rate
+        self.samples = list(audio.samples) + [0.0] * max(0, audio.sample_rate - len(audio.samples))
+
+
 def sounds(audio):
-    return [t.strip() for t in recognize(zipa, audio).tokens if t.strip()]
+    return [t.strip() for t in recognize(zipa, Padded(audio)).tokens if t.strip()]
 
 
 def variants(phrase, swap):

@@ -112,9 +112,12 @@ class SoundRecognizer(store: ModelStore) {
     )
 
     fun sounds(audio: Audio): List<String> {
-        if (audio.samples.size < audio.sampleRate / 4) return emptyList()
+        if (audio.samples.isEmpty()) return emptyList()
+        // ZIPA fails on very short clips (a short word said on its own), so pad them with silence.
+        val minSamples = audio.sampleRate
+        val samples = if (audio.samples.size >= minSamples) audio.samples else audio.samples.copyOf(minSamples)
         val stream = recognizer.createStream()
-        stream.acceptWaveform(audio.samples, audio.sampleRate)
+        stream.acceptWaveform(samples, audio.sampleRate)
         recognizer.decode(stream)
         val tokens = recognizer.getResult(stream).tokens.map { it.trim() }.filter { it.isNotEmpty() }
         stream.release()
