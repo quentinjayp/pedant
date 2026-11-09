@@ -120,7 +120,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
 
     init {
-        viewModelScope.launch { snapshotFlow { busy }.collect { if (it == Busy.Idle) startBackground() } }
         crashReport = diagnostics.takeCrashReport()
         when {
             crashReport != null -> screen = Screen.Crashed
@@ -311,6 +310,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var pendingWord: Pair<String, String>? = null
     private val triedAlone = mutableSetOf<Pair<String, String>>()
     private var backgroundJob: Job? = null
+
+    init {
+        // Resume background lookups whenever the app becomes idle. This must come after the fields
+        // above: viewModelScope runs it straight away, during construction.
+        viewModelScope.launch { snapshotFlow { busy }.collect { if (it == Busy.Idle) startBackground() } }
+    }
 
     /** Queues [sentence]'s words to be explained in the background; [first] puts it at the front. */
     private fun queueLookups(sentence: String, first: Boolean = false) {
