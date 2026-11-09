@@ -245,7 +245,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     language = lang
                     chat.clear()
-                    setDrill(null)
+                    startDrill(null)
                     editableIndex = null
                     screen = Screen.Conversation
                     runTurn(if (mode == Mode.Learning) Tutor.LEARNING_START else Tutor.CONVERSATION_START)
@@ -273,7 +273,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun newConversation() {
         viewModelScope.launch {
             stopConversationWork()
-            setDrill(null)
+            startDrill(null)
             editableIndex = null
             lookup = null
             screen = Screen.PickLanguage
@@ -534,7 +534,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (busy != Busy.Idle || index != editableIndex || english.isEmpty()) return
         while (chat.size > index + 1) chat.removeAt(chat.lastIndex)
         chat[index] = ChatItem.User(english)
-        setDrill(null)
+        startDrill(null)
         launchAction(Busy.Thinking) { translate(english, addLine = false) }
     }
 
@@ -542,7 +542,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun deleteEnglish(index: Int) {
         if (busy != Busy.Idle || index != editableIndex) return
         while (chat.size > index) chat.removeAt(chat.lastIndex)
-        setDrill(null)
+        startDrill(null)
         editableIndex = null
     }
 
@@ -551,7 +551,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val d = drill ?: return
         if (busy != Busy.Idle) return
         chat += ChatItem.Note("Skipped")
-        setDrill(null)
+        startDrill(null)
         editableIndex = null
         launchAction(Busy.Thinking) { runTurn(Tutor.learningSaid(d.phrase)) }
     }
@@ -610,7 +610,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             busy = Busy.Preparing
             expected.await()
         }
-        setDrill(Drill(phrase, audio, refWords))
+        startDrill(Drill(phrase, audio, refWords))
         queueLookups(phrase)
     }
 
@@ -625,7 +625,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         chat += ChatItem.Attempt(transcript, SoundRecognizer.display(sounds), result)
         if (result.passed) {
-            setDrill(null)
+            startDrill(null)
             editableIndex = null
             runTurn(Tutor.learningSaid(d.phrase))
         } else {
@@ -635,7 +635,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun setDrill(d: Drill?) {
+    private fun startDrill(d: Drill?) {
         drill = d
         drillAttempts = 0
     }
