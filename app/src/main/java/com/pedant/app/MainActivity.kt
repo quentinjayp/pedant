@@ -123,11 +123,17 @@ private fun SetupScreen(vm: AppViewModel) {
     ) {
         Text("Pedant", fontSize = 32.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(16.dp))
-        Text(
-            "Pedant runs entirely on your phone. First it needs to download its models: Gemma 4 E4B, " +
-                "the speech recognizer and ZIPA (about 4.3 GB in total; anything already downloaded is " +
-                "skipped). Use Wi-Fi and keep the app open.",
-        )
+        Text("Pedant runs entirely on your phone. First it needs to download its models (about 4.3 GB):")
+        Spacer(Modifier.height(8.dp))
+        listOf(
+            "Gemma 4 E4B" to "the tutor: talks with you and explains",
+            "Omnilingual ASR" to "hears the words you say",
+            "ZIPA" to "hears the sounds you make",
+        ).forEach { (name, role) ->
+            Text("• $name: $role", modifier = Modifier.fillMaxWidth())
+        }
+        Spacer(Modifier.height(8.dp))
+        Text("Use Wi-Fi and keep the app open.")
         Spacer(Modifier.height(24.dp))
         val p = vm.progress
         if (p != null) {
