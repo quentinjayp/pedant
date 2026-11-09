@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -257,9 +258,11 @@ private fun LanguageScreen(vm: AppViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         vm.progress?.let {
+            BackHandler(onBack = vm::cancelVoiceDownload)
             Column(Modifier.padding(16.dp)) {
                 Text("Downloading the voice…")
                 ProgressBlock(it)
+                TextButton(onClick = vm::cancelVoiceDownload) { Text("Cancel") }
             }
         }
         vm.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
@@ -290,6 +293,7 @@ private fun ConversationScreen(vm: AppViewModel) {
         if (vm.chat.isNotEmpty()) listState.animateScrollToItem(vm.chat.size - 1)
     }
 
+    BackHandler(onBack = vm::newConversation)
     vm.lookup?.let { WordBubble(it, appBusy = vm.busy != Busy.Idle, onHear = vm::hearWord, onClose = vm::closeLookup) }
     var editing by remember { mutableStateOf<Pair<Int, String>?>(null) }
     editing?.let { (index, original) ->
@@ -312,7 +316,7 @@ private fun ConversationScreen(vm: AppViewModel) {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(start = 8.dp),
             )
-            TextButton(onClick = vm::newConversation, enabled = vm.busy == Busy.Idle) { Text("New conversation") }
+            TextButton(onClick = vm::newConversation) { Text("New conversation") }
         }
         Text(
             vm.scenario.scene,

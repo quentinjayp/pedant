@@ -105,6 +105,11 @@ class Tutor(context: Context, modelFile: File) {
         }
     }
 
+    /** Stops the main conversation's reply in progress. */
+    fun cancelGeneration() {
+        conversation?.cancelProcess()
+    }
+
     /** Stops a lookup in progress so the main conversation can use Gemma. */
     fun cancelLookup() {
         lookupConversation?.cancelProcess()

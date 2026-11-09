@@ -10,7 +10,10 @@ import androidx.lifecycle.viewModelScope
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -98,6 +101,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var drillAttempts by mutableStateOf(0)
         private set
     val chat = mutableStateListOf<ChatItem>()
+
+    /**
+     * Everything a conversation does (replies, speech, checks) runs in this scope, so starting a new
+     * conversation can stop it all, and wait for it, before anything is released.
+     */
+    private val conversationJobs = SupervisorJob(viewModelScope.coroutineContext[Job])
+    private val conversationScope = CoroutineScope(viewModelScope.coroutineContext + conversationJobs)
     /**
      * Learning mode: the chat index of the English line whose phrase is being practised. It can be
      * edited (long press) until the phrase is said or skipped.
@@ -215,39 +225,77 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun pickLanguage(lang: Language) {
         error = null
         viewModelScope.launch {
-            try {
-                val voice = store.installedVoice(lang)
-                    ?: withProgress { report -> store.downloadVoice(lang, report) }
-                withContext(Dispatchers.Default) {
-                    if (ttsVoice != voice) {
-                        diagnostics.step = "Loading the $voice voice"
-                        tts?.release()
-                        tts = TextToSpeech(store, voice, getApplication<Application>().cacheDir)
-                        ttsVoice = voice
+            // Stop anything left from the last conversation before its voice is released.
+            stopConversationWork()
+            conversationScope.launch {
+                try {
+                    val voice = store.installedVoice(lang)
+                        ?: withProgress { report -> store.downloadVoice(lang, report) }
+                    pendingSentences.clear()
+                    pendingWord = null
+                    withContext(Dispatchers.Default) {
+                        if (ttsVoice != voice) {
+                            diagnostics.step = "Loading the $voice voice"
+                            tts?.release()
+                            tts = TextToSpeech(store, voice, getApplication<Application>().cacheDir)
+                            ttsVoice = voice
+                        }
+                        diagnostics.step = "Starting a ${lang.englishName} ${mode.title} session"
+                        checkNotNull(tutor).startConversation(lang, mode, scenario)
+                        diagnostics.step = null
                     }
-                    diagnostics.step = "Starting a ${lang.englishName} ${mode.title} session"
-                    checkNotNull(tutor).startConversation(lang, mode, scenario)
+                    language = lang
+                    chat.clear()
+                    setDrill(null)
+                    editableIndex = null
+                    screen = Screen.Conversation
+                    runTurn(if (mode == Mode.Learning) Tutor.LEARNING_START else Tutor.CONVERSATION_START)
+                } catch (e: CancellationException) {
                     diagnostics.step = null
+                    throw e
+                } catch (e: Throwable) {
+                    diagnostics.step = null
+                    progress = null
+                    error = "Could not start: ${e.message}"
                 }
-                pauseBackground()
-                pendingSentences.clear()
-                pendingWord = null
-                language = lang
-                chat.clear()
-                setDrill(null)
-                screen = Screen.Conversation
-                runTurn(if (mode == Mode.Learning) Tutor.LEARNING_START else Tutor.CONVERSATION_START)
-            } catch (e: Throwable) {
-                diagnostics.step = null
-                progress = null
-                error = "Could not start: ${e.message}"
             }
         }
     }
 
+    /** Stops a voice download in progress, staying on the language list. */
+    fun cancelVoiceDownload() {
+        viewModelScope.launch {
+            stopConversationWork()
+            progress = null
+        }
+    }
+
+    /** Goes back to the language list at any time, stopping whatever the conversation is doing. */
     fun newConversation() {
-        if (busy != Busy.Idle) return
-        screen = Screen.PickLanguage
+        viewModelScope.launch {
+            stopConversationWork()
+            setDrill(null)
+            editableIndex = null
+            lookup = null
+            screen = Screen.PickLanguage
+        }
+    }
+
+    /**
+     * Stops the current conversation's work: Gemma's reply, speech playback, recording, background
+     * lookups and any download, and waits until it has all actually stopped.
+     */
+    private suspend fun stopConversationWork() {
+        tutor?.cancelGeneration()
+        tts?.stopPlayback()
+        if (busy == Busy.Listening) withContext(Dispatchers.Default) { recorder.stop() }
+        conversationJobs.children.toList().also { jobs -> jobs.forEach { it.cancel() } }.joinAll()
+        pauseBackground()
+        // Clear the lookup queue too, or the background lookups would restart once the app is idle.
+        pendingSentences.clear()
+        pendingWord = null
+        busy = Busy.Idle
+        progress = null
     }
 
     fun startTalking() {
@@ -260,7 +308,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun stopTalking() {
         if (busy != Busy.Listening) return
         busy = Busy.Transcribing
-        viewModelScope.launch {
+        conversationScope.launch {
             val audio = withContext(Dispatchers.Default) { Audio(recorder.stop(), SAMPLE_RATE) }
             try {
                 when {
@@ -272,6 +320,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     }
                     else -> checkAttempt(checkNotNull(drill), audio)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 chat += ChatItem.Note("Something went wrong: ${e.message}")
             } finally {
@@ -284,9 +334,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Learning mode: the learner typed what they want to say. */
     fun submitEnglish(text: String) {
         if (busy != Busy.Idle || mode != Mode.Learning || drill != null || text.isBlank()) return
-        viewModelScope.launch {
+        conversationScope.launch {
             try {
                 translate(text.trim())
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 chat += ChatItem.Note("Something went wrong: ${e.message}")
             } finally {
@@ -301,7 +353,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val d = drill ?: return
         if (busy != Busy.Idle) return
         busy = Busy.Speaking
-        viewModelScope.launch {
+        conversationScope.launch {
             try {
                 pauseBackground()
                 withContext(Dispatchers.Default) {
@@ -453,7 +505,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun hearWord(word: String, slow: Boolean) {
         if (busy != Busy.Idle || word.isBlank()) return
         busy = Busy.Speaking
-        viewModelScope.launch {
+        conversationScope.launch {
             try {
                 pauseBackground()
                 withContext(Dispatchers.Default) {
@@ -470,7 +522,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun sayWord(text: String) {
         if (busy != Busy.Idle || text.isBlank()) return
         busy = Busy.Speaking
-        viewModelScope.launch {
+        conversationScope.launch {
             try {
                 pauseBackground()
                 withContext(Dispatchers.Default) { tts?.speak(text) }
@@ -484,7 +536,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun saySounds(sounds: String) {
         if (busy != Busy.Idle || sounds.isBlank()) return
         busy = Busy.Speaking
-        viewModelScope.launch {
+        conversationScope.launch {
             try {
                 pauseBackground()
                 withContext(Dispatchers.Default) { tts?.speakSounds(SoundRecognizer.symbols(sounds)) }
@@ -506,9 +558,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         while (chat.size > index + 1) chat.removeAt(chat.lastIndex)
         chat[index] = ChatItem.User(english)
         setDrill(null)
-        viewModelScope.launch {
+        conversationScope.launch {
             try {
                 translate(english, addLine = false)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Throwable) {
                 chat += ChatItem.Note("Something went wrong: ${e.message}")
             } finally {
@@ -533,7 +587,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         chat += ChatItem.Note("Skipped")
         setDrill(null)
         editableIndex = null
-        viewModelScope.launch { runTurn(Tutor.learningSaid(d.phrase)) }
+        conversationScope.launch { runTurn(Tutor.learningSaid(d.phrase)) }
     }
 
     /** Hears the recording with both Omnilingual (words) and ZIPA (sounds), side by side. */
@@ -638,6 +692,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             diagnostics.step = "Speaking the reply with Piper"
             withContext(Dispatchers.Default) { tts?.speak(latest.reply) }
             queueLookups(latest.reply)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Throwable) {
             chat[index] = ChatItem.Tutor(null, "(Something went wrong: ${e.message})")
         } finally {

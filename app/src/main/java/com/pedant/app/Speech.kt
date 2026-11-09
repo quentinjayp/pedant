@@ -205,11 +205,20 @@ class TextToSpeech(store: ModelStore, private val voice: String, private val wor
             .setBufferSizeInBytes(audio.samples.size * 4)
             .build()
         track.write(audio.samples, 0, audio.samples.size, AudioTrack.WRITE_BLOCKING)
+        stopRequested = false
         track.play()
-        val durationMs = audio.samples.size * 1000L / audio.sampleRate
-        Thread.sleep(durationMs + 150)
+        // Wait for playback to finish, checking often so stopPlayback() takes effect quickly.
+        val end = System.currentTimeMillis() + audio.samples.size * 1000L / audio.sampleRate + 150
+        while (!stopRequested && System.currentTimeMillis() < end) Thread.sleep(50)
         track.stop()
         track.release()
+    }
+
+    @Volatile private var stopRequested = false
+
+    /** Stops speech that is playing. */
+    fun stopPlayback() {
+        stopRequested = true
     }
 
     /**
