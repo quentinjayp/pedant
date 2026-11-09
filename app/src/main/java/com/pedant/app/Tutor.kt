@@ -164,30 +164,26 @@ class Tutor(context: Context, modelFile: File) {
             You explain ${language.englishName} words to an English-speaking learner.
             You get a word and the sentence it appears in. Answer in exactly this format and nothing else:
             MEANING: <a short English definition of the word as used in this sentence, with its part of speech>
-            SOUNDS LIKE: <an English-style respelling of how to say the word, with the stressed syllable in capitals>
         """.trimIndent()
 
         private fun sentenceLookupPrompt(language: Language) = """
             You explain ${language.englishName} words to an English-speaking learner.
             You get a ${language.englishName} sentence. For every word in it, in order, write one line in
             exactly this format and nothing else:
-            word | short English meaning of the word as used in this sentence, with its part of speech | English-style respelling of how to say it, stressed syllable in capitals
+            word | short English meaning of the word as used in this sentence, with its part of speech
         """.trimIndent()
 
-        /** Splits a sentence lookup into word (lower case) → (meaning, sounds-like respelling). */
-        fun parseSentenceLookup(raw: String): Map<String, Pair<String, String?>> =
+        /** Splits a sentence lookup into word (lower case) → meaning. */
+        fun parseSentenceLookup(raw: String): Map<String, String> =
             raw.lines().mapNotNull { line ->
                 val parts = line.split('|').map { it.trim().trim('*', '-', '•').trim() }
                 if (parts.size < 2 || parts[0].isEmpty() || parts[1].isEmpty()) null
-                else parts[0].lowercase() to (parts[1] to parts.getOrNull(2)?.ifEmpty { null })
+                else parts[0].lowercase() to parts[1]
             }.toMap()
 
-        /** Splits a lookup answer into (meaning, sounds-like respelling). */
-        fun parseLookup(raw: String): Pair<String?, String?> {
-            val meaning = raw.substringAfter("MEANING:", "").substringBefore("SOUNDS LIKE:").trim()
-            val soundsLike = raw.substringAfter("SOUNDS LIKE:", "").trim().lines().firstOrNull()?.trim()
-            return meaning.ifEmpty { null } to soundsLike?.ifEmpty { null }
-        }
+        /** The meaning from a single-word lookup answer. */
+        fun parseLookup(raw: String): String? =
+            raw.substringAfter("MEANING:", "").trim().lines().firstOrNull()?.trim()?.ifEmpty { null }
 
         private val LABELS = listOf("CORRECTION:", "REPLY:", "ENGLISH:", "SAY:")
 

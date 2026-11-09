@@ -362,9 +362,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             emptyMap()
         }
         for (w in words) {
-            val m = meanings[w.lowercase()]
-            lookupCache[w.lowercase() to sentence] =
-                WordLookup(w, sentence, meaning = m?.first, soundsLike = m?.second, sounds = sounds[w], loading = false)
+            val wordSounds = sounds[w]
+            lookupCache[w.lowercase() to sentence] = WordLookup(
+                w, sentence,
+                meaning = meanings[w.lowercase()],
+                soundsLike = wordSounds?.let(Respell::fromIpa)?.ifEmpty { null },
+                sounds = wordSounds,
+                loading = false,
+            )
         }
         refreshOpenLookup()
     }
@@ -377,13 +382,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             SoundRecognizer.display(checkNotNull(zipa).sounds(checkNotNull(tts).synthesize(word)))
         }
         val result = try {
-            val (meaning, soundsLike) = Tutor.parseLookup(checkNotNull(tutor).lookUp(lang, word, sentence))
-            WordLookup(word, sentence, meaning, soundsLike, sounds, loading = false)
+            val meaning = Tutor.parseLookup(checkNotNull(tutor).lookUp(lang, word, sentence))
+            WordLookup(word, sentence, meaning, Respell.fromIpa(sounds).ifEmpty { null }, sounds, loading = false)
         } catch (e: CancellationException) {
             triedAlone -= key
             throw e
         } catch (e: Throwable) {
-            WordLookup(word, sentence, sounds = sounds, error = "Couldn't look this up: ${e.message}", loading = false)
+            WordLookup(
+                word, sentence,
+                soundsLike = Respell.fromIpa(sounds).ifEmpty { null },
+                sounds = sounds,
+                error = "Couldn't look this up: ${e.message}",
+                loading = false,
+            )
         }
         lookupCache[key] = result
         refreshOpenLookup()
@@ -403,8 +414,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Opens the bubble for a tapped [word] from [sentence]: its meaning in that sentence and a
-     * pronunciation guide from Gemma, and its sounds from ZIPA listening to Piper say it.
+     * Opens the bubble for a tapped [word] from [sentence]: its meaning in that sentence from Gemma,
+     * and its sounds from ZIPA listening to Piper say it, with an English-style respelling of them.
      */
     fun lookUp(word: String, sentence: String) {
         lookup = WordLookup(word, sentence)
