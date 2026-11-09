@@ -180,16 +180,21 @@ def segment(phrase_sounds, isolated):
             for k, (w, iso) in enumerate(isolated)]
 
 
-def word_ratios(ref_words, heard):
-    ref = [s for _, ss in ref_words for s in ss]
+def ratios_from_steps(ref_words, steps):
+    """Each reference word's sound error ratio, from an alignment of all its sounds."""
     ref_word_of = [w for w, (_, ss) in enumerate(ref_words) for _ in ss]
     cost = [0.0] * len(ref_words)
     last = 0
-    for r, h, c in align(ref, heard, sound_cost, sound_indel):
+    for r, h, c in steps:
         if r is not None:
             last = ref_word_of[r]
         cost[last] += c
     return [cost[w] / max(1, len(ss)) for w, (_, ss) in enumerate(ref_words)]
+
+
+def word_ratios(ref_words, heard):
+    ref = [s for _, ss in ref_words for s in ss]
+    return ratios_from_steps(ref_words, align(ref, heard, sound_cost, sound_indel))
 
 
 def check(target, transcript, ref_words, heard_sounds):
@@ -203,17 +208,9 @@ def check(target, transcript, ref_words, heard_sounds):
         if r is not None and h is not None and c == 0:
             word_ok[r] = True
     ref = [s for _, ss in ref_words for s in ss]
-    ref_word_of = [w for w, (_, ss) in enumerate(ref_words) for _ in ss]
     sound_steps = align(ref, heard_sounds, sound_cost, sound_indel)
     sound_score = score(sound_steps, sum(sound_indel(s) for s in ref))
-    cost = [0.0] * len(ref_words)
-    last = 0
-    for r, h, c in sound_steps:
-        if r is not None:
-            last = ref_word_of[r]
-        cost[last] += c
-    ratios = [cost[w] / max(1, len(ss)) for w, (_, ss) in enumerate(ref_words)]
-    return word_score, sound_score, list(zip(word_ok, ratios))
+    return word_score, sound_score, list(zip(word_ok, ratios_from_steps(ref_words, sound_steps)))
 
 
 # ---- Models -----------------------------------------------------------------------------------
@@ -288,33 +285,22 @@ for kind in ["correct", "swap one word", "drop one word", "different sentence"]:
     for metric, idx in [("words", 4), ("sounds", 5)]:
         vals = [r[idx] for r in rows if r[1] == kind]
         print(f"{kind:18} {metric:6} min {min(vals):.2f} mean {sum(vals) / len(vals):.2f} max {max(vals):.2f}")
-for wt in [0.6, 0.7, 0.8]:
-    for st in [0.5, 0.55, 0.6, 0.65, 0.7]:
-        ok = [r for r in rows if r[1] == "correct"]
-        bad = [r for r in rows if r[1] != "correct"]
-        pass_ok = sum(r[4] >= wt and r[5] >= st for r in ok) / len(ok)
-        pass_bad = sum(r[4] >= wt and r[5] >= st for r in bad) / len(bad)
-        print(f"words>={wt} sounds>={st}: correct pass {pass_ok:.0%}, wrong pass {pass_bad:.0%}")
 
-print("\n== Per-word rule: a word is right if Omnilingual heard it OR its sound error ratio <= limit ==")
-for limit in [0.3, 0.4, 0.5, 0.6]:
-    for allowed in [0, 1]:
-        def passes(r):
-            bad = sum(1 for heard, ratio in r[6] if not (heard or ratio <= limit))
-            return bad <= (allowed if len(r[6]) >= 5 else 0)
-        ok = [r for r in rows if r[1] == "correct"]
-        for kind in ["swap one word", "drop one word", "different sentence"]:
-            pass
-        bad_rows = [r for r in rows if r[1] != "correct"]
-        by_kind = {k: sum(passes(r) for r in rows if r[1] == k) / max(1, sum(r[1] == k for r in rows))
-                   for k in ["swap one word", "drop one word", "different sentence"]}
-        print(f"limit {limit} allow {allowed} bad word(s) in 5+ word phrases: correct pass "
-              f"{sum(passes(r) for r in ok) / len(ok):.0%}, wrong pass {sum(passes(r) for r in bad_rows) / len(bad_rows):.0%} "
-              + ", ".join(f"{k} {v:.0%}" for k, v in by_kind.items()))
+# The app's rule: a word is right if Omnilingual heard it OR its sound error ratio <= WORD_SOUND_LIMIT.
+LIMIT = 0.5
+KINDS = ["correct", "swap one word", "drop one word", "different sentence"]
 
-print("\n== Correct attempts that fail the per-word rule (limit 0.4, allow 0) ==")
+
+def bad_words(r):
+    return [i for i, (heard, ratio) in enumerate(r[6]) if not (heard or ratio <= LIMIT)]
+
+
+print(f"\n== Per-word rule (limit {LIMIT}): share of attempts that pass ==")
+for kind in KINDS:
+    group = [r for r in rows if r[1] == kind]
+    print(f"{kind:18} {sum(not bad_words(r) for r in group) / max(1, len(group)):.0%}")
+
+print("\n== Correct attempts that fail the per-word rule ==")
 for r in rows:
-    if r[1] == "correct":
-        bad = [i for i, (heard, ratio) in enumerate(r[6]) if not (heard or ratio <= 0.4)]
-        if bad:
-            print(r[0], r[2], r[3], "bad word indexes", bad)
+    if r[1] == "correct" and bad_words(r):
+        print(r[0], r[2], r[3], "bad word indexes", bad_words(r))

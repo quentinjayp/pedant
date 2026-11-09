@@ -71,7 +71,7 @@ object Respell {
     }
 
     private fun parse(ipa: String): List<Sound> {
-        val text = ipa.filter { !it.isWhitespace() && it !in "/ˈˌːˑ.˞ʰʲʷ—" }
+        val text = ipa.filter { !it.isWhitespace() && it !in "/ˈˌːˑ.˞ʰʲʷ" }
         val out = mutableListOf<Sound>()
         var i = 0
         while (i < text.length) {

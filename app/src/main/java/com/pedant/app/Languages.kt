@@ -1,12 +1,22 @@
 package com.pedant.app
 
-/** A language the app can hold a conversation in, with the Piper voices that can speak it (first choice first). */
+/**
+ * A language the app can hold a conversation in, with the Piper voices that can speak it (first
+ * choice first) and [ttsRewrites]: fixes for text espeak-ng misreads, applied before speaking.
+ */
 data class Language(
     val code: String,
     val englishName: String,
     val nativeName: String,
     val piperVoices: List<String>,
+    val ttsRewrites: List<Pair<Regex, String>> = emptyList(),
 )
+
+/**
+ * espeak-ng reads a French hyphenated "-y" at the end of a word ("Allons-y", "Vas-y") as the
+ * letter's name, "i grec"; "-i" is read correctly.
+ */
+private val FRENCH_HYPHEN_Y = Regex("(?<=\\p{L})-[yY](?![\\p{L}\\p{N}])") to "-i"
 
 /** The 28 languages supported by Gemma 4 E4B, Omnilingual ASR, ZIPA and Piper together. */
 val LANGUAGES = listOf(
@@ -18,7 +28,7 @@ val LANGUAGES = listOf(
     Language("en", "English", "English", listOf("en_US-lessac-medium")),
     Language("es", "Spanish", "Español", listOf("es_ES-davefx-medium")),
     Language("fi", "Finnish", "Suomi", listOf("fi_FI-harri-medium")),
-    Language("fr", "French", "Français", listOf("fr_FR-siwis-medium")),
+    Language("fr", "French", "Français", listOf("fr_FR-siwis-medium"), ttsRewrites = listOf(FRENCH_HYPHEN_Y)),
     Language("hi", "Hindi", "हिन्दी", listOf("hi_IN-pratham-medium")),
     Language("hu", "Hungarian", "Magyar", listOf("hu_HU-anna-medium")),
     Language("id", "Indonesian", "Bahasa Indonesia", listOf("id_ID-news_tts-medium")),

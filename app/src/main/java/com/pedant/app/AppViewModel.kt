@@ -20,6 +20,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
 sealed interface Screen {
@@ -77,7 +78,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var tutor: Tutor? = null
     private var stt: SpeechToText? = null
     private var zipa: SoundRecognizer? = null
-    private var drill: Drill? = null
     private var tts: TextToSpeech? = null
     private var ttsVoice: String? = null
 
@@ -95,9 +95,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var mode by mutableStateOf(Mode.Learning)
     var scenario by mutableStateOf(Scenario.Default)
+    private var drill by mutableStateOf<Drill?>(null)
     /** Learning mode: the phrase to repeat, or null while waiting for the next English line. */
-    var drillPhrase by mutableStateOf<String?>(null)
-        private set
+    val drillPhrase: String? get() = drill?.phrase
     var drillAttempts by mutableStateOf(0)
         private set
     val chat = mutableStateListOf<ChatItem>()
@@ -177,7 +177,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Loads Gemma (on the CPU), the speech recognizer and ZIPA. */
     /** What is loading right now and since when, shown on the loading screen. */
     var loadingStep by mutableStateOf<Pair<String, Long>?>(null)
         private set
@@ -196,6 +195,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return result
     }
 
+    /** Loads Gemma (on the CPU), the speech recognizer and ZIPA. */
     private fun loadModels() {
         error = null
         screen = Screen.Loading
@@ -231,14 +231,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 try {
                     val voice = store.installedVoice(lang)
                         ?: withProgress { report -> store.downloadVoice(lang, report) }
-                    pendingSentences.clear()
-                    pendingWord = null
                     withContext(Dispatchers.Default) {
                         if (ttsVoice != voice) {
                             diagnostics.step = "Loading the $voice voice"
                             tts?.release()
-                            tts = TextToSpeech(store, voice, getApplication<Application>().cacheDir)
+                            tts = TextToSpeech(store, voice, lang.ttsRewrites, getApplication<Application>().cacheDir)
                             ttsVoice = voice
+                            wordSoundsCache.clear()
                         }
                         diagnostics.step = "Starting a ${lang.englishName} ${mode.title} session"
                         checkNotNull(tutor).startConversation(lang, mode, scenario)
@@ -305,21 +304,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { pauseBackground() }
     }
 
-    fun stopTalking() {
-        if (busy != Busy.Listening) return
-        busy = Busy.Transcribing
+    /**
+     * Runs a conversation action: marks the app as [state], pauses the background lookups, reports
+     * any error as a note, and goes back to idle when done. Leaving the conversation cancels it.
+     */
+    private fun launchAction(state: Busy, action: suspend () -> Unit) {
+        busy = state
         conversationScope.launch {
-            val audio = withContext(Dispatchers.Default) { Audio(recorder.stop(), SAMPLE_RATE) }
             try {
-                when {
-                    mode == Mode.Conversation -> conversationTurn(audio)
-                    drill == null -> {
-                        // Learning mode, waiting for English: only the words matter here.
-                        val english = withContext(Dispatchers.Default) { checkNotNull(stt).transcribe(audio.samples) }
-                        if (english.isNotBlank()) translate(english)
-                    }
-                    else -> checkAttempt(checkNotNull(drill), audio)
-                }
+                pauseBackground()
+                action()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -327,6 +321,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 diagnostics.step = null
                 busy = Busy.Idle
+            }
+        }
+    }
+
+    fun stopTalking() {
+        if (busy != Busy.Listening) return
+        launchAction(Busy.Transcribing) {
+            val audio = withContext(Dispatchers.Default) { Audio(recorder.stop(), SAMPLE_RATE) }
+            val d = drill
+            when {
+                mode == Mode.Conversation -> conversationTurn(audio)
+                d == null -> {
+                    // Learning mode, waiting for English: only the words matter here.
+                    val english = withContext(Dispatchers.Default) { checkNotNull(stt).transcribe(audio.samples) }
+                    if (english.isNotBlank()) translate(english)
+                }
+                else -> checkAttempt(d, audio)
             }
         }
     }
@@ -334,38 +345,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Learning mode: the learner typed what they want to say. */
     fun submitEnglish(text: String) {
         if (busy != Busy.Idle || mode != Mode.Learning || drill != null || text.isBlank()) return
-        conversationScope.launch {
-            try {
-                translate(text.trim())
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                chat += ChatItem.Note("Something went wrong: ${e.message}")
-            } finally {
-                diagnostics.step = null
-                busy = Busy.Idle
-            }
-        }
+        launchAction(Busy.Thinking) { translate(text.trim()) }
     }
 
     /** Learning mode: plays the phrase again. */
     fun hearAgain(slow: Boolean) {
         val d = drill ?: return
         if (busy != Busy.Idle) return
-        busy = Busy.Speaking
-        conversationScope.launch {
-            try {
-                pauseBackground()
-                withContext(Dispatchers.Default) {
-                    val voice = tts ?: return@withContext
-                    val audio = if (!slow) d.audio else d.slowAudio ?: voice.synthesize(d.phrase, SLOW_SPEED).also { d.slowAudio = it }
-                    voice.play(audio)
-                }
-            } finally {
-                busy = Busy.Idle
+        launchAction(Busy.Speaking) {
+            withContext(Dispatchers.Default) {
+                val voice = checkNotNull(tts)
+                val audio = if (!slow) d.audio else d.slowAudio ?: voice.synthesize(d.phrase, SLOW_SPEED).also { d.slowAudio = it }
+                voice.play(audio)
             }
         }
     }
+
+    /** What ZIPA hears when Piper says [text]: the sounds the app expects for it. */
+    private fun soundsOf(text: String): List<String> = checkNotNull(zipa).sounds(checkNotNull(tts).synthesize(text))
+
+    /** [soundsOf] for single words, remembered for the current voice (drills and lookups share them). */
+    private val wordSoundsCache = ConcurrentHashMap<String, List<String>>()
+    private fun wordSounds(word: String): List<String> = wordSoundsCache.getOrPut(word) { soundsOf(word) }
 
     // Word meanings are worked out in the background, a whole sentence at a time, as soon as a
     // phrase or reply appears. The background work only runs while the app is idle: it stops when
@@ -426,7 +427,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val words = tappableWords(sentence).distinctBy { it.lowercase() }
         // Sounds first: quick, and they don't need Gemma.
         val sounds = withContext(Dispatchers.Default) {
-            words.associateWith { w -> SoundRecognizer.display(checkNotNull(zipa).sounds(checkNotNull(tts).synthesize(w))) }
+            words.associateWith { w -> SoundRecognizer.display(wordSounds(w)) }
         }
         val meanings = try {
             Tutor.parseSentenceLookup(checkNotNull(tutor).lookUpSentence(lang, sentence))
@@ -453,7 +454,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val key = word.lowercase() to sentence
         triedAlone += key
         val sounds = lookupCache[key]?.sounds ?: withContext(Dispatchers.Default) {
-            SoundRecognizer.display(checkNotNull(zipa).sounds(checkNotNull(tts).synthesize(word)))
+            SoundRecognizer.display(wordSounds(word))
         }
         val result = try {
             val meaning = Tutor.parseLookup(checkNotNull(tutor).lookUp(lang, word, sentence))
@@ -493,41 +494,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun lookUp(word: String, sentence: String) {
         lookup = WordLookup(word, sentence)
-        if (sentence in doneSentences) refreshOpenLookup() else queueLookups(sentence, first = true)
-        startBackground()
+        if (sentence in doneSentences) {
+            refreshOpenLookup()
+            startBackground()
+        } else {
+            queueLookups(sentence, first = true)
+        }
     }
 
     fun closeLookup() {
         lookup = null
     }
 
-    /** Has Piper say [word], slowly if [slow]. */
+    /** Has Piper say [word] (or any text), slowly if [slow]. */
     fun hearWord(word: String, slow: Boolean) {
         if (busy != Busy.Idle || word.isBlank()) return
-        busy = Busy.Speaking
-        conversationScope.launch {
-            try {
-                pauseBackground()
-                withContext(Dispatchers.Default) {
-                    val voice = tts ?: return@withContext
-                    voice.play(voice.synthesize(word, if (slow) SLOW_SPEED else 1.0f))
-                }
-            } finally {
-                busy = Busy.Idle
-            }
-        }
-    }
-
-    /** Has Piper say [text], e.g. a correct word or the word that was heard instead. */
-    fun sayWord(text: String) {
-        if (busy != Busy.Idle || text.isBlank()) return
-        busy = Busy.Speaking
-        conversationScope.launch {
-            try {
-                pauseBackground()
-                withContext(Dispatchers.Default) { tts?.speak(text) }
-            } finally {
-                busy = Busy.Idle
+        launchAction(Busy.Speaking) {
+            withContext(Dispatchers.Default) {
+                val voice = checkNotNull(tts)
+                voice.play(voice.synthesize(word, if (slow) SLOW_SPEED else 1.0f))
             }
         }
     }
@@ -535,16 +520,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Has Piper say raw sounds, e.g. the sounds ZIPA heard. [sounds] is the displayed IPA text. */
     fun saySounds(sounds: String) {
         if (busy != Busy.Idle || sounds.isBlank()) return
-        busy = Busy.Speaking
-        conversationScope.launch {
-            try {
-                pauseBackground()
-                withContext(Dispatchers.Default) { tts?.speakSounds(SoundRecognizer.symbols(sounds)) }
-            } catch (e: Throwable) {
-                chat += ChatItem.Note("Couldn't play those sounds: ${e.message}")
-            } finally {
-                busy = Busy.Idle
-            }
+        launchAction(Busy.Speaking) {
+            withContext(Dispatchers.Default) { checkNotNull(tts).speakSounds(SoundRecognizer.symbols(sounds)) }
         }
     }
 
@@ -558,18 +535,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         while (chat.size > index + 1) chat.removeAt(chat.lastIndex)
         chat[index] = ChatItem.User(english)
         setDrill(null)
-        conversationScope.launch {
-            try {
-                translate(english, addLine = false)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                chat += ChatItem.Note("Something went wrong: ${e.message}")
-            } finally {
-                diagnostics.step = null
-                busy = Busy.Idle
-            }
-        }
+        launchAction(Busy.Thinking) { translate(english, addLine = false) }
     }
 
     /** Learning mode: removes the English line at [index] and its phrase, to say something else. */
@@ -587,7 +553,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         chat += ChatItem.Note("Skipped")
         setDrill(null)
         editableIndex = null
-        conversationScope.launch { runTurn(Tutor.learningSaid(d.phrase)) }
+        launchAction(Busy.Thinking) { runTurn(Tutor.learningSaid(d.phrase)) }
     }
 
     /** Hears the recording with both Omnilingual (words) and ZIPA (sounds), side by side. */
@@ -610,7 +576,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Learning mode: translates what the learner wants to say and starts drilling it. */
     private suspend fun translate(english: String, addLine: Boolean = true) {
-        pauseBackground()
         if (addLine) {
             chat += ChatItem.User(english)
             editableIndex = chat.lastIndex
@@ -632,15 +597,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         diagnostics.step = "Preparing the phrase with Piper and ZIPA"
         val voice = checkNotNull(tts)
         val audio = withContext(Dispatchers.Default) { voice.synthesize(phrase) }
-        busy = Busy.Speaking
-        withContext(Dispatchers.Default) { voice.play(audio) }
-        busy = Busy.Preparing
-        // Expected sounds: ZIPA listens to Piper saying the whole phrase (the audio you hear). Each
-        // word said on its own only guides where the word boundaries fall.
-        val refWords = withContext(Dispatchers.Default) {
-            val recognizer = checkNotNull(zipa)
-            val isolated = Matching.words(phrase).map { w -> RefWord(w, recognizer.sounds(voice.synthesize(w))) }
-            Matching.segmentReference(recognizer.sounds(audio), isolated)
+        val refWords = coroutineScope {
+            // Expected sounds: ZIPA listens to Piper saying the whole phrase (the audio you hear).
+            // Each word said on its own only guides where the word boundaries fall. This runs
+            // while the phrase plays.
+            val expected = async(Dispatchers.Default) {
+                val isolated = Matching.words(phrase).map { w -> RefWord(w, wordSounds(w)) }
+                Matching.segmentReference(checkNotNull(zipa).sounds(audio), isolated)
+            }
+            busy = Busy.Speaking
+            withContext(Dispatchers.Default) { voice.play(audio) }
+            busy = Busy.Preparing
+            expected.await()
         }
         setDrill(Drill(phrase, audio, refWords))
         queueLookups(phrase)
@@ -652,9 +620,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (!result.passed && transcript.isNotBlank()) {
             // Sound-alike check: Piper says what Omnilingual heard and ZIPA listens, so a word
             // spelled differently but pronounced the same (like "sava" for "Ça va") still counts.
-            val transcriptSounds = withContext(Dispatchers.Default) {
-                checkNotNull(zipa).sounds(checkNotNull(tts).synthesize(transcript))
-            }
+            val transcriptSounds = withContext(Dispatchers.Default) { soundsOf(transcript) }
             result = Matching.check(d.phrase, transcript, d.refWords, sounds, transcriptSounds)
         }
         chat += ChatItem.Attempt(transcript, SoundRecognizer.display(sounds), result)
@@ -671,13 +637,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun setDrill(d: Drill?) {
         drill = d
-        drillPhrase = d?.phrase
         drillAttempts = 0
     }
 
     /** Sends [message] to the tutor, shows the answer as it streams in and speaks the reply. */
     private suspend fun runTurn(message: String) {
-        pauseBackground()
         busy = Busy.Thinking
         val index = chat.size
         chat += ChatItem.Tutor(null, "")

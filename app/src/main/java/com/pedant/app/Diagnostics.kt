@@ -38,8 +38,9 @@ class Diagnostics(private val context: Context) {
     fun log(event: String) {
         runCatching {
             val time = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
-            val lines = (if (eventLog.exists()) eventLog.readLines() else emptyList()) + "$time $event"
-            eventLog.writeText(lines.takeLast(40).joinToString("\n") + "\n")
+            eventLog.appendText("$time $event\n")
+            // Trim now and then rather than rewriting the file on every event.
+            if (eventLog.length() > 16_384) eventLog.writeText(eventLog.readLines().takeLast(40).joinToString("\n") + "\n")
         }
     }
 
@@ -55,6 +56,7 @@ class Diagnostics(private val context: Context) {
     var step: String?
         get() = prefs.getString("step", null)
         set(value) {
+            if (value == prefs.getString("step", null)) return
             prefs.edit().putString("step", value).commit()
             value?.let { log(it) }
         }
@@ -76,12 +78,12 @@ class Diagnostics(private val context: Context) {
             )
         }
         if (unfinishedStep == null && javaTrace == null && !crashed) {
-            exits.firstOrNull()?.let { prefs.edit().putLong("lastExitSeen", it.timestamp).commit() }
+            markSeen(exits)
             return null
         }
 
         val report = buildString {
-            appendLine("App version: ${BuildConfigInfo.version(context)}")
+            appendLine("App version: ${appVersion()}")
             unfinishedStep?.let { appendLine("Was doing: $it") }
             exits.forEachIndexed { i, exit ->
                 val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(exit.timestamp))
@@ -101,8 +103,16 @@ class Diagnostics(private val context: Context) {
 
         step = null
         javaCrashFile.delete()
-        exits.firstOrNull()?.let { prefs.edit().putLong("lastExitSeen", it.timestamp).commit() }
+        markSeen(exits)
         return report
+    }
+
+    private fun appVersion(): String = runCatching {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    }.getOrNull() ?: "unknown"
+
+    private fun markSeen(exits: List<ApplicationExitInfo>) {
+        exits.firstOrNull()?.let { prefs.edit().putLong("lastExitSeen", it.timestamp).commit() }
     }
 
     /** How the app closed recently (newest first), since the last report. */
@@ -128,10 +138,4 @@ class Diagnostics(private val context: Context) {
         ApplicationExitInfo.REASON_OTHER -> "closed by the system (other)"
         else -> "code $reason"
     }
-}
-
-private object BuildConfigInfo {
-    fun version(context: Context): String = runCatching {
-        context.packageManager.getPackageInfo(context.packageName, 0).versionName
-    }.getOrNull() ?: "unknown"
 }

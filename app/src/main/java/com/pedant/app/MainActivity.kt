@@ -53,6 +53,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -201,11 +202,6 @@ private fun ModelLoadingScreen(vm: AppViewModel) {
         val seconds = (now - step.second) / 1000
         "\n\nLoading ${step.first}… $seconds s\nMemory: ${vm.memorySummary()}"
     }
-    LoadingScreen("Loading the models…\nThe first time can take a minute or two.$detail")
-}
-
-@Composable
-private fun LoadingScreen(message: String) {
     Column(
         Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
@@ -213,7 +209,7 @@ private fun LoadingScreen(message: String) {
     ) {
         CircularProgressIndicator()
         Spacer(Modifier.height(16.dp))
-        Text(message)
+        Text("Loading the models…\nThe first time can take a minute or two.$detail")
     }
 }
 
@@ -359,7 +355,7 @@ private fun ConversationScreen(vm: AppViewModel) {
                     is ChatItem.Attempt -> AttemptCard(
                         item,
                         enabled = vm.busy == Busy.Idle,
-                        onSay = vm::sayWord,
+                        onSay = { vm.hearWord(it, false) },
                         onSaySounds = vm::saySounds,
                     )
                     is ChatItem.Note -> Text(
@@ -534,7 +530,7 @@ private fun IssueRow(issue: WordIssue, enabled: Boolean, onSay: (String) -> Unit
         fontWeight = FontWeight.SemiBold,
     )
     if (issue.expectedSounds != null) {
-        Text("Expected /${issue.expectedSounds}/ · heard /${issue.heardSounds}/", fontSize = 13.sp)
+        Text("Expected /${issue.expectedSounds}/ · heard /${issue.heardSounds.orEmpty().ifEmpty { "—" }}/", fontSize = 13.sp)
     }
     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         TextButton(onClick = { onSay(issue.word) }, enabled = enabled) { Text("▶ Correct") }
@@ -542,7 +538,7 @@ private fun IssueRow(issue: WordIssue, enabled: Boolean, onSay: (String) -> Unit
             TextButton(onClick = { onSay(heardWord!!) }, enabled = enabled) { Text("▶ Heard word") }
         }
         val heardSounds = issue.heardSounds
-        if (heardSounds != null && heardSounds != "—") {
+        if (!heardSounds.isNullOrEmpty()) {
             TextButton(onClick = { onSaySounds(heardSounds) }, enabled = enabled) { Text("▶ Heard sounds") }
         }
     }
@@ -559,21 +555,8 @@ private fun TappableText(
     fontWeight: FontWeight? = null,
     onWord: (word: String, sentence: String) -> Unit,
 ) {
-    val linkStyle = TextLinkStyles(style = SpanStyle(textDecoration = TextDecoration.None))
-    val wordRanges = mutableListOf<IntRange>()
-    val annotated = buildAnnotatedString {
-        var last = 0
-        for (match in WORD_PATTERN.findAll(text)) {
-            append(text.substring(last, match.range.first))
-            for (piece in splitWord(match.value)) {
-                val start = length
-                withLink(LinkAnnotation.Clickable(piece, linkStyle) { onWord(piece, text) }) { append(piece) }
-                wordRanges += start until length
-            }
-            last = match.range.last + 1
-        }
-        append(text.substring(last))
-    }
+    val currentOnWord by rememberUpdatedState(onWord)
+    val (annotated, wordRanges) = remember(text) { tappableAnnotated(text) { currentOnWord(it, text) } }
     // A dotted underline under each tappable word, so it's clear they can be tapped.
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val color = LocalContentColor.current.copy(alpha = 0.6f)
@@ -606,6 +589,26 @@ private fun TappableText(
     )
 }
 
+/** [text] with each word a link that calls [onWord], plus the range of each word. */
+private fun tappableAnnotated(text: String, onWord: (String) -> Unit): Pair<AnnotatedString, List<IntRange>> {
+    val linkStyle = TextLinkStyles(style = SpanStyle(textDecoration = TextDecoration.None))
+    val wordRanges = mutableListOf<IntRange>()
+    val annotated = buildAnnotatedString {
+        var last = 0
+        for (match in WORD_PATTERN.findAll(text)) {
+            append(text.substring(last, match.range.first))
+            for (piece in splitWord(match.value)) {
+                val start = length
+                withLink(LinkAnnotation.Clickable(piece, linkStyle) { onWord(piece) }) { append(piece) }
+                wordRanges += start until length
+            }
+            last = match.range.last + 1
+        }
+        append(text.substring(last))
+    }
+    return annotated to wordRanges
+}
+
 /** The bubble for a tapped word: meaning, pronunciation guide and Normal/Slow playback. */
 @Composable
 private fun WordBubble(
@@ -630,11 +633,7 @@ private fun WordBubble(
                 lookup.soundsLike?.let { Text("Sounds like: $it", fontSize = 15.sp) }
                 lookup.sounds?.let { Text("Sounds (IPA): /$it/", fontSize = 14.sp) }
                 lookup.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 14.sp) }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Hear it:", fontSize = 14.sp)
-                    TextButton(onClick = { onHear(lookup.word, false) }) { Text("Normal") }
-                    TextButton(onClick = { onHear(lookup.word, true) }) { Text("Slow") }
-                }
+                HearButtons("Hear it:") { slow -> onHear(lookup.word, slow) }
                 Text(
                     "From: ${lookup.sentence}",
                     fontSize = 12.sp,
@@ -684,12 +683,20 @@ private fun LearningControls(vm: AppViewModel) {
             ) { Text("Send") }
         }
     } else {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("Hear it again:", fontSize = 14.sp)
-            TextButton(onClick = { vm.hearAgain(slow = false) }) { Text("Normal") }
-            TextButton(onClick = { vm.hearAgain(slow = true) }) { Text("Slow") }
+        HearButtons("Hear it again:", vm::hearAgain) {
             if (vm.drillAttempts >= 3) TextButton(onClick = vm::skip) { Text("Skip") }
         }
+    }
+}
+
+/** A label with Normal and Slow playback buttons, then any [extra] buttons. */
+@Composable
+private fun HearButtons(label: String, onHear: (slow: Boolean) -> Unit, extra: @Composable () -> Unit = {}) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, fontSize = 14.sp)
+        TextButton(onClick = { onHear(false) }) { Text("Normal") }
+        TextButton(onClick = { onHear(true) }) { Text("Slow") }
+        extra()
     }
 }
 

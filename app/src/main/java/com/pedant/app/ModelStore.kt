@@ -27,26 +27,27 @@ class ModelStore(context: Context) {
     private val gemmaDir = File(root, "gemma")
     private val asrDir = File(root, "asr")
     private val zipaDir = File(root, "zipa")
-    private val espeakDir = File(root, "espeak-ng-data")
+    val espeakData = File(root, "espeak-ng-data")
     private fun voiceDir(voice: String) = File(root, "piper/$voice")
 
     val gemmaModel: File? get() = gemmaDir.listFiles { f -> f.name.endsWith(".litertlm") }?.firstOrNull()
-    val asrModel get() = File(asrDir, "model.int8.onnx")
-    val asrTokens get() = File(asrDir, "tokens.txt")
-    val zipaModel get() = File(zipaDir, "model.int8.onnx")
-    val zipaTokens get() = File(zipaDir, "tokens.txt")
-    val espeakData get() = espeakDir
+    val asrModel = File(asrDir, MODEL_FILE)
+    val asrTokens = File(asrDir, TOKENS_FILE)
+    val zipaModel = File(zipaDir, MODEL_FILE)
+    val zipaTokens = File(zipaDir, TOKENS_FILE)
     fun voiceModel(voice: String) = File(voiceDir(voice), "$voice.onnx")
     fun voiceTokens(voice: String) = File(voiceDir(voice), "tokens.txt")
 
     private val readyMarker = ".complete"
 
-    fun coreReady() = listOf(gemmaDir, asrDir, zipaDir).all { File(it, readyMarker).exists() }
+    private fun isReady(dir: File) = File(dir, readyMarker).exists()
+
+    fun coreReady() = listOf(gemmaDir, asrDir, zipaDir).all(::isReady)
 
     /** The voice already downloaded for [language], if any. */
     fun installedVoice(language: Language): String? =
         language.piperVoices.firstOrNull { voice ->
-            File(voiceDir(voice), readyMarker).exists() && File(espeakDir, readyMarker).exists()
+            isReady(voiceDir(voice)) && isReady(espeakData)
         }
 
     /**
@@ -59,8 +60,9 @@ class ModelStore(context: Context) {
             ?: throw IOException("No .litertlm file found in $GEMMA_REPO")
         val asrRepo = ASR_REPOS.firstNotNullOfOrNull { repo -> runCatching { repo to listRepo(repo) }.getOrNull() }
             ?: throw IOException("Speech recognizer repository not found on Hugging Face")
-        val asrFiles = asrRepo.second.filter { it.path == "model.int8.onnx" || it.path == "tokens.txt" }
-        val zipaFiles = listRepo(ZIPA_REPO).filter { it.path == "model.int8.onnx" || it.path == "tokens.txt" }
+        val modelFiles = setOf(MODEL_FILE, TOKENS_FILE)
+        val asrFiles = asrRepo.second.filter { it.path in modelFiles }
+        val zipaFiles = listRepo(ZIPA_REPO).filter { it.path in modelFiles }
 
         val jobs = listOf(gemma to File(gemmaDir, gemma.path.substringAfterLast('/'))) +
             asrFiles.map { it to File(asrDir, it.path) } +
@@ -81,13 +83,13 @@ class ModelStore(context: Context) {
             val jobs = mutableListOf<Pair<HfFile, File>>()
             files.filter { it.path == "$voice.onnx" || it.path == "tokens.txt" }
                 .forEach { jobs += it to File(voiceDir(voice), it.path) }
-            val needEspeak = !File(espeakDir, readyMarker).exists()
+            val needEspeak = !isReady(espeakData)
             if (needEspeak) {
                 files.filter { it.path.startsWith("espeak-ng-data/") }
                     .forEach { jobs += it to File(root, it.path) }
             }
             downloadAll(jobs, onProgress)
-            if (needEspeak) File(espeakDir, readyMarker).createNewFile()
+            if (needEspeak) File(espeakData, readyMarker).createNewFile()
             File(voiceDir(voice), readyMarker).createNewFile()
             voice
         }
@@ -186,6 +188,8 @@ class ModelStore(context: Context) {
     }
 
     companion object {
+        private const val MODEL_FILE = "model.int8.onnx"
+        private const val TOKENS_FILE = "tokens.txt"
         const val GEMMA_REPO = "litert-community/gemma-4-E4B-it-litert-lm"
         const val ZIPA_REPO = "anyspeech/zipa-large-crctc-500k"
         val ASR_REPOS = listOf(

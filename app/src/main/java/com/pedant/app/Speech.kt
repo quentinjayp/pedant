@@ -6,10 +6,12 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
+import com.k2fsa.sherpa.onnx.GeneratedAudio
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineOmnilingualAsrCtcModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
+import com.k2fsa.sherpa.onnx.OfflineRecognizerResult
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
@@ -71,27 +73,33 @@ class MicRecorder {
     }
 }
 
+/** A sherpa-onnx recognizer for [model] using two threads. */
+private fun recognizer(model: OfflineModelConfig) =
+    OfflineRecognizer(config = OfflineRecognizerConfig(modelConfig = model.apply { numThreads = 2 }))
+
+/** Runs [recognizer] on [samples] and returns its result. */
+private fun OfflineRecognizer.recognize(samples: FloatArray, sampleRate: Int): OfflineRecognizerResult {
+    val stream = createStream()
+    try {
+        stream.acceptWaveform(samples, sampleRate)
+        decode(stream)
+        return getResult(stream)
+    } finally {
+        stream.release()
+    }
+}
+
 /** Speech-to-text with Omnilingual ASR. Writes down exactly what it hears, mistakes included. */
 class SpeechToText(store: ModelStore) {
-    private val recognizer = OfflineRecognizer(
-        config = OfflineRecognizerConfig(
-            modelConfig = OfflineModelConfig(
-                omnilingual = OfflineOmnilingualAsrCtcModelConfig(model = store.asrModel.path),
-                tokens = store.asrTokens.path,
-                numThreads = 2,
-            ),
+    private val recognizer = recognizer(
+        OfflineModelConfig(
+            omnilingual = OfflineOmnilingualAsrCtcModelConfig(model = store.asrModel.path),
+            tokens = store.asrTokens.path,
         ),
     )
 
-    fun transcribe(samples: FloatArray): String {
-        if (samples.size < SAMPLE_RATE / 4) return ""
-        val stream = recognizer.createStream()
-        stream.acceptWaveform(samples, SAMPLE_RATE)
-        recognizer.decode(stream)
-        val text = recognizer.getResult(stream).text.trim()
-        stream.release()
-        return text
-    }
+    fun transcribe(samples: FloatArray): String =
+        if (samples.size < SAMPLE_RATE / 4) "" else recognizer.recognize(samples, SAMPLE_RATE).text.trim()
 
     fun release() = recognizer.release()
 }
@@ -101,13 +109,10 @@ class SpeechToText(store: ModelStore) {
  * Returns ZIPA's tokens, with "▁" between words.
  */
 class SoundRecognizer(store: ModelStore) {
-    private val recognizer = OfflineRecognizer(
-        config = OfflineRecognizerConfig(
-            modelConfig = OfflineModelConfig(
-                zipformerCtc = OfflineZipformerCtcModelConfig(model = store.zipaModel.path),
-                tokens = store.zipaTokens.path,
-                numThreads = 2,
-            ),
+    private val recognizer = recognizer(
+        OfflineModelConfig(
+            zipformerCtc = OfflineZipformerCtcModelConfig(model = store.zipaModel.path),
+            tokens = store.zipaTokens.path,
         ),
     )
 
@@ -118,12 +123,7 @@ class SoundRecognizer(store: ModelStore) {
         val margin = audio.sampleRate / 4
         val length = maxOf(audio.samples.size + 2 * margin, audio.sampleRate)
         val samples = FloatArray(length).also { audio.samples.copyInto(it, destinationOffset = margin) }
-        val stream = recognizer.createStream()
-        stream.acceptWaveform(samples, audio.sampleRate)
-        recognizer.decode(stream)
-        val tokens = recognizer.getResult(stream).tokens.map { it.trim() }.filter { it.isNotEmpty() }
-        stream.release()
-        return tokens
+        return recognizer.recognize(samples, audio.sampleRate).tokens.map { it.trim() }.filter { it.isNotEmpty() }
     }
 
     fun release() = recognizer.release()
@@ -134,16 +134,26 @@ class SoundRecognizer(store: ModelStore) {
          * marks (such as the nasal ◌̃) kept as their own symbols, as ZIPA and Piper both use them.
          */
         fun symbols(text: String): List<String> =
-            text.filter { !it.isWhitespace() && it != '/' && it != '—' }.map { it.toString() }
+            text.filter { !it.isWhitespace() && it != '/' }.map { it.toString() }
 
         /** Readable form of ZIPA's tokens, with spaces between words. */
         fun display(tokens: List<String>) =
-            tokens.joinToString("") { if (it == "▁") " " else it }.trim().replace(Regex("\\s+"), " ")
+            tokens.joinToString("") { if (it == "▁") " " else it }.trim().replace(SPACES, " ")
+
+        private val SPACES = Regex("\\s+")
     }
 }
 
-/** Text-to-speech with a Piper voice (espeak-ng turns the text into sounds first). */
-class TextToSpeech(store: ModelStore, private val voice: String, private val workDir: File) {
+/**
+ * Text-to-speech with a Piper voice (espeak-ng turns the text into sounds first). [rewrites] fix
+ * text that espeak-ng misreads in this language, applied before every synthesis.
+ */
+class TextToSpeech(
+    store: ModelStore,
+    voice: String,
+    private val rewrites: List<Pair<Regex, String>>,
+    private val workDir: File,
+) {
     private val modelPath = store.voiceModel(voice).path
     private val tokensPath = store.voiceTokens(voice).path
 
@@ -153,14 +163,13 @@ class TextToSpeech(store: ModelStore, private val voice: String, private val wor
         .map { line -> line.substringBeforeLast(' ').ifEmpty { " " } }
         .toSet()
 
-    private val tts = OfflineTts(
+    private val tts = engine(dataDir = store.espeakData.path)
+
+    /** This voice, reading text through espeak-ng ([dataDir]) or through a [lexicon] instead. */
+    private fun engine(dataDir: String = "", lexicon: String = "") = OfflineTts(
         config = OfflineTtsConfig(
             model = OfflineTtsModelConfig(
-                vits = OfflineTtsVitsModelConfig(
-                    model = store.voiceModel(voice).path,
-                    tokens = store.voiceTokens(voice).path,
-                    dataDir = store.espeakData.path,
-                ),
+                vits = OfflineTtsVitsModelConfig(model = modelPath, tokens = tokensPath, dataDir = dataDir, lexicon = lexicon),
                 numThreads = 2,
             ),
         ),
@@ -173,16 +182,11 @@ class TextToSpeech(store: ModelStore, private val voice: String, private val wor
     }
 
     fun synthesize(text: String, speed: Float = 1.0f): Audio {
-        val generated = tts.generate(fixForEspeak(text), sid = 0, speed = speed)
-        return Audio(generated.samples, generated.sampleRate)
+        val fixed = rewrites.fold(text) { t, (pattern, replacement) -> pattern.replace(t, replacement) }
+        return tts.generate(fixed, sid = 0, speed = speed).toAudio()
     }
 
-    /**
-     * Works around espeak-ng misreading some text. In French it reads a hyphenated "-y" at the end
-     * of a word ("Allons-y", "Vas-y") as the letter's name, "i grec"; "-i" is read correctly.
-     */
-    private fun fixForEspeak(text: String): String =
-        if (voice.startsWith("fr_")) FRENCH_HYPHEN_Y.replace(text, "-i") else text
+    private fun GeneratedAudio.toAudio() = Audio(samples, sampleRate)
 
     /** Plays [audio] and returns once playback has finished. */
     fun play(audio: Audio) {
@@ -237,17 +241,9 @@ class TextToSpeech(store: ModelStore, private val voice: String, private val wor
         }
         val lexicon = File(workDir, "sounds-lexicon.txt")
         lexicon.writeText("zz ${ids.joinToString(" ")}\n")
-        val raw = OfflineTts(
-            config = OfflineTtsConfig(
-                model = OfflineTtsModelConfig(
-                    vits = OfflineTtsVitsModelConfig(model = modelPath, tokens = tokensPath, lexicon = lexicon.path),
-                    numThreads = 2,
-                ),
-            ),
-        )
+        val raw = engine(lexicon = lexicon.path)
         try {
-            val generated = raw.generate("zz", sid = 0, speed = 1.0f)
-            play(Audio(generated.samples, generated.sampleRate))
+            play(raw.generate("zz", sid = 0, speed = 1.0f).toAudio())
         } finally {
             raw.release()
         }
@@ -256,8 +252,6 @@ class TextToSpeech(store: ModelStore, private val voice: String, private val wor
     fun release() = tts.release()
 
     companion object {
-        private val FRENCH_HYPHEN_Y = Regex("(?<=\\p{L})-[yY](?![\\p{L}\\p{N}])")
-
         /** ZIPA symbols written differently in Piper's IPA. */
         private val ZIPA_TO_PIPER = mapOf("g" to "ɡ")
     }

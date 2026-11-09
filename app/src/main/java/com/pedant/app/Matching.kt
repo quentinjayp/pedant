@@ -71,7 +71,7 @@ object Matching {
         val heardUnits = if (spaced) heardWords.map(::normalize) else chars(transcript)
 
         val wordSteps = align(targetUnits, heardUnits, ::wordCost, indel = { 1.0 })
-        val wordScore = score(wordSteps, targetUnits.size)
+        val wordScore = score(wordSteps, targetUnits.size.toDouble())
 
         // For each target word, what was heard in its place and whether it counts as wrong.
         val heardFor = arrayOfNulls<String>(targetUnits.size)
@@ -136,16 +136,20 @@ object Matching {
         }
     }
 
+    private val MARKS = Regex("\\p{Mn}+")
+    private val PUNCTUATION = Regex("[\\p{P}\\p{S}]")
+    private val SPACES = Regex("\\s+")
+
     /** Lower-cases and strips punctuation and accents so only the words themselves are compared. */
     fun normalize(text: String): String {
         val noAccents = Normalizer.normalize(text.lowercase(), Normalizer.Form.NFD)
-            .replace(Regex("\\p{Mn}+"), "")
-        return noAccents.replace(Regex("[\\p{P}\\p{S}]"), " ").replace(Regex("\\s+"), " ").trim()
+            .replace(MARKS, "")
+        return noAccents.replace(PUNCTUATION, " ").replace(SPACES, " ").trim()
     }
 
     /** The words of [text] as written, without surrounding punctuation, for per-word reference sounds. */
     fun words(text: String): List<String> =
-        text.split(Regex("\\s+")).map { it.trim { c -> !c.isLetterOrDigit() } }.filter { it.isNotEmpty() }
+        text.split(SPACES).map { it.trim { c -> !c.isLetterOrDigit() } }.filter { it.isNotEmpty() }
 
     private fun chars(text: String): List<String> = normalize(text).filter { it != ' ' }.map { it.toString() }
 
@@ -173,7 +177,7 @@ object Matching {
             refWords.indices.map { w ->
                 WordSounds(
                     expected = expected[w].toString(),
-                    heard = heard[w].toString().ifEmpty { "—" },
+                    heard = heard[w].toString(),
                     ratio = wordCost[w] / refWords[w].sounds.size.coerceAtLeast(1),
                 )
             },
@@ -183,7 +187,6 @@ object Matching {
     private fun score(steps: List<Step>, total: Double): Double =
         if (total <= 0) 0.0 else (1.0 - steps.sumOf { it.cost } / total).coerceIn(0.0, 1.0)
 
-    private fun score(steps: List<Step>, total: Int) = score(steps, total.toDouble())
 
     /** Cost of hearing word [b] for word [a]: none if the spelling is close, otherwise up to 1. */
     private fun wordCost(a: String, b: String): Double {
@@ -206,7 +209,7 @@ object Matching {
         setOf("a", "ɑ", "æ", "ɐ", "ʌ"),
         setOf("o", "ɔ", "ɒ", "ʌ", "ɤ"),
         setOf("u", "ʊ", "ɯ", "w"),
-        setOf("r", "ʁ", "ɹ", "ʀ", "ɾ", "ɻ", "χ", "ʀ"),
+        setOf("r", "ʁ", "ɹ", "ʀ", "ɾ", "ɻ", "χ"),
         setOf("g", "ɡ"),
         setOf("ʃ", "ʂ", "ɕ"),
         setOf("ʒ", "ʐ", "ʑ"),
