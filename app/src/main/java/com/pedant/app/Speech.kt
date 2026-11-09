@@ -143,7 +143,7 @@ class SoundRecognizer(store: ModelStore) {
 }
 
 /** Text-to-speech with a Piper voice (espeak-ng turns the text into sounds first). */
-class TextToSpeech(store: ModelStore, voice: String, private val workDir: File) {
+class TextToSpeech(store: ModelStore, private val voice: String, private val workDir: File) {
     private val modelPath = store.voiceModel(voice).path
     private val tokensPath = store.voiceTokens(voice).path
 
@@ -173,9 +173,16 @@ class TextToSpeech(store: ModelStore, voice: String, private val workDir: File) 
     }
 
     fun synthesize(text: String, speed: Float = 1.0f): Audio {
-        val generated = tts.generate(text, sid = 0, speed = speed)
+        val generated = tts.generate(fixForEspeak(text), sid = 0, speed = speed)
         return Audio(generated.samples, generated.sampleRate)
     }
+
+    /**
+     * Works around espeak-ng misreading some text. In French it reads a hyphenated "-y" at the end
+     * of a word ("Allons-y", "Vas-y") as the letter's name, "i grec"; "-i" is read correctly.
+     */
+    private fun fixForEspeak(text: String): String =
+        if (voice.startsWith("fr_")) FRENCH_HYPHEN_Y.replace(text, "-i") else text
 
     /** Plays [audio] and returns once playback has finished. */
     fun play(audio: Audio) {
@@ -240,6 +247,8 @@ class TextToSpeech(store: ModelStore, voice: String, private val workDir: File) 
     fun release() = tts.release()
 
     companion object {
+        private val FRENCH_HYPHEN_Y = Regex("(?<=\\p{L})-[yY](?![\\p{L}\\p{N}])")
+
         /** ZIPA symbols written differently in Piper's IPA. */
         private val ZIPA_TO_PIPER = mapOf("g" to "ɡ")
     }
