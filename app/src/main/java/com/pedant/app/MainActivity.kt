@@ -102,7 +102,7 @@ class MainActivity : ComponentActivity() {
                     Box(Modifier.fillMaxSize().safeDrawingPadding()) {
                         when (vm.screen) {
                             Screen.Setup -> SetupScreen(vm)
-                            Screen.Loading -> LoadingScreen("Loading the models…\nThe first time can take a minute or two.")
+                            Screen.Loading -> ModelLoadingScreen(vm)
                             Screen.Crashed -> CrashScreen(vm)
                             Screen.PickLanguage -> LanguageScreen(vm)
                             Screen.Conversation -> ConversationScreen(vm)
@@ -183,6 +183,24 @@ private fun CrashScreen(vm: AppViewModel) {
             Button(onClick = vm::dismissCrash) { Text("Try again") }
         }
     }
+}
+
+/** The loading screen: which model is loading, for how long, and the free memory. */
+@Composable
+private fun ModelLoadingScreen(vm: AppViewModel) {
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+    val step = vm.loadingStep
+    val detail = if (step == null) "" else {
+        val seconds = (now - step.second) / 1000
+        "\n\nLoading ${step.first}… $seconds s\nMemory: ${vm.memorySummary()}"
+    }
+    LoadingScreen("Loading the models…\nThe first time can take a minute or two.$detail")
 }
 
 @Composable

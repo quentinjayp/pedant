@@ -168,6 +168,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Loads Gemma (on the CPU), the speech recognizer and ZIPA. */
+    /** What is loading right now and since when, shown on the loading screen. */
+    var loadingStep by mutableStateOf<Pair<String, Long>?>(null)
+        private set
+
+    fun memorySummary(): String = diagnostics.memorySummary()
+
+    /** Loads one model, recording how long it took and the free memory before and after. */
+    private fun <T> timedLoad(name: String, load: () -> T): T {
+        val before = diagnostics.memorySummary()
+        loadingStep = name to System.currentTimeMillis()
+        diagnostics.step = "Loading $name ($before)"
+        diagnostics.log("Loading $name: start, $before")
+        val start = System.currentTimeMillis()
+        val result = load()
+        diagnostics.log("Loading $name: done in ${(System.currentTimeMillis() - start) / 1000.0} s, ${diagnostics.memorySummary()}")
+        return result
+    }
+
     private fun loadModels() {
         error = null
         screen = Screen.Loading
@@ -176,18 +194,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 withContext(Dispatchers.Default) {
                     // Gemma first: it needs the most memory, so it loads while the most is free.
                     if (tutor == null) {
-                        diagnostics.step = "Loading Gemma (${diagnostics.memorySummary()})"
-                        tutor = Tutor(getApplication(), checkNotNull(store.gemmaModel) { "Gemma model file is missing" })
+                        tutor = timedLoad("Gemma") {
+                            Tutor(getApplication(), checkNotNull(store.gemmaModel) { "Gemma model file is missing" })
+                        }
                     }
-                    if (stt == null) {
-                        diagnostics.step = "Loading the speech recognizer (${diagnostics.memorySummary()})"
-                        stt = SpeechToText(store)
-                    }
-                    if (zipa == null) {
-                        diagnostics.step = "Loading ZIPA (${diagnostics.memorySummary()})"
-                        zipa = SoundRecognizer(store)
-                    }
+                    if (stt == null) stt = timedLoad("Omnilingual ASR") { SpeechToText(store) }
+                    if (zipa == null) zipa = timedLoad("ZIPA") { SoundRecognizer(store) }
                     diagnostics.step = null
+                    loadingStep = null
                 }
                 screen = Screen.PickLanguage
             } catch (e: Throwable) {
@@ -329,6 +343,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (backgroundJob?.isActive == true || busy != Busy.Idle) return
         if (pendingSentences.isEmpty() && pendingWord == null) return
         val lang = language ?: return
+        diagnostics.log("Background lookups: start (${diagnostics.memorySummary()})")
         backgroundJob = viewModelScope.launch {
             while (true) {
                 val word = pendingWord
@@ -351,6 +366,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         tutor?.cancelLookup()
         job.cancelAndJoin()
         backgroundJob = null
+        diagnostics.log("Background lookups: paused")
     }
 
     /** Works out the meaning and sounds of every word in [sentence] and stores them. */

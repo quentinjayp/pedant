@@ -78,7 +78,7 @@ class SpeechToText(store: ModelStore) {
             modelConfig = OfflineModelConfig(
                 omnilingual = OfflineOmnilingualAsrCtcModelConfig(model = store.asrModel.path),
                 tokens = store.asrTokens.path,
-                numThreads = 4,
+                numThreads = 2,
             ),
         ),
     )
@@ -106,7 +106,7 @@ class SoundRecognizer(store: ModelStore) {
             modelConfig = OfflineModelConfig(
                 zipformerCtc = OfflineZipformerCtcModelConfig(model = store.zipaModel.path),
                 tokens = store.zipaTokens.path,
-                numThreads = 4,
+                numThreads = 2,
             ),
         ),
     )

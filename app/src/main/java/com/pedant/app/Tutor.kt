@@ -37,7 +37,8 @@ class Tutor(context: Context, modelFile: File) {
     private val engine: Engine = Engine(
         EngineConfig(
             modelPath = modelFile.path,
-            backend = Backend.CPU(),
+            // Four threads leave the phone's other cores free for the screen and the system.
+            backend = Backend.CPU(threadCount = 4),
             maxNumTokens = 2048,
             cacheDir = context.cacheDir.path,
         ),

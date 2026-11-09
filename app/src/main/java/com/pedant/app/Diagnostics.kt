@@ -32,6 +32,17 @@ class Diagnostics(private val context: Context) {
         }
     }
 
+    private val eventLog = File(context.filesDir, "events.log")
+
+    /** Adds a timestamped line to a short rolling log that is included in crash reports. */
+    fun log(event: String) {
+        runCatching {
+            val time = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
+            val lines = (if (eventLog.exists()) eventLog.readLines() else emptyList()) + "$time $event"
+            eventLog.writeText(lines.takeLast(40).joinToString("\n") + "\n")
+        }
+    }
+
     /** Free memory right now, for crash reports. */
     fun memorySummary(): String {
         val am = context.getSystemService(ActivityManager::class.java) ?: return ""
@@ -45,6 +56,7 @@ class Diagnostics(private val context: Context) {
         get() = prefs.getString("step", null)
         set(value) {
             prefs.edit().putString("step", value).commit()
+            value?.let { log(it) }
         }
 
     /**
@@ -54,40 +66,50 @@ class Diagnostics(private val context: Context) {
     fun takeCrashReport(): String? {
         val unfinishedStep = step
         val javaTrace = javaCrashFile.takeIf { it.exists() }?.readText()
-        // Android also closes background apps for memory; only count that if a step was unfinished.
-        val exit = lastExitInfo()?.takeIf {
-            unfinishedStep != null || it.reason in setOf(
+        val exits = recentExits()
+        // Android also closes background apps for memory; only report if something went wrong.
+        val crashed = exits.any {
+            it.reason in setOf(
                 ApplicationExitInfo.REASON_CRASH,
                 ApplicationExitInfo.REASON_CRASH_NATIVE,
                 ApplicationExitInfo.REASON_ANR,
             )
         }
-        if (unfinishedStep == null && javaTrace == null && exit == null) return null
+        if (unfinishedStep == null && javaTrace == null && !crashed) {
+            exits.firstOrNull()?.let { prefs.edit().putLong("lastExitSeen", it.timestamp).commit() }
+            return null
+        }
 
         val report = buildString {
             appendLine("App version: ${BuildConfigInfo.version(context)}")
             unfinishedStep?.let { appendLine("Was doing: $it") }
-            exit?.let {
-                val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(it.timestamp))
-                appendLine("Closed at: $time")
-                appendLine("Reason: ${reasonName(it.reason)}")
-                it.description?.let { d -> appendLine("Details: $d") }
-                appendLine("Memory used: ${it.pss / 1024} MB (resident ${it.rss / 1024} MB)")
-                appendLine("Status code: ${it.status}")
+            exits.forEachIndexed { i, exit ->
+                val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date(exit.timestamp))
+                appendLine()
+                appendLine(if (i == 0) "Last closed at: $time" else "Before that, closed at: $time")
+                appendLine("Reason: ${reasonName(exit.reason)}")
+                exit.description?.let { d -> appendLine("Details: $d") }
+                appendLine("Memory used: ${exit.pss / 1024} MB (resident ${exit.rss / 1024} MB)")
+            }
+            if (eventLog.exists()) {
+                appendLine()
+                appendLine("Recent events:")
+                eventLog.readLines().takeLast(15).forEach { appendLine(it) }
             }
             javaTrace?.let { appendLine(); append(it.take(4000)) }
         }
 
         step = null
         javaCrashFile.delete()
-        exit?.let { prefs.edit().putLong("lastExitSeen", it.timestamp).commit() }
+        exits.firstOrNull()?.let { prefs.edit().putLong("lastExitSeen", it.timestamp).commit() }
         return report
     }
 
-    private fun lastExitInfo(): ApplicationExitInfo? {
-        val am = context.getSystemService(ActivityManager::class.java) ?: return null
-        val info = am.getHistoricalProcessExitReasons(context.packageName, 0, 1).firstOrNull() ?: return null
-        return info.takeIf { it.timestamp > prefs.getLong("lastExitSeen", 0) }
+    /** How the app closed recently (newest first), since the last report. */
+    private fun recentExits(): List<ApplicationExitInfo> {
+        val am = context.getSystemService(ActivityManager::class.java) ?: return emptyList()
+        val seen = prefs.getLong("lastExitSeen", 0)
+        return am.getHistoricalProcessExitReasons(context.packageName, 0, 3).filter { it.timestamp > seen }
     }
 
     private fun reasonName(reason: Int) = when (reason) {
