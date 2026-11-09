@@ -44,12 +44,12 @@ class Tutor(context: Context, modelFile: File) {
     ).also { it.initialize() }
     private var conversation: Conversation? = null
 
-    fun startConversation(language: Language, mode: Mode) {
+    fun startConversation(language: Language, mode: Mode, scenario: Scenario) {
         conversation?.close()
         val prompt = when (mode) {
             Mode.Conversation -> conversationPrompt(language)
             Mode.Learning -> learningPrompt(language)
-        }
+        } + "\n\n" + scenarioPrompt(language, scenario)
         conversation = engine.createConversation(
             ConversationConfig(
                 systemInstruction = Contents.of(prompt),
@@ -115,9 +115,7 @@ class Tutor(context: Context, modelFile: File) {
     }
 
     companion object {
-        const val CONVERSATION_START =
-            "[The learner has just started the conversation. Greet them and ask one simple question. " +
-                "Write CORRECTION: none]"
+        const val CONVERSATION_START = "[START] Write CORRECTION: none"
         const val LEARNING_START = "[START]"
         fun learningTranslate(english: String) = "[TRANSLATE] $english"
         fun learningSaid(phrase: String) = "[SAID] $phrase"
@@ -143,10 +141,22 @@ class Tutor(context: Context, modelFile: File) {
             sentences) and usually end with a question to keep the conversation going.>
         """.trimIndent()
 
+        /** How to open the conversation, and who to play in a scenario. */
+        private fun scenarioPrompt(language: Language, scenario: Scenario): String {
+            val role = scenario.role
+            return if (role == null) {
+                "When you receive [START], open the conversation by asking, in ${language.englishName}: " +
+                    "\"Are you ready to learn some ${language.englishName}? What would you like to talk about today?\""
+            } else {
+                "Role-play: $role Stay in character as that person throughout, speaking naturally. " +
+                    "When you receive [START], open the scene in character with one or two short, simple sentences."
+            }
+        }
+
         private fun learningPrompt(language: Language) = """
             You are a friendly ${language.englishName} tutor running a speaking drill with an English speaker.
             You receive three kinds of messages:
-            - [START]: greet the learner in ${language.englishName} with one short, simple sentence.
+            - [START]: open the conversation in ${language.englishName} as described below.
             - [TRANSLATE] <English>: the learner wants to say this. It may be a raw speech transcript
               without punctuation. Translate it into natural, simple ${language.englishName}.
             - [SAID] <phrase>: the learner has just said this phrase in ${language.englishName}. Reply to it

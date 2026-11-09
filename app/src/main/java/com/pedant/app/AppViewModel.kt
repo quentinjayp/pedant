@@ -91,6 +91,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var busy by mutableStateOf(Busy.Idle)
         private set
     var mode by mutableStateOf(Mode.Learning)
+    var scenario by mutableStateOf(Scenario.Default)
     /** Learning mode: the phrase to repeat, or null while waiting for the next English line. */
     var drillPhrase by mutableStateOf<String?>(null)
         private set
@@ -212,7 +213,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         ttsVoice = voice
                     }
                     diagnostics.step = "Starting a ${lang.englishName} ${mode.title} session"
-                    checkNotNull(tutor).startConversation(lang, mode)
+                    checkNotNull(tutor).startConversation(lang, mode, scenario)
                     diagnostics.step = null
                 }
                 pauseBackground()

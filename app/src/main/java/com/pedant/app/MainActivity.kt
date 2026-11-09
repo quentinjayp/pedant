@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
@@ -210,8 +211,26 @@ private fun LanguageScreen(vm: AppViewModel) {
             }
         }
         Text(
-            vm.mode.description + " Then pick a language.",
+            vm.mode.description,
             modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        Text(
+            "Scenario",
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp),
+        )
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Scenario.entries.forEach { sc ->
+                FilterChip(selected = vm.scenario == sc, onClick = { vm.scenario = sc }, label = { Text(sc.title) })
+            }
+        }
+        Text(
+            vm.scenario.scene + " Then pick a language.",
+            modifier = Modifier.padding(horizontal = 16.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         vm.progress?.let {
             Column(Modifier.padding(16.dp)) {
@@ -271,6 +290,12 @@ private fun ConversationScreen(vm: AppViewModel) {
             )
             TextButton(onClick = vm::newConversation, enabled = vm.busy == Busy.Idle) { Text("New conversation") }
         }
+        Text(
+            vm.scenario.scene,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 6.dp),
+        )
         HorizontalDivider()
 
         LazyColumn(
