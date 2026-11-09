@@ -633,7 +633,7 @@ private fun WordBubble(
                 lookup.soundsLike?.let { Text("Sounds like: $it", fontSize = 15.sp) }
                 lookup.sounds?.let { Text("Sounds (IPA): /$it/", fontSize = 14.sp) }
                 lookup.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 14.sp) }
-                HearButtons("Hear it:") { slow -> onHear(lookup.word, slow) }
+                HearButtons("Hear it:", onHear = { slow -> onHear(lookup.word, slow) })
                 Text(
                     "From: ${lookup.sentence}",
                     fontSize = 12.sp,
