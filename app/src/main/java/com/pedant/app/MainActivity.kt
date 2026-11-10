@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -191,7 +192,11 @@ private fun CrashScreen(vm: AppViewModel) {
 /** The loading screen: a rough progress bar and which model is loading. */
 @Composable
 private fun ModelLoadingScreen(vm: AppViewModel) {
-    val progress by animateFloatAsState(vm.loadProgress, label = "loading")
+    val progress by animateFloatAsState(
+        vm.loadProgress,
+        animationSpec = tween(AppViewModel.LOADING_BAR_FILL_MS),
+        label = "loading",
+    )
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,

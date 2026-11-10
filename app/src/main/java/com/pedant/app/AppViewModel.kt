@@ -226,8 +226,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val ticker = launch(Dispatchers.Default) {
                 while (true) {
                     val grown = (residentBytes() - startBytes).coerceAtLeast(0L)
-                    // Never past 97% until loading is done, and never backwards.
-                    loadProgress = maxOf(loadProgress, (grown.toFloat() / expected).coerceAtMost(0.97f))
+                    // Never past 99% until loading is done, and never backwards.
+                    loadProgress = maxOf(loadProgress, (grown.toFloat() / expected).coerceAtMost(0.99f))
                     delay(250)
                 }
             }
@@ -247,6 +247,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 ticker.cancel()
                 (residentBytes() - startBytes).takeIf { loadingAll && it > 0 }?.let { loadPrefs.edit().putLong("growth", it).apply() }
                 loadProgress = 1f
+                // Let the bar fill to 100% before moving on.
+                delay(LOADING_BAR_FILL_MS + 100L)
                 screen = Screen.PickLanguage
             } catch (e: Throwable) {
                 ticker.cancel()
@@ -755,6 +757,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         /** Speaking rate for "Slow": a bit over half normal speed, still natural-sounding. */
         private const val SLOW_SPEED = 0.6f
+
+        /** How long the loading bar takes to move to a new amount. */
+        const val LOADING_BAR_FILL_MS = 500
     }
 
     override fun onCleared() {
