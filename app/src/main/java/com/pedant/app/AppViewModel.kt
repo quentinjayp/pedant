@@ -1,6 +1,9 @@
 package com.pedant.app
 
 import android.app.Application
+import android.content.Context
+import android.system.Os
+import android.system.OsConstants
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -20,6 +23,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
@@ -178,16 +182,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** What is loading right now and since when, shown on the loading screen. */
-    var loadingStep by mutableStateOf<Pair<String, Long>?>(null)
+    /** The model loading right now, shown on the loading screen. */
+    var loadingStep by mutableStateOf<String?>(null)
         private set
 
-    fun memorySummary(): String = diagnostics.memorySummary()
+    /**
+     * Rough loading progress, 0 to 1, estimated from how much memory the app has taken on so far
+     * compared with how much loading took last time (the model files' size the first time).
+     */
+    var loadProgress by mutableStateOf(0f)
+        private set
+
+    private val loadPrefs = app.getSharedPreferences("loading", Context.MODE_PRIVATE)
+
+    /** Memory the app is using right now (resident set size), in bytes. */
+    private fun residentBytes(): Long = runCatching {
+        File("/proc/self/statm").readText().trim().split(' ')[1].toLong() * Os.sysconf(OsConstants._SC_PAGESIZE)
+    }.getOrDefault(0L)
 
     /** Loads one model, recording how long it took and the free memory before and after. */
     private fun <T> timedLoad(name: String, load: () -> T): T {
         val before = diagnostics.memorySummary()
-        loadingStep = name to System.currentTimeMillis()
+        loadingStep = name
         diagnostics.step = "Loading $name ($before)"
         diagnostics.log("Loading $name: start, $before")
         val start = System.currentTimeMillis()
@@ -201,6 +217,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         error = null
         screen = Screen.Loading
         viewModelScope.launch {
+            // Only a full load is a fair guide for next time.
+            val loadingAll = tutor == null && stt == null && zipa == null
+            val startBytes = residentBytes()
+            val expected = loadPrefs.getLong("growth", 0L).takeIf { it > 0 }
+                ?: listOfNotNull(store.gemmaModel, store.asrModel, store.zipaModel).sumOf { it.length() }.coerceAtLeast(1L)
+            loadProgress = 0f
+            val ticker = launch(Dispatchers.Default) {
+                while (true) {
+                    val grown = (residentBytes() - startBytes).coerceAtLeast(0L)
+                    // Never past 97% until loading is done, and never backwards.
+                    loadProgress = maxOf(loadProgress, (grown.toFloat() / expected).coerceAtMost(0.97f))
+                    delay(250)
+                }
+            }
             try {
                 withContext(Dispatchers.Default) {
                     // Gemma first: it needs the most memory, so it loads while the most is free.
@@ -214,8 +244,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     diagnostics.step = null
                     loadingStep = null
                 }
+                ticker.cancel()
+                (residentBytes() - startBytes).takeIf { loadingAll && it > 0 }?.let { loadPrefs.edit().putLong("growth", it).apply() }
+                loadProgress = 1f
                 screen = Screen.PickLanguage
             } catch (e: Throwable) {
+                ticker.cancel()
                 diagnostics.step = null
                 error = "Could not load the models: ${e.message}"
                 screen = Screen.Setup

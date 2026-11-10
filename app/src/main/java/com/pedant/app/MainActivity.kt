@@ -32,6 +32,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -187,29 +188,24 @@ private fun CrashScreen(vm: AppViewModel) {
     }
 }
 
-/** The loading screen: which model is loading, for how long, and the free memory. */
+/** The loading screen: a rough progress bar and which model is loading. */
 @Composable
 private fun ModelLoadingScreen(vm: AppViewModel) {
-    var now by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            now = System.currentTimeMillis()
-            kotlinx.coroutines.delay(1000)
-        }
-    }
-    val step = vm.loadingStep
-    val detail = if (step == null) "" else {
-        val seconds = (now - step.second) / 1000
-        "\n\nLoading ${step.first}… $seconds s\nMemory: ${vm.memorySummary()}"
-    }
+    val progress by animateFloatAsState(vm.loadProgress, label = "loading")
     Column(
-        Modifier.fillMaxSize(),
+        Modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CircularProgressIndicator()
+        Text("Loading the models…")
         Spacer(Modifier.height(16.dp))
-        Text("Loading the models…\nThe first time can take a minute or two.$detail")
+        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        Text(
+            vm.loadingStep?.let { "Loading $it…" } ?: "",
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
