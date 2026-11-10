@@ -74,6 +74,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val store = ModelStore(app)
     private val diagnostics = Diagnostics(app)
+    private val openings = OpeningCache(app.filesDir)
     private val recorder = MicRecorder()
     private var tutor: Tutor? = null
     private var stt: SpeechToText? = null
@@ -231,7 +232,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 try {
                     val voice = store.installedVoice(lang)
                         ?: withProgress { report -> store.downloadVoice(lang, report) }
-                    withContext(Dispatchers.Default) {
+                    val openingKey = Tutor.openingKey(lang, mode, scenario)
+                    val opening = withContext(Dispatchers.Default) {
                         if (ttsVoice != voice) {
                             diagnostics.step = "Loading the $voice voice"
                             tts?.release()
@@ -240,15 +242,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             wordSoundsCache.clear()
                         }
                         diagnostics.step = "Starting a ${lang.englishName} ${mode.title} session"
-                        checkNotNull(tutor).startConversation(lang, mode, scenario)
+                        val saved = openings.text(openingKey)
+                        checkNotNull(tutor).startConversation(lang, mode, scenario, saved)
                         diagnostics.step = null
+                        saved
                     }
                     language = lang
                     chat.clear()
                     startDrill(null)
                     editableIndex = null
                     screen = Screen.Conversation
-                    runTurn(if (mode == Mode.Learning) Tutor.LEARNING_START else Tutor.CONVERSATION_START)
+                    if (opening != null) {
+                        showOpening(openingKey, voice, opening)
+                    } else {
+                        runTurn(Tutor.startMessage(mode), saveOpening = openingKey to voice)
+                    }
                 } catch (e: CancellationException) {
                     diagnostics.step = null
                     throw e
@@ -640,21 +648,58 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         drillAttempts = 0
     }
 
-    /** Sends [message] to the tutor, shows the answer as it streams in and speaks the reply. */
-    private suspend fun runTurn(message: String) {
+    /** Shows and plays the saved opening [raw] for [key], without asking Gemma. */
+    private suspend fun showOpening(key: String, voice: String, raw: String) {
+        val turn = Tutor.parse(raw)
+        chat += ChatItem.Tutor(turn.correction, turn.reply, turn.english)
+        busy = Busy.Speaking
+        try {
+            diagnostics.step = "Speaking the saved opening with Piper"
+            withContext(Dispatchers.Default) {
+                val engine = checkNotNull(tts)
+                val audio = openings.audio(key, voice)
+                    ?: engine.synthesize(turn.reply).also { openings.saveAudio(key, voice, it) }
+                engine.play(audio)
+            }
+            queueLookups(turn.reply)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            chat += ChatItem.Note("Something went wrong: ${e.message}")
+        } finally {
+            diagnostics.step = null
+            busy = Busy.Idle
+        }
+    }
+
+    /**
+     * Sends [message] to the tutor, shows the answer as it streams in and speaks the reply.
+     * [saveOpening] (key, voice) saves the answer and its audio as the opening for those choices.
+     */
+    private suspend fun runTurn(message: String, saveOpening: Pair<String, String>? = null) {
         busy = Busy.Thinking
         val index = chat.size
         chat += ChatItem.Tutor(null, "")
         try {
+            var raw = ""
             var latest = TutorTurn()
             diagnostics.step = "Generating a reply with Gemma"
-            checkNotNull(tutor).respond(message).collect { raw ->
-                latest = Tutor.parse(raw)
+            checkNotNull(tutor).respond(message).collect {
+                raw = it
+                latest = Tutor.parse(it)
                 chat[index] = ChatItem.Tutor(latest.correction, latest.reply, latest.english)
             }
             busy = Busy.Speaking
             diagnostics.step = "Speaking the reply with Piper"
-            withContext(Dispatchers.Default) { tts?.speak(latest.reply) }
+            withContext(Dispatchers.Default) {
+                val voice = checkNotNull(tts)
+                val audio = voice.synthesize(latest.reply)
+                if (saveOpening != null && latest.reply.isNotBlank()) {
+                    openings.saveText(saveOpening.first, raw)
+                    openings.saveAudio(saveOpening.first, saveOpening.second, audio)
+                }
+                voice.play(audio)
+            }
             queueLookups(latest.reply)
         } catch (e: CancellationException) {
             throw e

@@ -175,12 +175,6 @@ class TextToSpeech(
         ),
     )
 
-    /** Speaks [text] and returns once playback has finished. */
-    fun speak(text: String) {
-        if (text.isBlank()) return
-        play(synthesize(text))
-    }
-
     fun synthesize(text: String, speed: Float = 1.0f): Audio {
         val fixed = rewrites.fold(text) { t, (pattern, replacement) -> pattern.replace(t, replacement) }
         return tts.generate(fixed, sid = 0, speed = speed).toAudio()

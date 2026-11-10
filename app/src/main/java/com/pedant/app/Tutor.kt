@@ -45,15 +45,16 @@ class Tutor(context: Context, modelFile: File) {
     ).also { it.initialize() }
     private var conversation: Conversation? = null
 
-    fun startConversation(language: Language, mode: Mode, scenario: Scenario) {
+    /**
+     * Starts a new conversation. With [opening] (Gemma's saved answer to [startMessage]), the
+     * conversation begins as if Gemma had just said it, so there is nothing to generate.
+     */
+    fun startConversation(language: Language, mode: Mode, scenario: Scenario, opening: String? = null) {
         conversation?.close()
-        val prompt = when (mode) {
-            Mode.Conversation -> conversationPrompt(language)
-            Mode.Learning -> learningPrompt(language)
-        } + "\n\n" + scenarioPrompt(language, scenario)
         conversation = engine.createConversation(
             ConversationConfig(
-                systemInstruction = Contents.of(prompt),
+                systemInstruction = Contents.of(systemPrompt(language, mode, scenario)),
+                initialMessages = opening?.let { listOf(Message.user(startMessage(mode)), Message.model(it)) }.orEmpty(),
                 samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.7),
             ),
         )
@@ -121,8 +122,22 @@ class Tutor(context: Context, modelFile: File) {
     }
 
     companion object {
-        const val CONVERSATION_START = "[START] Write CORRECTION: none"
-        const val LEARNING_START = "[START]"
+        /** The message that asks Gemma to open the conversation. */
+        fun startMessage(mode: Mode) = when (mode) {
+            Mode.Conversation -> "[START] Write CORRECTION: none"
+            Mode.Learning -> "[START]"
+        }
+
+        private fun systemPrompt(language: Language, mode: Mode, scenario: Scenario) = when (mode) {
+            Mode.Conversation -> conversationPrompt(language)
+            Mode.Learning -> learningPrompt(language)
+        } + "\n\n" + scenarioPrompt(language, scenario)
+
+        /** Names the saved opening for these choices; it changes whenever the instructions change. */
+        fun openingKey(language: Language, mode: Mode, scenario: Scenario): String {
+            val hash = (systemPrompt(language, mode, scenario) + startMessage(mode)).hashCode()
+            return "${language.code}-${mode.name}-${scenario.name}-${Integer.toHexString(hash)}"
+        }
         fun learningTranslate(english: String) = "[TRANSLATE] $english"
         fun learningSaid(phrase: String) = "[SAID] $phrase"
 
