@@ -51,14 +51,29 @@ class Tutor(context: Context, modelFile: File) {
      */
     fun startConversation(language: Language, mode: Mode, scenario: Scenario, opening: String? = null) {
         conversation?.close()
-        conversation = engine.createConversation(
-            ConversationConfig(
-                systemInstruction = Contents.of(systemPrompt(language, mode, scenario)),
-                initialMessages = opening?.let { listOf(Message.user(startMessage(mode)), Message.model(it)) }.orEmpty(),
-                samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.7),
-            ),
-        )
+        conversation = null
+        val key = openingKey(language, mode, scenario) + if (opening != null) "+opening" else ""
+        val base = ready?.takeIf { it.first == key }?.second ?: run {
+            ready?.second?.close()
+            ready = null
+            // Gemma reads the instructions (and the saved opening) now, not on the first message.
+            engine.createConversation(
+                ConversationConfig(
+                    systemInstruction = Contents.of(systemPrompt(language, mode, scenario)),
+                    initialMessages = opening?.let { listOf(Message.user(startMessage(mode)), Message.model(it)) }.orEmpty(),
+                    samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.7),
+                    prefillPrefaceOnInit = true,
+                ),
+            ).also { ready = key to it }
+        }
+        conversation = base.clone()
     }
+
+    /**
+     * The last conversation's start, with the instructions already read, kept so starting the same
+     * choices again skips that step. Only one is kept: each holds memory.
+     */
+    private var ready: Pair<String, Conversation>? = null
 
     /** Streams the tutor's raw answer to [userText] as it is generated (cumulative text). */
     fun respond(userText: String): Flow<String> {
@@ -118,6 +133,7 @@ class Tutor(context: Context, modelFile: File) {
 
     fun close() {
         conversation?.close()
+        ready?.second?.close()
         engine.close()
     }
 

@@ -233,20 +233,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     val voice = store.installedVoice(lang)
                         ?: withProgress { report -> store.downloadVoice(lang, report) }
                     val openingKey = Tutor.openingKey(lang, mode, scenario)
-                    val opening = withContext(Dispatchers.Default) {
-                        if (ttsVoice != voice) {
-                            diagnostics.step = "Loading the $voice voice"
-                            tts?.release()
-                            tts = TextToSpeech(store, voice, lang.ttsRewrites, getApplication<Application>().cacheDir)
-                            ttsVoice = voice
-                            wordSoundsCache.clear()
+                    diagnostics.step = "Starting a ${lang.englishName} ${mode.title} session and loading the $voice voice"
+                    val opening = coroutineScope {
+                        // Gemma reads its instructions while the voice loads.
+                        val started = async(Dispatchers.Default) {
+                            val saved = openings.text(openingKey)
+                            checkNotNull(tutor).startConversation(lang, mode, scenario, saved)
+                            diagnostics.log("Gemma ready for the ${lang.englishName} ${mode.title} session")
+                            saved
                         }
-                        diagnostics.step = "Starting a ${lang.englishName} ${mode.title} session"
-                        val saved = openings.text(openingKey)
-                        checkNotNull(tutor).startConversation(lang, mode, scenario, saved)
-                        diagnostics.step = null
-                        saved
+                        withContext(Dispatchers.Default) {
+                            if (ttsVoice != voice) {
+                                tts?.release()
+                                tts = TextToSpeech(store, voice, lang.ttsRewrites, getApplication<Application>().cacheDir)
+                                ttsVoice = voice
+                                wordSoundsCache.clear()
+                                diagnostics.log("Loaded the $voice voice")
+                            }
+                        }
+                        started.await()
                     }
+                    diagnostics.step = null
                     language = lang
                     chat.clear()
                     startDrill(null)
