@@ -32,24 +32,50 @@ class Dictionary(file: File) : Closeable {
         }
 
     /**
-     * The meanings of [word], one line per part of speech, followed by the meanings of the word it
-     * is a form of ("vais" → "aller"). Null if the dictionary doesn't have it.
+     * The meanings of [word], meanings first. A form ("dessins") shows its base word's meanings,
+     * with what form it is noted after:
+     *
+     *     drawing (act of drawing); design (pattern)
+     *     noun · plural of dessin
+     *
+     * When the word is more than one part of speech, each gets its own line, labelled at the end.
+     * Null if the dictionary doesn't have the word.
      */
     fun describe(word: String): Description? {
         val found = entries(word)
         if (found.isEmpty()) return null
-        val lines = found.map { line(it) }.toMutableList()
-        found.mapNotNull { it.formOf }.distinct().take(1).forEach { base ->
-            entries(base).filter { it.formOf == null }.take(2).forEach { lines += "${it.word}: ${line(it)}" }
+        val senses = found.map { e ->
+            val base = e.formOf?.let { baseEntries(it, e.pos) }.orEmpty()
+            if (base.isEmpty()) Sense(e.pos, e.meanings, note = null)
+            else Sense(e.pos, base.flatMap { it.meanings }, note = e.meanings.first())
         }
-        return Description(lines.distinct().joinToString("\n"), found.firstNotNullOfOrNull { it.ipa })
+        // One line per part of speech.
+        val groups = senses.groupBy { it.pos }.map { (pos, group) ->
+            Sense(pos, group.flatMap { it.meanings }.distinct().take(MAX_MEANINGS), group.firstNotNullOfOrNull { it.note })
+        }
+        val text = if (groups.size == 1) {
+            val g = groups[0]
+            listOf(g.meanings.joinToString("; "), listOfNotNull(posName(g.pos), g.note).joinToString(" · "))
+                .filter { it.isNotEmpty() }
+                .joinToString("\n")
+        } else {
+            groups.joinToString("\n") { g ->
+                val label = listOfNotNull(posName(g.pos), g.note).joinToString("; ")
+                if (label.isEmpty()) g.meanings.joinToString("; ") else "${g.meanings.joinToString("; ")} ($label)"
+            }
+        }
+        return Description(text, found.firstNotNullOfOrNull { it.ipa })
     }
 
-    private fun line(e: Entry): String {
-        val pos = e.pos?.let { POS_NAMES[it] ?: it }
-        val meanings = e.meanings.joinToString("; ")
-        return if (pos == null) meanings else "($pos) $meanings"
+    private data class Sense(val pos: String?, val meanings: List<String>, val note: String?)
+
+    /** [base]'s own entries (not forms of something else), the same part of speech first. */
+    private fun baseEntries(base: String, pos: String?): List<Entry> {
+        val all = entries(base).filter { it.formOf == null }
+        return all.filter { it.pos == pos }.ifEmpty { all }
     }
+
+    private fun posName(pos: String?): String? = pos?.let { POS_NAMES[it] ?: it }
 
     override fun close() = db.close()
 
@@ -62,6 +88,8 @@ class Dictionary(file: File) : Closeable {
             "pron" to "pronoun", "det" to "determiner", "intj" to "interjection", "num" to "number",
             "name" to "name", "particle" to "particle", "article" to "article",
         )
+
+        private const val MAX_MEANINGS = 4
 
         /** Shown with dictionary meanings, as the license requires. */
         const val CREDIT = "From Wiktionary (CC BY-SA 4.0)"
