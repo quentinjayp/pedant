@@ -222,14 +222,34 @@ private fun Modifier.card(
     borderWidth: Dp = 1.dp,
 ): Modifier = clip(shape).background(background).then(if (border != null) Modifier.border(borderWidth, border, shape) else Modifier)
 
-/** The logo's background, as on the app icon: bright orange to bright blue. */
-private val LogoGradient = Brush.linearGradient(0.33f to Color(0xFFFF7615), 0.67f to Color(0xFF159EFF))
+/**
+ * The logo's background, as on the app icon: violet from the top left, cyan from the top right
+ * and orange from the bottom, each radiating from its corner and blending in the middle.
+ */
+private fun Modifier.logoBackground() = drawBehind {
+    val w = size.width
+    val h = size.height
+    // The icon's points, in its 108-unit drawing whose visible part is the middle 72.
+    fun at(x: Float, y: Float) = Offset((x - 18f) / 72f * w, (y - 18f) / 72f * h)
+    val radius = 70f / 72f * w
+    drawRect(LogoColors.Violet)
+    listOf(at(14f, 14f) to LogoColors.Violet, at(94f, 14f) to LogoColors.Cyan, at(54f, 94f) to LogoColors.Orange)
+        .forEach { (centre, colour) ->
+            drawRect(
+                Brush.radialGradient(
+                    0f to colour, 0.35f to colour, 1f to colour.copy(alpha = 0f),
+                    center = centre,
+                    radius = radius,
+                ),
+            )
+        }
+}
 
 /** The logo: the app icon's P (Potta One) on its gradient, cut to a rounded tile. */
 @Composable
 private fun LogoTile() {
     Box(
-        Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(LogoGradient),
+        Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).logoBackground(),
         contentAlignment = Alignment.Center,
     ) {
         // The icon's drawing is 108 units with the visible part in the middle 72, as launchers show it.
@@ -255,7 +275,7 @@ private fun HeaderTitle(label: String, title: String) {
 
 /** A small upper-case label. */
 @Composable
-private fun SmallLabel(text: String, color: Color = Pastel.SkyDark, modifier: Modifier = Modifier) {
+private fun SmallLabel(text: String, color: Color = Pastel.PrimaryDark, modifier: Modifier = Modifier) {
     Text(
         text.uppercase(),
         fontSize = 11.sp,
@@ -268,7 +288,7 @@ private fun SmallLabel(text: String, color: Color = Pastel.SkyDark, modifier: Mo
 
 /** A small rounded tag, e.g. "Tutor" on a tutor's line. */
 @Composable
-private fun Tag(text: String, background: Color = Pastel.SkyContainer, color: Color = Pastel.SkyDark) {
+private fun Tag(text: String, background: Color = Pastel.PrimaryContainer, color: Color = Pastel.PrimaryDark) {
     SmallLabel(
         text,
         color,
@@ -276,7 +296,7 @@ private fun Tag(text: String, background: Color = Pastel.SkyContainer, color: Co
     )
 }
 
-private enum class PillStyle { Primary, Outline, Soft, Dark }
+private enum class PillStyle { Primary, Outline, Secondary, Cta }
 
 /** A small pill-shaped button. */
 @Composable
@@ -287,10 +307,10 @@ private fun PillButton(
     enabled: Boolean = true,
 ) {
     val (container, content) = when (style) {
-        PillStyle.Primary -> Pastel.Sky to Pastel.White
-        PillStyle.Outline -> Pastel.White to Pastel.SkyDark
-        PillStyle.Soft -> Pastel.SurfaceContainer to Pastel.Ink
-        PillStyle.Dark -> Pastel.Ink to Pastel.White
+        PillStyle.Primary -> Pastel.Primary to Pastel.PrimaryInk
+        PillStyle.Outline -> Pastel.White to Pastel.PrimaryDark
+        PillStyle.Secondary -> Pastel.VioletContainer to Pastel.VioletDark
+        PillStyle.Cta -> Pastel.Cta to Pastel.CtaInk
     }
     Button(
         onClick = onClick,
@@ -302,7 +322,11 @@ private fun PillButton(
             disabledContainerColor = Pastel.SurfaceLow,
             disabledContentColor = Pastel.Outline,
         ),
-        border = if (style == PillStyle.Outline) BorderStroke(1.dp, Pastel.OutlineSoft) else null,
+        border = when (style) {
+            PillStyle.Outline -> BorderStroke(1.dp, Pastel.OutlineSoft)
+            PillStyle.Secondary -> BorderStroke(1.dp, Pastel.Violet)
+            else -> null
+        },
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
     ) {
         Text(text, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -316,7 +340,7 @@ private fun CtaButton(text: String, onClick: () -> Unit, modifier: Modifier = Mo
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Pastel.Apricot, contentColor = Pastel.White),
+        colors = ButtonDefaults.buttonColors(containerColor = Pastel.Cta, contentColor = Pastel.CtaInk),
         contentPadding = PaddingValues(vertical = 14.dp),
     ) {
         Text(text, fontSize = 15.sp, fontWeight = FontWeight.Bold)
@@ -329,7 +353,7 @@ private fun LinkButton(text: String, onClick: () -> Unit, enabled: Boolean = tru
     TextButton(
         onClick = onClick,
         enabled = enabled,
-        colors = ButtonDefaults.textButtonColors(contentColor = Pastel.SkyDark),
+        colors = ButtonDefaults.textButtonColors(contentColor = Pastel.PrimaryDark),
     ) {
         Text(text, fontWeight = FontWeight.Bold)
     }
@@ -340,8 +364,8 @@ private fun ProgressBar(fraction: Float, modifier: Modifier = Modifier) {
     LinearProgressIndicator(
         progress = { fraction },
         modifier = modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
-        color = Pastel.Sky,
-        trackColor = Pastel.OutlineSoft,
+        color = Pastel.PrimaryDark,
+        trackColor = Pastel.White.copy(alpha = 0.7f),
     )
 }
 
@@ -351,10 +375,10 @@ private fun PeachNotice(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
         fontSize = 13.sp,
-        color = Pastel.ApricotInk,
+        color = Pastel.CtaInk,
         modifier = modifier
             .fillMaxWidth()
-            .card(Pastel.ApricotContainer, Pastel.Apricot.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+            .card(Pastel.CtaContainer, Pastel.Cta, RoundedCornerShape(16.dp))
             .padding(12.dp),
     )
 }
@@ -456,7 +480,8 @@ private fun HomeScreen(vm: AppViewModel) {
                 mark = "▶",
                 title = "Continue conversation",
                 subtitle = if (vm.canContinue) "Pick up where you left off" else "No conversation yet",
-                color = Pastel.Apricot,
+                color = Pastel.Cta,
+                ink = Pastel.CtaInk,
                 enabled = vm.canContinue,
                 onClick = vm::continueConversation,
             )
@@ -464,7 +489,8 @@ private fun HomeScreen(vm: AppViewModel) {
                 mark = "+",
                 title = "New conversation",
                 subtitle = "Pick a mode, scenario and language",
-                color = Pastel.Sky,
+                color = Pastel.Primary,
+                ink = Pastel.PrimaryInk,
                 enabled = true,
                 onClick = vm::startNewConversation,
             )
@@ -474,8 +500,16 @@ private fun HomeScreen(vm: AppViewModel) {
 
 /** A large home-page button with a mark, a title and a line of explanation. */
 @Composable
-private fun HomeButton(mark: String, title: String, subtitle: String, color: Color, enabled: Boolean, onClick: () -> Unit) {
-    val content = if (enabled) Pastel.White else Pastel.Outline
+private fun HomeButton(
+    mark: String,
+    title: String,
+    subtitle: String,
+    color: Color,
+    ink: Color,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    val content = if (enabled) ink else Pastel.Outline
     Row(
         Modifier
             .fillMaxWidth()
@@ -487,7 +521,7 @@ private fun HomeButton(mark: String, title: String, subtitle: String, color: Col
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Box(
-            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Pastel.White.copy(alpha = if (enabled) 0.25f else 0.6f)),
+            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Pastel.White.copy(alpha = if (enabled) 0.5f else 0.6f)),
             contentAlignment = Alignment.Center,
         ) {
             Text(mark, color = content, fontSize = 18.sp, fontWeight = FontWeight.Bold)
@@ -544,11 +578,16 @@ private fun LanguageScreen(vm: AppViewModel) {
             ) {
                 Mode.entries.forEach { m ->
                     val selected = vm.mode == m
+                    // Learning in the main colour, Conversation in the second, as in the mockup.
+                    val (fill, ink) = when (m) {
+                        Mode.Learning -> Pastel.Primary to Pastel.PrimaryInk
+                        Mode.Conversation -> Pastel.Violet to Pastel.VioletInk
+                    }
                     Box(
                         Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(if (selected) Pastel.Sky else Color.Transparent)
+                            .background(if (selected) fill else Color.Transparent)
                             .clickable { vm.mode = m }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center,
@@ -557,7 +596,7 @@ private fun LanguageScreen(vm: AppViewModel) {
                             "${m.mark} ${m.title}",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (selected) Pastel.White else Pastel.Ink,
+                            color = if (selected) ink else Pastel.Ink,
                         )
                     }
                 }
@@ -587,10 +626,10 @@ private fun LanguageScreen(vm: AppViewModel) {
                         sc.title,
                         fontSize = 13.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                        color = if (selected) Pastel.White else Pastel.Ink,
+                        color = if (selected) Pastel.VioletInk else Pastel.Ink,
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
-                            .background(if (selected) Pastel.Sky else Pastel.SurfaceContainer)
+                            .background(if (selected) Pastel.Violet else Pastel.White.copy(alpha = 0.85f))
                             .clickable { vm.scenario = sc }
                             .padding(horizontal = 14.dp, vertical = 9.dp),
                     )
@@ -608,10 +647,10 @@ private fun LanguageScreen(vm: AppViewModel) {
                     Modifier
                         .padding(start = 16.dp, end = 16.dp, top = 10.dp)
                         .fillMaxWidth()
-                        .card(Pastel.SkyContainer, Pastel.Sky.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                        .card(Pastel.PrimaryContainer, Pastel.Primary, RoundedCornerShape(20.dp))
                         .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 4.dp),
                 ) {
-                    Text("Downloading the voice…", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Pastel.SkyInk)
+                    Text("Downloading the voice…", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Pastel.PrimaryInk)
                     Spacer(Modifier.height(8.dp))
                     ProgressBlock(it)
                     LinkButton("Cancel", vm::cancelVoiceDownload)
@@ -627,17 +666,17 @@ private fun LanguageScreen(vm: AppViewModel) {
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .card(Pastel.White, shape = RoundedCornerShape(16.dp))
+                            .card(Pastel.White.copy(alpha = 0.9f), shape = RoundedCornerShape(16.dp))
                             .clickable(enabled = vm.progress == null) { vm.pickLanguage(lang) }
                             .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Box(
-                            Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(Pastel.SurfaceContainer),
+                            Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(Pastel.VioletContainer),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(lang.code.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text(lang.code.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Pastel.VioletDark)
                         }
                         Text(lang.englishName, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         Text(lang.nativeName, fontSize = 14.sp, color = Pastel.InkSoft)
@@ -686,7 +725,7 @@ private fun ConversationScreen(vm: AppViewModel) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(Modifier.size(10.dp).clip(CircleShape).background(Pastel.Sky))
+                        Box(Modifier.size(10.dp).clip(CircleShape).background(Pastel.PrimaryDark))
                         Text(
                             vm.language?.let { "${it.englishName} · ${it.nativeName}" } ?: "",
                             fontSize = 17.sp,
@@ -747,7 +786,7 @@ private fun ConversationScreen(vm: AppViewModel) {
                         item.text,
                         fontSize = 13.sp,
                         color = Pastel.InkSoft,
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Pastel.SurfaceContainer)
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Pastel.White.copy(alpha = 0.75f))
                             .padding(horizontal = 14.dp, vertical = 8.dp),
                     )
                 }
@@ -765,18 +804,18 @@ private fun MicButton(vm: AppViewModel) {
     val enabled = vm.busy == Busy.Idle || listening
     val scale by animateFloatAsState(if (listening) 0.92f else 1f, label = "mic")
     val shape = RoundedCornerShape(28.dp)
-    val content = if (enabled) Pastel.White else Pastel.Outline
+    val content = if (enabled) Pastel.CtaInk else Pastel.Outline
     Column(
         Modifier
             .scale(scale)
             .size(88.dp)
             .card(
                 background = when {
-                    listening -> Pastel.ApricotPressed
-                    enabled -> Pastel.Apricot
+                    listening -> Pastel.CtaPressed
+                    enabled -> Pastel.Cta
                     else -> Pastel.White
                 },
-                border = if (enabled) null else Pastel.OutlineSoft,
+                border = if (enabled) Pastel.White else Pastel.OutlineSoft,
                 shape = shape,
                 borderWidth = 2.dp,
             )
@@ -842,15 +881,15 @@ private fun Bubble(
     } else {
         RoundedCornerShape(topStart = 6.dp, topEnd = 24.dp, bottomEnd = 24.dp, bottomStart = 24.dp)
     }
-    val ink = if (mine) Pastel.SkyInk else Pastel.Ink
+    val ink = if (mine) Pastel.VioletInk else Pastel.Ink
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
         Box {
             Column(
                 Modifier
                     .widthIn(max = 310.dp)
                     .card(
-                        background = if (mine) Pastel.SkySoft else Pastel.White,
-                        border = if (mine) Pastel.Sky.copy(alpha = 0.4f) else Pastel.OutlineSoft,
+                        background = if (mine) Pastel.VioletSoft else Pastel.White,
+                        border = if (mine) Pastel.Violet else Pastel.OutlineSoft,
                         shape = shape,
                     )
                     .then(
@@ -860,7 +899,7 @@ private fun Bubble(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (mine) SmallLabel(label) else Tag(label)
+                if (mine) SmallLabel(label, Pastel.VioletDark) else Tag(label)
                 if (onWord != null) {
                     TappableText(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = ink, onWord = { w, sentence, _ -> onWord(w, sentence) })
                 } else {
@@ -868,7 +907,7 @@ private fun Bubble(
                 }
                 detail?.takeIf { it.isNotBlank() }?.let {
                     if (!mine) HorizontalDivider(Modifier.padding(top = 4.dp), color = Pastel.SurfaceLow)
-                    Text(it, fontSize = 13.sp, color = if (mine) Pastel.SkyDark else Pastel.InkSoft)
+                    Text(it, fontSize = 13.sp, color = if (mine) Pastel.VioletDark else Pastel.InkSoft)
                 }
             }
             DropdownMenu(expanded = menuOpen && menu != null, onDismissRequest = { menuOpen = false }) {
@@ -886,20 +925,20 @@ private fun SayCard(item: ChatItem.Say, language: String?, onWord: (word: String
     Column(
         Modifier
             .fillMaxWidth()
-            .card(Pastel.SkyContainer, Pastel.Sky, RoundedCornerShape(26.dp), borderWidth = 2.dp)
+            .card(Pastel.PrimaryContainer, Pastel.Primary, RoundedCornerShape(26.dp), borderWidth = 2.dp)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(Pastel.Sky))
+            Box(Modifier.size(8.dp).clip(CircleShape).background(Pastel.PrimaryDark))
             SmallLabel(if (language == null) "Say:" else "Say in $language:")
         }
         if (item.phrase.isEmpty()) {
-            Text("…", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Pastel.SkyInk)
+            Text("…", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Pastel.PrimaryInk)
         } else {
-            TappableText(item.phrase, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Pastel.SkyInk, onWord = { w, sentence, _ -> onWord(w, sentence) })
+            TappableText(item.phrase, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Pastel.PrimaryInk, onWord = { w, sentence, _ -> onWord(w, sentence) })
         }
-        Text("“${item.english}”", fontSize = 13.sp, color = Pastel.SkyDark)
+        Text("“${item.english}”", fontSize = 13.sp, color = Pastel.PrimaryDark)
     }
 }
 
@@ -912,22 +951,22 @@ private fun AttemptCard(
     onSaySounds: (String) -> Unit,
 ) {
     val r = item.result
-    val accent = if (r.passed) Pastel.Sky else Pastel.Apricot
-    val ink = if (r.passed) Pastel.SkyInk else Pastel.ApricotInk
-    val inkSoft = if (r.passed) Pastel.SkyDark else Pastel.ApricotDark
+    val accent = if (r.passed) Pastel.Primary else Pastel.Cta
+    val ink = if (r.passed) Pastel.PrimaryInk else Pastel.CtaInk
     Column(
         Modifier
             .fillMaxWidth()
-            .card(if (r.passed) Pastel.SkySoft else Pastel.ApricotContainer, accent.copy(alpha = 0.4f), RoundedCornerShape(26.dp))
+            .card(if (r.passed) Pastel.PrimarySoft else Pastel.CtaContainer, accent, RoundedCornerShape(26.dp), borderWidth = if (r.passed) 2.dp else 1.dp)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Box(
-                Modifier.size(28.dp).clip(if (r.passed) CircleShape else RoundedCornerShape(10.dp)).background(accent),
+                Modifier.size(28.dp).clip(if (r.passed) CircleShape else RoundedCornerShape(10.dp))
+                    .background(if (r.passed) Pastel.PrimaryDark else Pastel.Cta),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(if (r.passed) "✓" else "!", color = Pastel.White, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+                Text(if (r.passed) "✓" else "!", color = if (r.passed) Pastel.White else Pastel.CtaInk, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
             }
             Text(
                 if (r.passed) "Correct!" else "Not quite. Listen and try again.",
@@ -937,7 +976,7 @@ private fun AttemptCard(
             )
         }
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Pastel.White.copy(alpha = 0.65f)).padding(12.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Pastel.White.copy(alpha = 0.75f)).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
@@ -948,25 +987,25 @@ private fun AttemptCard(
                 fontSize = 13.sp,
                 color = ink,
             )
-            Text("Sounds: /${item.sounds}/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = inkSoft)
+            Text("Sounds: /${item.sounds}/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.VioletDark)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ScoreMeter("Words", r.wordScore, Modifier.weight(1f))
-            ScoreMeter("Sounds", r.soundScore, Modifier.weight(1f))
+            ScoreMeter("Words", r.wordScore, Pastel.PrimaryDark, Modifier.weight(1f))
+            ScoreMeter("Sounds", r.soundScore, Pastel.VioletDark, Modifier.weight(1f))
         }
         r.issues.forEach { issue -> IssueCard(issue, enabled, onSay, onSaySounds) }
     }
 }
 
 @Composable
-private fun ScoreMeter(label: String, score: Double, modifier: Modifier = Modifier) {
+private fun ScoreMeter(label: String, score: Double, color: Color, modifier: Modifier = Modifier) {
     Row(
         modifier.clip(RoundedCornerShape(16.dp)).background(Pastel.White).padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Pastel.InkSoft)
-        Text("${(score * 100).toInt()}%", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Pastel.SkyDark)
+        Text("${(score * 100).toInt()}%", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = color)
     }
 }
 
@@ -986,20 +1025,20 @@ private fun IssueCard(issue: WordIssue, enabled: Boolean, onSay: (String) -> Uni
             Text("“${issue.word}”", fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
             when {
                 heardWord == null -> Tag("not heard", Pastel.SurfaceContainer, Pastel.InkSoft)
-                wordDiffers -> Tag("heard “$heardWord”", Pastel.ApricotContainer, Pastel.ApricotDark)
-                else -> Tag("word right, sounds off", Pastel.ApricotContainer, Pastel.ApricotDark)
+                wordDiffers -> Tag("heard “$heardWord”", Pastel.CtaContainer, Pastel.CtaDark)
+                else -> Tag("word right, sounds off", Pastel.CtaContainer, Pastel.CtaDark)
             }
         }
         if (issue.expectedSounds != null) {
-            SoundChip("Expected /${issue.expectedSounds}/", Pastel.SkyContainer, null, Pastel.SkyDark)
-            SoundChip("heard /${issue.heardSounds.orEmpty().ifEmpty { "—" }}/", Pastel.Bg, Pastel.OutlineSoft, Pastel.InkSoft)
+            SoundChip("Expected /${issue.expectedSounds}/", Pastel.PrimaryContainer, null, Pastel.PrimaryDark)
+            SoundChip("heard /${issue.heardSounds.orEmpty().ifEmpty { "—" }}/", Pastel.VioletContainer, null, Pastel.VioletDark)
         }
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PillButton("▶ Correct", { onSay(issue.word) }, PillStyle.Primary, enabled)
-            if (wordDiffers) PillButton("▶ Heard word", { onSay(heardWord!!) }, PillStyle.Soft, enabled)
+            if (wordDiffers) PillButton("▶ Heard word", { onSay(heardWord!!) }, PillStyle.Secondary, enabled)
             val heardSounds = issue.heardSounds
             if (!heardSounds.isNullOrEmpty()) {
-                PillButton("▶ Heard sounds", { onSaySounds(heardSounds) }, PillStyle.Soft, enabled)
+                PillButton("▶ Heard sounds", { onSaySounds(heardSounds) }, PillStyle.Secondary, enabled)
             }
         }
     }
@@ -1057,7 +1096,7 @@ private fun TappableText(
                 val right = l.getHorizontalPosition(range.last + 1, usePrimaryDirection = true)
                 val y = l.getLineBottom(line) - stroke
                 drawLine(
-                    color = Pastel.Sky,
+                    color = Pastel.VioletDark,
                     start = Offset(minOf(left, right), y),
                     end = Offset(maxOf(left, right), y),
                     strokeWidth = stroke,
@@ -1079,7 +1118,7 @@ private fun tappableAnnotated(
     onWord: (word: String, position: Int) -> Unit,
 ): Pair<AnnotatedString, List<IntRange>> {
     val linkStyle = TextLinkStyles(style = SpanStyle(textDecoration = TextDecoration.None))
-    val picked = SpanStyle(fontWeight = FontWeight.Bold, color = Pastel.SkyInk, background = Pastel.SkySoft)
+    val picked = SpanStyle(fontWeight = FontWeight.Bold, color = Pastel.VioletDark, background = Pastel.VioletContainer)
     val wordRanges = mutableListOf<IntRange>()
     val annotated = buildAnnotatedString {
         var last = 0
@@ -1153,16 +1192,16 @@ private fun WordBubble(
             Modifier
                 .padding(16.dp)
                 .fillMaxWidth()
-                .card(Pastel.White, Pastel.Sky, RoundedCornerShape(30.dp), borderWidth = 2.dp)
+                .card(Pastel.White, Pastel.Primary, RoundedCornerShape(30.dp), borderWidth = 2.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
             // The word and how to say it.
             Column(
-                Modifier.fillMaxWidth().background(Pastel.SkyContainer).padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 14.dp),
+                Modifier.fillMaxWidth().background(Pastel.PrimaryContainer).padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(Pastel.Sky))
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(Pastel.PrimaryDark))
                     SmallLabel("Word lookup")
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1170,7 +1209,7 @@ private fun WordBubble(
                         lookup.word,
                         fontSize = 26.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Pastel.SkyInk,
+                        color = Pastel.PrimaryInk,
                         modifier = Modifier.weight(1f),
                     )
                     if (words.size > 1) {
@@ -1186,7 +1225,7 @@ private fun WordBubble(
                         },
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Pastel.SkyDark,
+                        color = Pastel.PrimaryDark,
                         modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Pastel.White).padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
@@ -1195,8 +1234,8 @@ private fun WordBubble(
                         "IPA: /$it/",
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace,
-                        color = Pastel.InkSoft,
-                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Pastel.White.copy(alpha = 0.85f))
+                        color = Pastel.VioletDark,
+                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Pastel.VioletContainer)
                             .padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
@@ -1216,13 +1255,13 @@ private fun WordBubble(
                     Text(Dictionary.CREDIT, fontSize = 11.sp, color = Pastel.InkSoft)
                 }
                 Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Pastel.SurfaceContainer)
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Pastel.Bg)
                         .padding(horizontal = 14.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     HearButtons("Hear it:", onHear = { slow -> onHear(lookup.word, slow) })
                 }
-                Column(Modifier.fillMaxWidth().card(Pastel.Bg, shape = RoundedCornerShape(16.dp)).padding(12.dp)) {
+                Column(Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(16.dp)).padding(12.dp)) {
                     SmallLabel("From the conversation:", Pastel.InkSoft)
                     Spacer(Modifier.height(4.dp))
                     TappableText(
@@ -1234,7 +1273,7 @@ private fun WordBubble(
                     )
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    PillButton("Close", onClose, PillStyle.Dark)
+                    PillButton("Close", onClose, PillStyle.Cta)
                 }
             }
         }
@@ -1275,9 +1314,9 @@ private fun EnglishField(
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = Pastel.White,
             unfocusedContainerColor = Pastel.White,
-            focusedBorderColor = Pastel.Sky,
+            focusedBorderColor = Pastel.Primary,
             unfocusedBorderColor = Pastel.OutlineSoft,
-            cursorColor = Pastel.SkyDark,
+            cursorColor = Pastel.PrimaryDark,
         ),
         modifier = modifier,
     )
@@ -1315,7 +1354,7 @@ private fun HearButtons(label: String, onHear: (slow: Boolean) -> Unit, extra: @
         Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Pastel.InkSoft)
         Spacer(Modifier.width(2.dp))
         PillButton("▶ Normal", { onHear(false) })
-        PillButton("🐢 Slow", { onHear(true) }, PillStyle.Outline)
+        PillButton("🐢 Slow", { onHear(true) }, PillStyle.Secondary)
         extra()
     }
 }
@@ -1326,11 +1365,11 @@ private fun CorrectionCard(text: String) {
     Column(
         Modifier
             .fillMaxWidth()
-            .card(Pastel.ApricotContainer, Pastel.Apricot.copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+            .card(Pastel.CtaContainer, Pastel.Cta, RoundedCornerShape(20.dp))
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        SmallLabel("Correction", Pastel.ApricotDark)
-        Text(text, fontSize = 14.sp, color = Pastel.ApricotInk)
+        SmallLabel("Correction", Pastel.CtaDark)
+        Text(text, fontSize = 14.sp, color = Pastel.CtaInk)
     }
 }
