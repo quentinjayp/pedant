@@ -483,12 +483,16 @@ private fun HomeButton(mark: String, title: String, subtitle: String, color: Col
 
 /** A round white button with a back arrow. */
 @Composable
-private fun BackButton(onClick: () -> Unit) {
+private fun BackButton(onClick: () -> Unit) = ChevronButton(pointsLeft = true, onClick = onClick)
+
+/** A round white button with an arrow pointing left or right. */
+@Composable
+private fun ChevronButton(pointsLeft: Boolean, onClick: () -> Unit) {
     Box(
         Modifier.size(36.dp).clip(CircleShape).background(Pastel.White.copy(alpha = 0.85f)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.size(14.dp)) {
+        Canvas(Modifier.size(14.dp).scale(scaleX = if (pointsLeft) 1f else -1f, scaleY = 1f)) {
             val stroke = size.width * 0.16f
             val tip = Offset(size.width * 0.25f, size.height / 2)
             drawLine(Pastel.Ink, Offset(size.width * 0.7f, size.height * 0.1f), tip, stroke, StrokeCap.Round)
@@ -635,7 +639,9 @@ private fun ConversationScreen(vm: AppViewModel) {
     }
 
     BackHandler(onBack = vm::goHome)
-    vm.lookup?.let { WordBubble(it, appBusy = vm.busy != Busy.Idle, onHear = vm::hearWord, onClose = vm::closeLookup) }
+    vm.lookup?.let {
+        WordBubble(it, appBusy = vm.busy != Busy.Idle, onLookUp = vm::lookUp, onHear = vm::hearWord, onClose = vm::closeLookup)
+    }
     var editing by remember { mutableStateOf<Pair<Int, String>?>(null) }
     editing?.let { (index, original) ->
         EditLineDialog(
@@ -827,7 +833,7 @@ private fun Bubble(
             ) {
                 if (mine) SmallLabel(label) else Tag(label)
                 if (onWord != null) {
-                    TappableText(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = ink, onWord = onWord)
+                    TappableText(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = ink, onWord = { w, sentence, _ -> onWord(w, sentence) })
                 } else {
                     Text(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = ink)
                 }
@@ -862,7 +868,7 @@ private fun SayCard(item: ChatItem.Say, language: String?, onWord: (word: String
         if (item.phrase.isEmpty()) {
             Text("…", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Pastel.SkyInk)
         } else {
-            TappableText(item.phrase, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Pastel.SkyInk, onWord = onWord)
+            TappableText(item.phrase, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Pastel.SkyInk, onWord = { w, sentence, _ -> onWord(w, sentence) })
         }
         Text("“${item.english}”", fontSize = 13.sp, color = Pastel.SkyDark)
     }
@@ -992,10 +998,14 @@ private fun TappableText(
     fontSize: TextUnit,
     fontWeight: FontWeight? = null,
     color: Color = Color.Unspecified,
-    onWord: (word: String, sentence: String) -> Unit,
+    /** The position (among the words) of a word to pick out, if any. */
+    highlight: Int? = null,
+    onWord: (word: String, sentence: String, position: Int) -> Unit,
 ) {
     val currentOnWord by rememberUpdatedState(onWord)
-    val (annotated, wordRanges) = remember(text) { tappableAnnotated(text) { currentOnWord(it, text) } }
+    val (annotated, wordRanges) = remember(text, highlight) {
+        tappableAnnotated(text, highlight) { word, position -> currentOnWord(word, text, position) }
+    }
     // A dotted underline under each tappable word, so it's clear they can be tapped.
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     val density = LocalDensity.current
@@ -1029,9 +1039,18 @@ private fun TappableText(
     )
 }
 
-/** [text] with each word a link that calls [onWord], plus the range of each word. */
-private fun tappableAnnotated(text: String, onWord: (String) -> Unit): Pair<AnnotatedString, List<IntRange>> {
+/**
+ * [text] with each word a link that calls [onWord] with the word and its position among the
+ * words (the order of [tappableWords]), plus the range of each word. The word at [highlight] is
+ * picked out.
+ */
+private fun tappableAnnotated(
+    text: String,
+    highlight: Int?,
+    onWord: (word: String, position: Int) -> Unit,
+): Pair<AnnotatedString, List<IntRange>> {
     val linkStyle = TextLinkStyles(style = SpanStyle(textDecoration = TextDecoration.None))
+    val picked = SpanStyle(fontWeight = FontWeight.Bold, color = Pastel.SkyInk, background = Pastel.SkySoft)
     val wordRanges = mutableListOf<IntRange>()
     val annotated = buildAnnotatedString {
         var last = 0
@@ -1039,7 +1058,10 @@ private fun tappableAnnotated(text: String, onWord: (String) -> Unit): Pair<Anno
             append(text.substring(last, match.range.first))
             for (piece in splitWord(match.value)) {
                 val start = length
-                withLink(LinkAnnotation.Clickable(piece, linkStyle) { onWord(piece) }) { append(piece) }
+                val position = wordRanges.size
+                withLink(LinkAnnotation.Clickable(piece, linkStyle) { onWord(piece, position) }) {
+                    if (position == highlight) withStyle(picked) { append(piece) } else append(piece)
+                }
                 wordRanges += start until length
             }
             last = match.range.last + 1
@@ -1072,14 +1094,28 @@ private fun DictionaryStatus(vm: AppViewModel) {
     }
 }
 
-/** The bubble for a tapped word: meaning, pronunciation guide and Normal/Slow playback. */
+/**
+ * The bubble for a tapped word: meaning, pronunciation guide and Normal/Slow playback. The other
+ * words of the sentence can be tapped in it, or stepped through with the arrows (which wrap around).
+ */
 @Composable
 private fun WordBubble(
     lookup: WordLookup,
     appBusy: Boolean,
+    onLookUp: (word: String, sentence: String) -> Unit,
     onHear: (String, Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
+    val words = remember(lookup.sentence) { tappableWords(lookup.sentence) }
+    // Where the shown word is in the sentence; kept here so a word that appears twice is told apart.
+    var position by remember(lookup.sentence) {
+        mutableStateOf(words.indexOfFirst { it.equals(lookup.word, ignoreCase = true) }.coerceAtLeast(0))
+    }
+    fun show(i: Int) {
+        if (words.isEmpty()) return
+        position = Math.floorMod(i, words.size)
+        onLookUp(words[position], lookup.sentence)
+    }
     // Nearly as wide as the screen, like a card laid over the conversation.
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
@@ -1098,7 +1134,19 @@ private fun WordBubble(
                     Box(Modifier.size(6.dp).clip(CircleShape).background(Pastel.Sky))
                     SmallLabel("Word lookup")
                 }
-                Text(lookup.word, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Pastel.SkyInk)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        lookup.word,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Pastel.SkyInk,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (words.size > 1) {
+                        ChevronButton(pointsLeft = true, onClick = { show(position - 1) })
+                        ChevronButton(pointsLeft = false, onClick = { show(position + 1) })
+                    }
+                }
                 lookup.soundsLike?.let {
                     Text(
                         buildAnnotatedString {
@@ -1146,7 +1194,13 @@ private fun WordBubble(
                 Column(Modifier.fillMaxWidth().card(Pastel.Bg, shape = RoundedCornerShape(16.dp)).padding(12.dp)) {
                     SmallLabel("From the conversation:", Pastel.InkSoft)
                     Spacer(Modifier.height(4.dp))
-                    Text(highlighted(lookup.sentence, lookup.word), fontSize = 13.sp, color = Pastel.Ink)
+                    TappableText(
+                        lookup.sentence,
+                        fontSize = 15.sp,
+                        color = Pastel.Ink,
+                        highlight = position,
+                        onWord = { _, _, i -> show(i) },
+                    )
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     PillButton("Close", onClose, PillStyle.Dark)
@@ -1154,20 +1208,6 @@ private fun WordBubble(
             }
         }
     }
-}
-
-/** [sentence] with the first occurrence of [word] picked out. */
-private fun highlighted(sentence: String, word: String): AnnotatedString = buildAnnotatedString {
-    val i = if (word.isEmpty()) -1 else sentence.indexOf(word, ignoreCase = true)
-    if (i < 0) {
-        append(sentence)
-        return@buildAnnotatedString
-    }
-    append(sentence.substring(0, i))
-    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Pastel.SkyInk, background = Pastel.SkyContainer)) {
-        append(sentence.substring(i, i + word.length))
-    }
-    append(sentence.substring(i + word.length))
 }
 
 /** Learning mode: edits the English line being practised; saving translates it again. */
