@@ -737,13 +737,7 @@ private fun ConversationScreen(vm: AppViewModel) {
                         Bubble(item.reply, mine = false, label = "Tutor", detail = item.english, onWord = vm::openWord)
                     }
                     is ChatItem.Say -> SayCard(item, vm.language?.englishName, onWord = vm::openWord)
-                    is ChatItem.Attempt -> AttemptCard(
-                        item,
-                        enabled = vm.busy == Busy.Idle,
-                        onSay = { vm.hearWord(it, false) },
-                        onSaySounds = vm::saySounds,
-                        onOpen = { vm.openPractice(index) },
-                    )
+                    is ChatItem.Attempt -> AttemptCard(item, enabled = vm.busy == Busy.Idle, onOpen = { vm.openPractice(index) })
                     is ChatItem.Note -> Text(
                         item.text,
                         fontSize = 13.sp,
@@ -904,25 +898,17 @@ private fun SayCard(item: ChatItem.Say, language: String?, onWord: (word: String
     }
 }
 
-/** Learning mode: how one try at the phrase went, with buttons to hear each problem word. */
+/** Learning mode: how one try at the phrase went; tapping it opens the practice window. */
 @Composable
-private fun AttemptCard(
-    item: ChatItem.Attempt,
-    enabled: Boolean,
-    onSay: (String) -> Unit,
-    onSaySounds: (String) -> Unit,
-    onOpen: () -> Unit,
-) {
+private fun AttemptCard(item: ChatItem.Attempt, enabled: Boolean, onOpen: () -> Unit) {
     val r = item.result
     val accent = if (r.passed) Pastel.Primary else Pastel.Cta
     val ink = if (r.passed) Pastel.PrimaryInk else Pastel.CtaInk
-    // Attempts saved before word-by-word practice existed have no per-word results.
-    val byWord = r.words.isNotEmpty() && item.phrase.isNotBlank()
     Column(
         Modifier
             .fillMaxWidth()
             .card(if (r.passed) Pastel.PrimarySoft else Pastel.CtaContainer, accent, RoundedCornerShape(26.dp), borderWidth = if (r.passed) 2.dp else 1.dp)
-            .clickable(enabled = byWord && enabled, onClick = onOpen)
+            .clickable(enabled = enabled, onClick = onOpen)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -953,21 +939,15 @@ private fun AttemptCard(
                 fontSize = 13.sp,
                 color = ink,
             )
-            if (byWord) {
-                val expected = r.words.joinToString(" ") { it.expected.joinToString("").replace("▁", "") }
-                Text("Expected: /$expected/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.PrimaryDark)
-            }
+            val expected = r.words.joinToString(" ") { it.expected.joinToString("").replace("▁", "") }
+            Text("Expected: /$expected/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.PrimaryDark)
             Text("Heard: /${item.sounds}/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.VioletDark)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ScoreMeter("Words", r.wordScore, Pastel.PrimaryDark, Modifier.weight(1f))
             ScoreMeter("Sounds", r.soundScore, Pastel.VioletDark, Modifier.weight(1f))
         }
-        if (byWord) {
-            Text("Tap for word by word and practice ›", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Pastel.InkSoft)
-        } else {
-            r.issues.forEach { issue -> IssueCard(issue, enabled, onSay, onSaySounds) }
-        }
+        Text("Tap for word by word and practice ›", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Pastel.InkSoft)
     }
 }
 
@@ -1140,41 +1120,6 @@ private fun ScoreMeter(label: String, score: Double, color: Color, modifier: Mod
     ) {
         Text(label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Pastel.InkSoft)
         Text("${(score * 100).toInt()}%", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = color)
-    }
-}
-
-/**
- * One problem word: what was expected and what was heard, with Piper saying the correct word,
- * the word Omnilingual heard instead, and the sounds ZIPA heard.
- */
-@Composable
-private fun IssueCard(issue: WordIssue, enabled: Boolean, onSay: (String) -> Unit, onSaySounds: (String) -> Unit) {
-    val heardWord = issue.heardWord
-    val wordDiffers = heardWord != null && Matching.normalize(heardWord) != Matching.normalize(issue.word)
-    Column(
-        Modifier.fillMaxWidth().card(Pastel.White, shape = RoundedCornerShape(22.dp)).padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("“${issue.word}”", fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            when {
-                heardWord == null -> Tag("not heard", Pastel.SurfaceContainer, Pastel.InkSoft)
-                wordDiffers -> Tag("heard “$heardWord”", Pastel.CtaContainer, Pastel.CtaDark)
-                else -> Tag("word right, sounds off", Pastel.CtaContainer, Pastel.CtaDark)
-            }
-        }
-        if (issue.expectedSounds != null) {
-            SoundChip("Expected /${issue.expectedSounds}/", Pastel.PrimaryContainer, null, Pastel.PrimaryDark)
-            SoundChip("heard /${issue.heardSounds.orEmpty().ifEmpty { "—" }}/", Pastel.VioletContainer, null, Pastel.VioletDark)
-        }
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            PillButton("▶ Correct", { onSay(issue.word) }, PillStyle.Primary, enabled)
-            if (wordDiffers) PillButton("▶ Heard word", { onSay(heardWord!!) }, PillStyle.Secondary, enabled)
-            val heardSounds = issue.heardSounds
-            if (!heardSounds.isNullOrEmpty()) {
-                PillButton("▶ Heard sounds", { onSaySounds(heardSounds) }, PillStyle.Secondary, enabled)
-            }
-        }
     }
 }
 

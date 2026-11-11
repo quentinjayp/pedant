@@ -23,9 +23,18 @@ data class SavedConversation(
     companion object {
         fun file(dir: File) = File(dir, "conversation.json")
 
-        fun load(dir: File): SavedConversation? = runCatching {
-            fromJson(JSONObject(file(dir).readText()))
-        }.getOrNull()
+        /** Bumped when the saved format changes; a conversation saved in another format is discarded. */
+        private const val VERSION = 2
+
+        fun load(dir: File): SavedConversation? {
+            val file = file(dir)
+            if (!file.exists()) return null
+            val saved = runCatching {
+                JSONObject(file.readText()).takeIf { it.optInt("version") == VERSION }?.let(::fromJson)
+            }.getOrNull()
+            if (saved == null) file.delete()
+            return saved
+        }
 
         fun delete(dir: File) {
             file(dir).delete()
@@ -49,7 +58,7 @@ data class SavedConversation(
             "tutor" -> ChatItem.Tutor(o.getString("reply"), o.optStringOrNull("english"))
             "say" -> ChatItem.Say(o.getString("english"), o.getString("phrase"))
             "attempt" -> ChatItem.Attempt(
-                o.getString("heard"), o.getString("sounds"), attemptResult(o.getJSONObject("result")), o.optString("phrase"),
+                o.getString("heard"), o.getString("sounds"), attemptResult(o.getJSONObject("result")), o.getString("phrase"),
             )
             else -> ChatItem.Note(o.getString("text"))
         }
@@ -58,10 +67,7 @@ data class SavedConversation(
             wordScore = o.getDouble("wordScore"),
             soundScore = o.getDouble("soundScore"),
             passed = o.getBoolean("passed"),
-            issues = o.getJSONArray("issues").objects().map {
-                WordIssue(it.getString("word"), it.optStringOrNull("heardWord"), it.optStringOrNull("expectedSounds"), it.optStringOrNull("heardSounds"))
-            },
-            words = o.optJSONArray("words")?.objects()?.map {
+            words = o.getJSONArray("words").objects().map {
                 WordResult(
                     word = it.getString("word"),
                     expected = it.getJSONArray("expected").strings(),
@@ -70,7 +76,7 @@ data class SavedConversation(
                     heardWord = it.optStringOrNull("heardWord"),
                     passed = it.getBoolean("passed"),
                 )
-            }.orEmpty(),
+            },
         )
 
         private fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }
@@ -81,6 +87,7 @@ data class SavedConversation(
     /** Writes this conversation, replacing the saved one; a crash midway leaves the old one intact. */
     fun save(dir: File) {
         val o = JSONObject()
+            .put("version", VERSION)
             .put("language", languageCode)
             .put("scenario", scenario.name)
             .put("chat", JSONArray(chat.map { json(it) }))
@@ -108,10 +115,6 @@ data class SavedConversation(
         .put("wordScore", r.wordScore)
         .put("soundScore", r.soundScore)
         .put("passed", r.passed)
-        .put("issues", JSONArray(r.issues.map {
-            JSONObject().put("word", it.word).put("heardWord", it.heardWord)
-                .put("expectedSounds", it.expectedSounds).put("heardSounds", it.heardSounds)
-        }))
         .put("words", JSONArray(r.words.map {
             JSONObject().put("word", it.word).put("expected", JSONArray(it.expected)).put("heard", it.heard)
                 .put("score", it.score).put("heardWord", it.heardWord).put("passed", it.passed)

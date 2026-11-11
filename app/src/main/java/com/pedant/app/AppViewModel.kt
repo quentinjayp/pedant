@@ -70,7 +70,7 @@ sealed interface ChatItem {
     /** Learning mode: the phrase to say, translated from what the learner wanted to say. */
     data class Say(val english: String, val phrase: String) : ChatItem
     /** Learning mode: one try at saying [phrase]. */
-    data class Attempt(val heard: String, val sounds: String, val result: AttemptResult, val phrase: String = "") : ChatItem
+    data class Attempt(val heard: String, val sounds: String, val result: AttemptResult, val phrase: String) : ChatItem
     data class Note(val text: String) : ChatItem
 }
 
@@ -275,7 +275,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun pickLanguage(lang: Language) = startSession(lang, resume = null)
 
     /** Whether there is a saved conversation to continue. */
-    var canContinue by mutableStateOf(SavedConversation.file(app.filesDir).exists())
+    var canContinue by mutableStateOf(SavedConversation.load(app.filesDir) != null)
         private set
 
     /** Continues the saved conversation exactly where it was left. */
@@ -1056,7 +1056,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Opens the practice window for the attempt at [index], on its first wrong word. */
     fun openPractice(index: Int) {
         val item = chat.getOrNull(index) as? ChatItem.Attempt ?: return
-        if (item.result.words.isEmpty() || item.phrase.isBlank()) return
+        if (item.result.words.isEmpty()) return
         val first = item.result.words.indexOfFirst { !it.passed }.coerceAtLeast(0)
         val p = Practice(index, item.phrase, item.heard, item.result, first, hasRecording = false)
         practice = p.copy(hasRecording = recordingFor(p) != null)

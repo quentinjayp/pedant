@@ -7,10 +7,8 @@ data class AttemptResult(
     val wordScore: Double,
     val soundScore: Double,
     val passed: Boolean,
-    /** The target words that went wrong, in phrase order. */
-    val issues: List<WordIssue>,
     /** Every word of the phrase, right or wrong, in order. */
-    val words: List<WordResult> = emptyList(),
+    val words: List<WordResult>,
 )
 
 /**
@@ -27,16 +25,6 @@ data class WordResult(
     val passed: Boolean,
 )
 
-/**
- * A target word that went wrong. [heardWord] is what Omnilingual heard in its place (null if
- * nothing); the sounds are set when ZIPA heard the word's sounds differently.
- */
-data class WordIssue(
-    val word: String,
-    val heardWord: String?,
-    val expectedSounds: String? = null,
-    val heardSounds: String? = null,
-)
 
 /** Per word: expected and heard sounds, and the share of the expected sounds that went wrong. */
 private data class WordSounds(
@@ -104,15 +92,11 @@ object Matching {
 
         val sounds = compareSounds(refWords, heardSounds)
         if (!spaced) {
-            val issues = targetUnits.indices.filter { wordWrong[it] }.map { WordIssue(targetUnits[it], heardFor[it]) } +
-                sounds.words.filter { it.ratio > WORD_SOUND_LIMIT }
-                    .map { WordIssue(target, transcript.ifEmpty { null }, it.expected, it.heard) }
             return AttemptResult(
                 wordScore = wordScore,
                 soundScore = sounds.score,
                 passed = wordScore >= PASS_WORDS && sounds.score >= PASS_SOUNDS,
-                issues = issues.take(6),
-                words = wordResults(refWords, sounds) { i, ws -> null to (ws.ratio <= WORD_SOUND_LIMIT) },
+                words = wordResults(refWords, sounds) { _, ws -> null to (ws.ratio <= WORD_SOUND_LIMIT) },
             )
         }
         // Both recognizers slip now and then on correct speech, but rarely on the same word, so a
@@ -128,10 +112,6 @@ object Matching {
             wordScore = wordScore,
             soundScore = sounds.score,
             passed = targetWords.isNotEmpty() && wrong.isEmpty(),
-            issues = wrong.map { i ->
-                val sound = sounds.words.getOrNull(i)
-                WordIssue(targetWords[i], heardFor[i], sound?.expected, sound?.heard)
-            }.take(6),
             words = wordResults(refWords, sounds) { i, _ -> heardFor.getOrNull(i) to (i !in wrong) },
         )
     }
