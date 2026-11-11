@@ -42,6 +42,7 @@ enum class Busy(val label: String) {
     Thinking("Thinking…"),
     Speaking("Speaking…"),
     Preparing("Preparing the phrase…"),
+    Starting("Getting ready…"),
 }
 
 /** A tapped word: its meaning in context and how to say it. Null fields are still loading. */
@@ -269,18 +270,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // Stop anything left from the last conversation before its voice is released.
             stopConversationWork()
             conversationScope.launch {
+                val voice = try {
+                    store.installedVoice(lang) ?: withProgress { report -> store.downloadVoice(lang, report) }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    progress = null
+                    error = "Could not start: ${e.message}"
+                    return@launch
+                }
+                val openingKey = Tutor.openingKey(lang, mode, scenario)
+                val opening = withContext(Dispatchers.IO) { openings.text(openingKey) }?.let { it to Tutor.parse(it) }
+
+                // Open the conversation straight away (with the saved opening, if there is one);
+                // Gemma and the voice get ready behind it, and talking waits until they are.
+                openDictionary(lang)
+                language = lang
+                chat.clear()
+                startDrill(null)
+                editableIndex = null
+                busy = Busy.Starting
+                screen = Screen.Conversation
+                opening?.let { (_, turn) -> chat += ChatItem.Tutor(turn.correction, turn.reply, turn.english) }
+                conversationScope.launch { checkDictionary(lang) }
+
                 try {
-                    val voice = store.installedVoice(lang)
-                        ?: withProgress { report -> store.downloadVoice(lang, report) }
-                    val openingKey = Tutor.openingKey(lang, mode, scenario)
                     diagnostics.step = "Starting a ${lang.englishName} ${mode.title} session and loading the $voice voice"
-                    val opening = coroutineScope {
-                        // Gemma reads its instructions while the voice loads.
+                    coroutineScope {
+                        // Gemma reads its instructions while the voice loads and the opening plays.
                         val started = async(Dispatchers.Default) {
-                            val saved = openings.text(openingKey)
-                            checkNotNull(tutor).startConversation(lang, mode, scenario, saved)
+                            checkNotNull(tutor).startConversation(lang, mode, scenario, opening?.first)
                             diagnostics.log("Gemma ready for the ${lang.englishName} ${mode.title} session")
-                            saved
                         }
                         withContext(Dispatchers.Default) {
                             if (ttsVoice != voice) {
@@ -291,28 +311,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                 diagnostics.log("Loaded the $voice voice")
                             }
                         }
-                        started.await()
-                    }
-                    diagnostics.step = null
-                    openDictionary(lang)
-                    conversationScope.launch { checkDictionary(lang) }
-                    language = lang
-                    chat.clear()
-                    startDrill(null)
-                    editableIndex = null
-                    screen = Screen.Conversation
-                    if (opening != null) {
-                        showOpening(openingKey, voice, opening)
-                    } else {
-                        runTurn(Tutor.startMessage(mode), saveOpening = openingKey to voice)
+                        if (opening != null) {
+                            playOpening(openingKey, voice, opening.second.reply)
+                            busy = Busy.Starting
+                            started.await()
+                            diagnostics.step = null
+                        } else {
+                            started.await()
+                            diagnostics.step = null
+                            runTurn(Tutor.startMessage(mode), saveOpening = openingKey to voice)
+                        }
                     }
                 } catch (e: CancellationException) {
-                    diagnostics.step = null
                     throw e
                 } catch (e: Throwable) {
+                    chat += ChatItem.Note("Something went wrong: ${e.message}")
+                } finally {
                     diagnostics.step = null
-                    progress = null
-                    error = "Could not start: ${e.message}"
+                    busy = Busy.Idle
                 }
             }
         }
@@ -774,28 +790,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         drillAttempts = 0
     }
 
-    /** Shows and plays the saved opening [raw] for [key], without asking Gemma. */
-    private suspend fun showOpening(key: String, voice: String, raw: String) {
-        val turn = Tutor.parse(raw)
-        chat += ChatItem.Tutor(turn.correction, turn.reply, turn.english)
+    /** Plays the saved opening [reply] for [key] (its saved audio, or Piper's if there is none yet). */
+    private suspend fun playOpening(key: String, voice: String, reply: String) {
         busy = Busy.Speaking
-        try {
-            diagnostics.step = "Speaking the saved opening with Piper"
-            withContext(Dispatchers.Default) {
-                val engine = checkNotNull(tts)
-                val audio = openings.audio(key, voice)
-                    ?: engine.synthesize(turn.reply).also { openings.saveAudio(key, voice, it) }
-                engine.play(audio)
-            }
-            queueLookups(turn.reply)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            chat += ChatItem.Note("Something went wrong: ${e.message}")
-        } finally {
-            diagnostics.step = null
-            busy = Busy.Idle
+        diagnostics.step = "Speaking the saved opening with Piper"
+        withContext(Dispatchers.Default) {
+            val engine = checkNotNull(tts)
+            val audio = openings.audio(key, voice) ?: engine.synthesize(reply).also { openings.saveAudio(key, voice, it) }
+            engine.play(audio)
         }
+        queueLookups(reply)
     }
 
     /**
