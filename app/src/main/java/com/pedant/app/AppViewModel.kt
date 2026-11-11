@@ -48,7 +48,6 @@ enum class Busy(val label: String) {
     Preparing("Preparing the phrase…"),
     Starting("Getting ready…"),
     Translating("Translating the reply…"),
-    Checking("Checking what you said…"),
 }
 
 /** A tapped word: its meaning in context and how to say it. Null fields are still loading. */
@@ -67,7 +66,7 @@ data class WordLookup(
 sealed interface ChatItem {
     /** What the learner said or typed; [sounds] is what ZIPA heard, when they spoke. */
     data class User(val text: String, val sounds: String? = null) : ChatItem
-    data class Tutor(val correction: String?, val reply: String, val english: String? = null) : ChatItem
+    data class Tutor(val reply: String, val english: String? = null) : ChatItem
     /** Learning mode: the phrase to say, translated from what the learner wanted to say. */
     data class Say(val english: String, val phrase: String) : ChatItem
     /** Learning mode: one try at saying [phrase]. */
@@ -111,7 +110,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var busy by mutableStateOf(Busy.Idle)
         private set
-    var mode by mutableStateOf(Mode.Learning)
     var scenario by mutableStateOf(Scenario.Default)
     private var drill by mutableStateOf<Drill?>(null)
     /** Learning mode: the phrase to repeat, or null while waiting for the next English line. */
@@ -153,7 +151,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val hint: String
         get() = when {
             busy != Busy.Idle -> busy.label
-            mode == Mode.Conversation -> "Hold the button and speak ${language?.englishName ?: ""}"
             drillPhrase == null -> "Hold the button and say in English what you want to say, or type it"
             else -> "Hold the button and say the phrase"
         }
@@ -289,7 +286,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             canContinue = false
             return
         }
-        mode = saved.mode
         scenario = saved.scenario
         startSession(lang, resume = saved)
     }
@@ -301,7 +297,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val d = drill
         val saved = SavedConversation(
             languageCode = lang.code,
-            mode = mode,
             scenario = scenario,
             chat = chat.toList(),
             history = tutor?.history.orEmpty(),
@@ -317,7 +312,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         canContinue = true
     }
 
-    /** From the home page: choose the language (and mode and scenario) for a new conversation. */
+    /** From the home page: choose the scenario and language for a new conversation. */
     fun startNewConversation() {
         screen = Screen.PickLanguage
     }
@@ -350,7 +345,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     error = "Could not start: ${e.message}"
                     return@launch
                 }
-                val openingKey = Tutor.openingKey(lang, mode, scenario)
+                val openingKey = Tutor.openingKey(lang, scenario)
                 val opening = if (resume != null) null else {
                     withContext(Dispatchers.IO) { openings.text(openingKey) }?.let { it to Tutor.parse(it) }
                 }
@@ -368,19 +363,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 editableIndex = resume?.editableIndex
                 busy = Busy.Starting
                 screen = Screen.Conversation
-                opening?.let { (_, turn) -> chat += ChatItem.Tutor(turn.correction, turn.reply, turn.english) }
+                opening?.let { (_, turn) -> chat += ChatItem.Tutor(turn.reply, turn.english) }
                 conversationScope.launch { checkDictionary(lang) }
 
                 try {
-                    diagnostics.step = "Starting a ${lang.englishName} ${mode.title} session and loading the $voice voice"
+                    diagnostics.step = "Starting a ${lang.englishName} session and loading the $voice voice"
                     coroutineScope {
                         // Gemma reads its instructions while the voice loads and the opening plays.
                         val started = async(Dispatchers.Default) {
                             val earlier = resume?.history
-                                ?: opening?.let { listOf(Tutor.Turn(true, Tutor.startMessage(mode)), Tutor.Turn(false, it.first)) }
+                                ?: opening?.let { listOf(Tutor.Turn(true, Tutor.startMessage()), Tutor.Turn(false, it.first)) }
                                 ?: emptyList()
-                            checkNotNull(tutor).startConversation(lang, mode, scenario, earlier)
-                            diagnostics.log("Gemma ready for the ${lang.englishName} ${mode.title} session")
+                            checkNotNull(tutor).startConversation(lang, scenario, earlier)
+                            diagnostics.log("Gemma ready for the ${lang.englishName} session")
                         }
                         withContext(Dispatchers.Default) {
                             if (ttsVoice != voice) {
@@ -408,7 +403,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         } else {
                             started.await()
                             diagnostics.step = null
-                            runTurn(Tutor.startMessage(mode), saveOpening = openingKey to voice)
+                            runTurn(Tutor.startMessage(), saveOpening = openingKey to voice)
                         }
                     }
                 } catch (e: CancellationException) {
@@ -498,7 +493,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             practiceTarget = null
             when {
                 target != null -> practiceTry(target, audio)
-                mode == Mode.Conversation -> conversationTurn(audio)
                 d == null -> {
                     // Learning mode, waiting for English: only the words matter here.
                     val english = withContext(Dispatchers.Default) { checkNotNull(stt).transcribe(audio.samples) }
@@ -511,7 +505,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Learning mode: the learner typed what they want to say. */
     fun submitEnglish(text: String) {
-        if (busy != Busy.Idle || mode != Mode.Learning || drill != null || text.isBlank()) return
+        if (busy != Busy.Idle || drill != null || text.isBlank()) return
         launchAction(Busy.Thinking) { translate(text.trim()) }
     }
 
@@ -850,16 +844,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private class Graded(val transcript: String, val heardText: String, val result: AttemptResult, val recording: Recording)
 
-    private suspend fun conversationTurn(audio: Audio) {
-        val (transcript, sounds) = hear(audio)
-        if (transcript.isBlank() && sounds.isEmpty()) return
-        val soundText = SoundRecognizer.display(sounds)
-        chat += ChatItem.User(transcript, soundText)
-        // Gemma's memory keeps only the words, in the language being learned.
-        val message = Tutor.heardMessage(transcript, soundText)
-        runTurn(message, remember = "Transcript: $transcript", check = message)
-    }
-
     /** Learning mode: translates what the learner wants to say and starts drilling it. */
     private suspend fun translate(english: String, addLine: Boolean = true) {
         if (addLine) {
@@ -935,20 +919,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Sends [message] to the tutor, shows the answer as it streams in and speaks the reply.
-     * Then, as their own steps, written while the reply plays: in Learning mode the English
-     * translation of the reply; for [check] (what the learner said, in Conversation mode) any
-     * corrections. Neither is kept in Gemma's conversation memory.
+     * Then, as its own step written while the reply plays, the English translation of the reply,
+     * which isn't kept in Gemma's conversation memory.
      * [saveOpening] (key, voice) saves the answer and its audio as the opening for those choices.
      */
     private suspend fun runTurn(
         message: String,
         saveOpening: Pair<String, String>? = null,
         remember: String = message,
-        check: String? = null,
     ) {
         busy = Busy.Thinking
         val index = chat.size
-        chat += ChatItem.Tutor(null, "")
+        chat += ChatItem.Tutor("")
         fun update(change: (ChatItem.Tutor) -> ChatItem.Tutor) {
             (chat.getOrNull(index) as? ChatItem.Tutor)?.let { chat[index] = change(it) }
         }
@@ -967,19 +949,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             coroutineScope {
                 val extra = async {
                     try {
-                        when {
-                            reply.isBlank() -> Unit
-                            mode == Mode.Learning -> {
-                                val raw = checkNotNull(tutor).translateReply(lang, reply) { partial ->
-                                    update { it.copy(english = Tutor.parse(partial).english) }
-                                }
-                                english = Tutor.parse(raw).english
+                        if (reply.isNotBlank()) {
+                            val raw = checkNotNull(tutor).translateReply(lang, reply) { partial ->
+                                update { it.copy(english = Tutor.parse(partial).english) }
                             }
-                            check != null -> {
-                                checkNotNull(tutor).checkSaid(lang, check) { partial ->
-                                    update { it.copy(correction = Tutor.parse(partial).correction) }
-                                }
-                            }
+                            english = Tutor.parse(raw).english
                         }
                     } catch (e: CancellationException) {
                         throw e
@@ -989,7 +963,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 busy = Busy.Speaking
                 withContext(Dispatchers.Default) { voice.play(audio) }
-                if (extra.isActive) busy = if (mode == Mode.Learning) Busy.Translating else Busy.Checking
+                if (extra.isActive) busy = Busy.Translating
                 extra.await()
             }
             if (saveOpening != null && reply.isNotBlank()) {
@@ -1000,7 +974,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            chat[index] = ChatItem.Tutor(null, "(Something went wrong: ${e.message})")
+            chat[index] = ChatItem.Tutor("(Something went wrong: ${e.message})")
         } finally {
             diagnostics.step = null
             busy = Busy.Idle

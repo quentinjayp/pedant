@@ -10,7 +10,6 @@ import java.io.File
  */
 data class SavedConversation(
     val languageCode: String,
-    val mode: Mode,
     val scenario: Scenario,
     val chat: List<ChatItem>,
     /** What was said to and by Gemma, so it can pick up the conversation. */
@@ -34,7 +33,6 @@ data class SavedConversation(
 
         private fun fromJson(o: JSONObject) = SavedConversation(
             languageCode = o.getString("language"),
-            mode = Mode.valueOf(o.getString("mode")),
             scenario = Scenario.valueOf(o.getString("scenario")),
             chat = o.getJSONArray("chat").objects().map(::chatItem),
             history = o.getJSONArray("history").objects().map { Tutor.Turn(it.getBoolean("learner"), it.getString("text")) },
@@ -48,7 +46,7 @@ data class SavedConversation(
 
         private fun chatItem(o: JSONObject): ChatItem = when (o.getString("type")) {
             "user" -> ChatItem.User(o.getString("text"), o.optStringOrNull("sounds"))
-            "tutor" -> ChatItem.Tutor(o.optStringOrNull("correction"), o.getString("reply"), o.optStringOrNull("english"))
+            "tutor" -> ChatItem.Tutor(o.getString("reply"), o.optStringOrNull("english"))
             "say" -> ChatItem.Say(o.getString("english"), o.getString("phrase"))
             "attempt" -> ChatItem.Attempt(
                 o.getString("heard"), o.getString("sounds"), attemptResult(o.getJSONObject("result")), o.optString("phrase"),
@@ -84,7 +82,6 @@ data class SavedConversation(
     fun save(dir: File) {
         val o = JSONObject()
             .put("language", languageCode)
-            .put("mode", mode.name)
             .put("scenario", scenario.name)
             .put("chat", JSONArray(chat.map { json(it) }))
             .put("history", JSONArray(history.map { JSONObject().put("learner", it.fromLearner).put("text", it.text) }))
@@ -99,7 +96,7 @@ data class SavedConversation(
 
     private fun json(item: ChatItem): JSONObject = when (item) {
         is ChatItem.User -> JSONObject().put("type", "user").put("text", item.text).put("sounds", item.sounds)
-        is ChatItem.Tutor -> JSONObject().put("type", "tutor").put("correction", item.correction).put("reply", item.reply)
+        is ChatItem.Tutor -> JSONObject().put("type", "tutor").put("reply", item.reply)
             .put("english", item.english)
         is ChatItem.Say -> JSONObject().put("type", "say").put("english", item.english).put("phrase", item.phrase)
         is ChatItem.Attempt -> JSONObject().put("type", "attempt").put("heard", item.heard).put("sounds", item.sounds)

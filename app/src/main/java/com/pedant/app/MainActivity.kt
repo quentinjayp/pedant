@@ -490,7 +490,7 @@ private fun HomeScreen(vm: AppViewModel) {
             HomeButton(
                 mark = "+",
                 title = "New conversation",
-                subtitle = "Pick a mode, scenario and language",
+                subtitle = "Pick a scenario and language",
                 color = Pastel.Primary,
                 ink = Pastel.PrimaryInk,
                 enabled = true,
@@ -556,11 +556,6 @@ private fun ChevronButton(pointsLeft: Boolean, onClick: () -> Unit) {
     }
 }
 
-private val Mode.mark get() = when (this) {
-    Mode.Learning -> "🎓"
-    Mode.Conversation -> "💬"
-}
-
 @Composable
 private fun LanguageScreen(vm: AppViewModel) {
     BackHandler(onBack = vm::goHome)
@@ -570,42 +565,9 @@ private fun LanguageScreen(vm: AppViewModel) {
                 BackButton(vm::goHome)
                 Text("New conversation", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
             }
-            Spacer(Modifier.height(12.dp))
-            // Mode: a two-part switch.
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .card(Pastel.White.copy(alpha = 0.85f), shape = RoundedCornerShape(16.dp))
-                    .padding(4.dp),
-            ) {
-                Mode.entries.forEach { m ->
-                    val selected = vm.mode == m
-                    // Learning in the main colour, Conversation in the second, as in the mockup.
-                    val (fill, ink) = when (m) {
-                        Mode.Learning -> Pastel.Primary to Pastel.PrimaryInk
-                        Mode.Conversation -> Pastel.Violet to Pastel.VioletInk
-                    }
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(if (selected) fill else Color.Transparent)
-                            .clickable { vm.mode = m }
-                            .padding(vertical = 10.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            "${m.mark} ${m.title}",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (selected) ink else Pastel.Ink,
-                        )
-                    }
-                }
-            }
             Spacer(Modifier.height(10.dp))
             Text(
-                vm.mode.description,
+                "Say what you want in English, then repeat it back in the language until you get it right.",
                 fontSize = 13.sp,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -756,27 +718,23 @@ private fun ConversationScreen(vm: AppViewModel) {
         ) {
             itemsIndexed(vm.chat) { index, item ->
                 when (item) {
-                    // In Learning mode the learner's lines are English, so only Conversation mode's are
-                    // tappable; the line being practised can be long-pressed to edit it instead.
+                    // The learner's lines are English, so they aren't tappable; the line being practised
+                    // can be long-pressed to edit it instead.
                     is ChatItem.User -> {
                         val editable = index == vm.editableIndex && vm.busy == Busy.Idle
                         Bubble(
                             item.text,
                             mine = true,
-                            label = if (vm.mode == Mode.Learning) "You said in English" else "You said",
+                            label = "You said in English",
                             detail = item.sounds?.let { "/$it/" },
-                            onWord = if (vm.mode == Mode.Conversation) vm::openWord else null,
                             menu = if (!editable) null else listOf(
                                 "Edit" to { editing = index to item.text },
                                 "Delete" to { vm.deleteEnglish(index) },
                             ),
                         )
                     }
-                    is ChatItem.Tutor -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item.correction?.let { CorrectionCard(it) }
-                        if (item.reply.isNotEmpty()) {
-                            Bubble(item.reply, mine = false, label = "Tutor", detail = item.english, onWord = vm::openWord)
-                        }
+                    is ChatItem.Tutor -> if (item.reply.isNotEmpty()) {
+                        Bubble(item.reply, mine = false, label = "Tutor", detail = item.english, onWord = vm::openWord)
                     }
                     is ChatItem.Say -> SayCard(item, vm.language?.englishName, onWord = vm::openWord)
                     is ChatItem.Attempt -> AttemptCard(
@@ -1501,7 +1459,7 @@ private fun EnglishField(
 /** Learning mode: the English text box, or Hear again / Skip while practising a phrase. */
 @Composable
 private fun LearningControls(vm: AppViewModel) {
-    if (vm.mode != Mode.Learning || vm.busy != Busy.Idle) return
+    if (vm.busy != Busy.Idle) return
     if (vm.drillPhrase == null) {
         var text by remember { mutableStateOf("") }
         Row(
@@ -1532,20 +1490,5 @@ private fun HearButtons(label: String, onHear: (slow: Boolean) -> Unit, extra: @
         PillButton("▶ Normal", { onHear(false) })
         PillButton("🐢 Slow", { onHear(true) }, PillStyle.Secondary)
         extra()
-    }
-}
-
-/** Conversation mode: what the tutor corrected, in the soft peach used for coaching. */
-@Composable
-private fun CorrectionCard(text: String) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .card(Pastel.CtaContainer, Pastel.Cta, RoundedCornerShape(20.dp))
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        SmallLabel("Correction", Pastel.CtaDark)
-        Text(text, fontSize = 14.sp, color = Pastel.CtaInk)
     }
 }

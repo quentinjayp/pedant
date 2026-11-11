@@ -15,23 +15,15 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import java.io.File
 
-enum class Mode(val title: String, val description: String) {
-    Learning("Learning", "Say what you want in English, then repeat it back in the language until you get it right."),
-    Conversation("Conversation", "Talk freely in the language. Mistakes are explained in English."),
-}
 
-/**
- * One tutor answer, split into its labelled parts. [correction] and [reply] are used in
- * Conversation mode; [reply], [english] and [say] in Learning mode.
- */
+/** One tutor answer, split into its labelled parts: the reply, its English, or a phrase to say. */
 data class TutorTurn(
-    val correction: String? = null,
     val reply: String = "",
     val english: String? = null,
     val say: String? = null,
 )
 
-/** Gemma 4 E4B acting as a conversation partner that corrects grammar in English. */
+/** Gemma 4 E4B: the tutor that talks with the learner, and translates and explains for them. */
 class Tutor(context: Context, modelFile: File) {
 
     // The CPU loads faster and responds better than the GPU.
@@ -49,12 +41,11 @@ class Tutor(context: Context, modelFile: File) {
     /** One message in the main conversation: from the learner, or Gemma's answer. */
     data class Turn(val fromLearner: Boolean, val text: String)
 
-    private var mode = Mode.Learning
     private val turns = mutableListOf<Turn>()
 
     /**
      * What has been said in the main conversation, in the language being learned only (no English
-     * translations, corrections or sounds), so it can be picked up again later.
+     * translations), so it can be picked up again later.
      */
     val history: List<Turn> get() = synchronized(turns) { turns.toList() }
 
@@ -62,23 +53,22 @@ class Tutor(context: Context, modelFile: File) {
      * Starts a new conversation. [earlier] (a saved opening, or a conversation being continued) is
      * given to Gemma as already said: as much of the most recent part as fits.
      */
-    fun startConversation(language: Language, mode: Mode, scenario: Scenario, earlier: List<Turn> = emptyList()) {
+    fun startConversation(language: Language, scenario: Scenario, earlier: List<Turn> = emptyList()) {
         conversation?.close()
         conversation = null
-        this.mode = mode
         val kept = fitting(earlier.map { if (it.fromLearner) it else Turn(false, compact(it.text)) })
         synchronized(turns) {
             turns.clear()
             turns += kept
         }
-        val key = openingKey(language, mode, scenario) + "|" + kept.hashCode()
+        val key = openingKey(language, scenario) + "|" + kept.hashCode()
         val base = ready?.takeIf { it.first == key }?.second ?: run {
             ready?.second?.close()
             ready = null
             // Gemma reads the instructions (and what was said before) now, not on the first message.
             engine.createConversation(
                 ConversationConfig(
-                    systemInstruction = Contents.of(systemPrompt(language, mode, scenario)),
+                    systemInstruction = Contents.of(systemPrompt(language, scenario)),
                     initialMessages = kept.map { if (it.fromLearner) Message.user(it.text) else Message.model(it.text) },
                     samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.7),
                     prefillPrefaceOnInit = true,
@@ -139,9 +129,6 @@ class Tutor(context: Context, modelFile: File) {
     suspend fun translateReply(language: Language, reply: String, onText: (String) -> Unit): String =
         ask(Instructions.replyTranslate(language), reply, onText)
 
-    /** Checks what the learner said (see [heardMessage]) for mistakes, in its own short conversation. */
-    suspend fun checkSaid(language: Language, message: String, onText: (String) -> Unit): String =
-        ask(Instructions.correction(language), message, onText)
 
     /** The one-off conversation in progress (a lookup or translation), so it can be stopped. */
     @Volatile private var lookupConversation: Conversation? = null
@@ -206,24 +193,23 @@ class Tutor(context: Context, modelFile: File) {
         private const val HISTORY_CHARS = 2500
 
         /** The message that asks Gemma to open the conversation. */
-        fun startMessage(mode: Mode) = Instructions.start
+        fun startMessage() = Instructions.start
 
-        private fun systemPrompt(language: Language, mode: Mode, scenario: Scenario) =
-            Instructions.system(language, mode, scenario)
+        private fun systemPrompt(language: Language, scenario: Scenario) = Instructions.system(language, scenario)
 
         /**
          * Names the opening for these choices; it changes whenever the instructions change.
          * tools/build_openings.py names the openings that ship with the app the same way.
          */
-        fun openingKey(language: Language, mode: Mode, scenario: Scenario): String {
-            val hash = (systemPrompt(language, mode, scenario) + startMessage(mode)).hashCode()
-            return "${language.code}-${mode.name}-${scenario.name}-${Integer.toHexString(hash)}"
+        fun openingKey(language: Language, scenario: Scenario): String {
+            val hash = (systemPrompt(language, scenario) + startMessage()).hashCode()
+            // "Learning" stays in the name, as before Conversation mode was removed, so shipped and
+            // saved openings still match.
+            return "${language.code}-Learning-${scenario.name}-${Integer.toHexString(hash)}"
         }
 
         fun learningSaid(phrase: String) = Instructions.said(phrase)
 
-        /** Formats what the learner said for Gemma: the words heard plus the sounds heard. */
-        fun heardMessage(transcript: String, sounds: String) = Instructions.heard(transcript, sounds)
 
 
 
@@ -245,7 +231,7 @@ class Tutor(context: Context, modelFile: File) {
         fun parseLookup(raw: String): String? =
             raw.substringAfter("MEANING:", "").trim().lines().firstOrNull()?.trim()?.ifEmpty { null }
 
-        private val LABELS = listOf("CORRECTION:", "REPLY:", "ENGLISH:", "SAY:")
+        private val LABELS = listOf("REPLY:", "ENGLISH:", "SAY:")
 
         /** Splits the raw answer into its labelled parts. Works on partial (streaming) text too. */
         fun parse(raw: String): TutorTurn {
@@ -259,8 +245,6 @@ class Tutor(context: Context, modelFile: File) {
                 return raw.substring(start, end).trim()
             }
             return TutorTurn(
-                correction = part("CORRECTION:")
-                    ?.takeUnless { it.isEmpty() || it.trimEnd('.').equals("none", ignoreCase = true) },
                 reply = part("REPLY:") ?: "",
                 english = part("ENGLISH:")?.ifEmpty { null },
                 say = part("SAY:")?.ifEmpty { null },

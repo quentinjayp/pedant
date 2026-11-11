@@ -1,6 +1,6 @@
 """
 Writes the openings that ship with the app (app/src/main/assets/openings.json): Gemma's first line
-for every language, mode and built-in scenario, plus its English translation in Learning mode.
+for every language and built-in scenario, plus its English translation.
 
 Gemma is told exactly what the app tells it, from app/src/main/assets/instructions.json, and each
 opening is stored under the same key the app looks it up by (Tutor.openingKey). Openings whose key
@@ -21,7 +21,8 @@ ROOT = "app/src/main"
 INSTRUCTIONS = f"{ROOT}/assets/instructions.json"
 OPENINGS = f"{ROOT}/assets/openings.json"
 LANGUAGES = f"{ROOT}/java/com/pedant/app/Languages.kt"
-MODES = ["Learning", "Conversation"]
+# Part of each key, as the app names openings (Tutor.openingKey).
+MODE = "Learning"
 
 
 def java_hash_hex(text):
@@ -37,21 +38,20 @@ def languages():
     return re.findall(r'Language\("([a-z]{2})", "([^"]+)"', open(LANGUAGES, encoding="utf-8").read())
 
 
-def system_prompt(ins, name, mode, scenario):
+def system_prompt(ins, name, scenario):
     role = ins["roles"][scenario]
     opening = ins["openDefault"] if role is None else ins["openRole"].replace("{role}", role)
-    return (ins["modes"][mode] + "\n\n" + opening).replace("{language}", name)
+    return (ins["learning"] + "\n\n" + opening).replace("{language}", name)
 
 
 def jobs(ins):
-    """(key, language name, mode, system prompt) for every opening, in a fixed order."""
+    """(key, language name, system prompt) for every opening, in a fixed order."""
     out = []
     for code, name in languages():
-        for mode in MODES:
-            for scenario in ins["roles"]:
-                system = system_prompt(ins, name, mode, scenario)
-                key = f"{code}-{mode}-{scenario}-{java_hash_hex(system + ins['start'])}"
-                out.append((key, name, mode, system))
+        for scenario in ins["roles"]:
+            system = system_prompt(ins, name, scenario)
+            key = f"{code}-{MODE}-{scenario}-{java_hash_hex(system + ins['start'])}"
+            out.append((key, name, system))
     return out
 
 
@@ -83,7 +83,7 @@ def build(args):
     exact = litert_lm.SamplerConfig(top_k=1, top_p=1.0, temperature=0.0)
     written = {}
     with litert_lm.Engine(args.model, backend=litert_lm.Backend.CPU(), max_num_tokens=2048) as engine:
-        for key, name, mode, system in todo:
+        for key, name, system in todo:
             started = time.time()
             with engine.create_conversation(system_message=system, sampler_config=reply_sampling) as conv:
                 reply = part(text_of(conv.send_message(ins["start"])), "REPLY:")
@@ -91,12 +91,11 @@ def build(args):
                 print(f"{key}: no reply, skipped", flush=True)
                 continue
             opening = f"REPLY: {reply}"
-            if mode == "Learning":
-                translate = ins["replyTranslate"].replace("{language}", name)
-                with engine.create_conversation(system_message=translate, sampler_config=exact) as conv:
-                    english = part(text_of(conv.send_message(reply)), "ENGLISH:")
-                if english:
-                    opening += f"\nENGLISH: {english}"
+            translate = ins["replyTranslate"].replace("{language}", name)
+            with engine.create_conversation(system_message=translate, sampler_config=exact) as conv:
+                english = part(text_of(conv.send_message(reply)), "ENGLISH:")
+            if english:
+                opening += f"\nENGLISH: {english}"
             written[key] = opening
             print(f"{key} ({time.time() - started:.0f} s): {opening!r}", flush=True)
     json.dump(written, open(args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
