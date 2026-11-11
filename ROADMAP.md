@@ -18,11 +18,11 @@ Ideas for later. Nothing here is being built yet.
 
 ## Models
 
-- **A/B test Gemma sizes.** Compare the current Gemma 4 E4B with a smaller, lower-quality Gemma
-  (such as E2B) for speed, memory and the quality of replies, translations and word meanings.
-- **Evals with Langfuse.** Set up evaluations, logged to Langfuse, to see whether a different model
-  is better or worse. They would run off the phone (in CI or on a computer) on fixed test
-  conversations, since the app itself stays offline.
+- **A/B test Gemma sizes.** Compare the current Gemma 4 E4B with the smaller, lower-quality
+  Gemma 4 E2B for speed, memory and the quality of replies, translations and word meanings.
+- **Evals with Langfuse, as a non-blocking CI job.** Changing a model (for example, swapping in
+  E2B) runs evaluations on fixed test conversations in CI, logged to Langfuse, and produces a report
+  of whether it's better or worse. The job reports only; it never blocks a build.
 
 ## Settings
 
