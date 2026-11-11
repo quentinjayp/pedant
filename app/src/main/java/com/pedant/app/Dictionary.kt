@@ -39,9 +39,23 @@ class Dictionary(file: File) : Closeable {
      *     noun · plural of dessin
      *
      * When the word is more than one part of speech, each gets its own line, labelled at the end.
+     *
+     * An elided word the dictionary doesn't have whole, like "d'encouragement", shows the main word
+     * with the elided part added after ("d': apocopic form of de: of"), and their IPA joined.
      * Null if the dictionary doesn't have the word.
      */
     fun describe(word: String): Description? {
+        describeWhole(word)?.let { return it }
+        val cut = word.indexOfFirst { it == '\'' || it == '’' }
+        if (cut <= 0 || cut == word.lastIndex) return null
+        val elided = word.substring(0, cut + 1)
+        val main = describeWhole(word.substring(cut + 1)) ?: return null
+        val part = entries(elided).firstOrNull() ?: return null
+        val ipa = if (main.ipa != null && part.ipa != null) part.ipa.trimEnd('‿') + main.ipa else null
+        return Description(main.meaning + "\n" + "${part.word}: ${part.meanings.first()}", ipa)
+    }
+
+    private fun describeWhole(word: String): Description? {
         val found = entries(word)
         if (found.isEmpty()) return null
         val senses = found.map { e ->
@@ -81,7 +95,8 @@ class Dictionary(file: File) : Closeable {
 
     companion object {
         /** The lookup key; build_dictionaries.py normalizes words the same way. */
-        fun key(word: String): String = Normalizer.normalize(word, Normalizer.Form.NFC).lowercase(Locale.ROOT)
+        fun key(word: String): String =
+            Normalizer.normalize(word, Normalizer.Form.NFC).lowercase(Locale.ROOT).replace('’', '\'')
 
         private val POS_NAMES = mapOf(
             "adj" to "adjective", "adv" to "adverb", "prep" to "preposition", "conj" to "conjunction",
