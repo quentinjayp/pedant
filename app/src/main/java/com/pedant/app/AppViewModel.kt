@@ -147,15 +147,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             else -> "Hold the button and say the phrase"
         }
 
-    init {
-        crashReport = diagnostics.takeCrashReport()
-        when {
-            crashReport != null -> screen = Screen.Crashed
-            store.coreReady() -> loadModels()
-            else -> screen = Screen.Setup
-        }
-    }
-
     fun dismissCrash() {
         crashReport = null
         if (store.coreReady()) loadModels() else screen = Screen.Setup
@@ -443,12 +434,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var pendingWord: Pair<String, String>? = null
     private val triedAlone = mutableSetOf<Pair<String, String>>()
     private var backgroundJob: Job? = null
-
-    init {
-        // Resume background lookups whenever the app becomes idle. This must come after the fields
-        // above: viewModelScope runs it straight away, during construction.
-        viewModelScope.launch { snapshotFlow { busy }.collect { if (it == Busy.Idle) startBackground() } }
-    }
 
     private fun openDictionary(lang: Language) {
         dictionary?.close()
@@ -858,6 +843,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         /** How long the loading bar takes to move to a new amount. */
         const val LOADING_BAR_FILL_MS = 500
+    }
+
+    // Startup comes last, after every field: viewModelScope runs coroutines straight away, so
+    // anything started here during construction must not find a field still uninitialized.
+    init {
+        // Resume background lookups whenever the app becomes idle.
+        viewModelScope.launch { snapshotFlow { busy }.collect { if (it == Busy.Idle) startBackground() } }
+        crashReport = diagnostics.takeCrashReport()
+        when {
+            crashReport != null -> screen = Screen.Crashed
+            store.coreReady() -> loadModels()
+            else -> screen = Screen.Setup
+        }
     }
 
     override fun onCleared() {
