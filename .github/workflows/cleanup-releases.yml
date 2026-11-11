@@ -1,0 +1,36 @@
+name: Remove releases from rewritten history
+
+# One-off: deletes every release (and its tag) whose commit is no longer part of this branch,
+# so no old commit stays reachable through a tag. Runs on a push whose message contains
+# [cleanup-releases].
+
+on:
+  push:
+    branches: [claude/offline-ai-language-app-v3widq, main]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: contains(github.event.head_commit.message, '[cleanup-releases]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Delete releases outside this branch's history
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for tag in $(git tag -l); do
+            commit=$(git rev-list -n1 "$tag")
+            if git merge-base --is-ancestor "$commit" HEAD; then
+              echo "keep   $tag"
+            else
+              echo "delete $tag ($commit)"
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag -y \
+                || git push origin --delete "$tag"
+            fi
+          done
