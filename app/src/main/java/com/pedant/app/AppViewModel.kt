@@ -1095,8 +1095,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val graded = grade(p.phrase, refWords, audio)
                 val r = graded.result
                 val old = chat.getOrNull(p.chatIndex) as? ChatItem.Attempt
-                val better = old != null && r.wordScore + r.soundScore > old.result.wordScore + old.result.soundScore
-                // A better try replaces the attempt's scores in the conversation.
+                // A try that gets the phrase right turns a wrong attempt into a right one; otherwise a
+                // try replaces the attempt only if it scores better, and never turns a right one wrong.
+                val better = old != null && when {
+                    r.passed != old.result.passed -> r.passed
+                    else -> r.wordScore + r.soundScore > old.result.wordScore + old.result.soundScore
+                }
                 if (better && old != null) chat[p.chatIndex] = old.copy(heard = graded.transcript, sounds = graded.heardText, result = r)
                 keepRecording(p.chatIndex, graded.recording, r)
                 val scores = "Words ${(r.wordScore * 100).toInt()}% · Sounds ${(r.soundScore * 100).toInt()}%"
@@ -1104,7 +1108,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     transcript = graded.transcript,
                     result = r,
                     hasRecording = true,
-                    note = if (better) "New best: $scores. Saved to the conversation." else "This try: $scores. Your best stays in the conversation.",
+                    note = when {
+                        better && r.passed && old?.result?.passed == false -> "Correct! $scores. The conversation now shows it as correct."
+                        better -> "New best: $scores. Saved to the conversation."
+                        else -> "This try: $scores. Your best stays in the conversation."
+                    },
                 )
             }
             PracticeTarget.Word -> {
