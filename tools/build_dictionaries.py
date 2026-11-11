@@ -2,8 +2,9 @@
 Builds the app's word dictionaries from English Wiktionary, via kaikki.org's Wiktextract data.
 
 Reads the raw data as a stream on stdin (decompressed on the fly, never saved), keeps entries in
-the app's languages, and keeps only what the word bubble shows: spelling, part of speech, IPA,
-a few short English meanings, and the word it is a form of. Writes one gzipped SQLite file per
+the app's languages, and keeps only what the app uses: spelling, part of speech, IPA (the one
+shown, and every pronunciation listed, tab-separated), a few short English meanings, and the word
+it is a form of. Writes one gzipped SQLite file per
 language, plus a manifest describing them.
 
     curl -sSL https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz | gzip -dc \
@@ -66,23 +67,35 @@ def app_codes(languages_kt):
 
 
 def pick_ipa(sounds, code):
+    """The pronunciation shown for the entry (the accent of the app's voice where tagged), and every
+    pronunciation listed, for the app to choose the one that matches what's being said."""
     candidates = [s for s in sounds or [] if isinstance(s, dict) and s.get("ipa")]
-    if not candidates:
-        return None
-    for tag in PREFERRED_ACCENT.get(code, []):
-        for s in candidates:
-            if tag in (s.get("tags") or []):
-                return clean_ipa(s["ipa"])
     if code == "zh":
-        return None  # Only Mandarin readings fit the app's voice.
-    return clean_ipa(candidates[0]["ipa"])
+        # Only Mandarin readings fit the app's voice.
+        candidates = [s for s in candidates if "Mandarin" in (s.get("tags") or [])]
+    if not candidates:
+        return None, []
+    shown = candidates[0]
+    for tag in PREFERRED_ACCENT.get(code, []):
+        tagged = [s for s in candidates if tag in (s.get("tags") or [])]
+        if tagged:
+            shown = tagged[0]
+            break
+    variants = []
+    for s in [shown] + candidates:
+        for v in split_ipa(s["ipa"]):
+            if v not in variants:
+                variants.append(v)
+    first = split_ipa(shown["ipa"])
+    return (first[0] if first else None), variants
 
 
-def clean_ipa(ipa):
-    ipa = ipa.strip()
-    if len(ipa) >= 2 and ipa[0] in "/[" and ipa[-1] in "/]":
-        ipa = ipa[1:-1]
-    return ipa.strip() or None
+def split_ipa(ipa):
+    """The transcriptions in one IPA field, without their slashes or brackets. A field sometimes
+    holds more than one, such as "/ˈsɪti/, [ˈsɪɾi]"."""
+    found = re.findall(r"[/\[]([^/\[\]]+)[/\]]", ipa)
+    parts = found if found else [ipa]
+    return [p.strip() for p in parts if p.strip()]
 
 
 def pick_senses(senses):
@@ -111,7 +124,7 @@ def open_db(path):
         os.remove(path)
     db = sqlite3.connect(path)
     db.execute(
-        "CREATE TABLE entries (key TEXT NOT NULL, word TEXT NOT NULL, pos TEXT, ipa TEXT,"
+        "CREATE TABLE entries (key TEXT NOT NULL, word TEXT NOT NULL, pos TEXT, ipa TEXT, ipas TEXT,"
         " meanings TEXT NOT NULL, form_of TEXT)"
     )
     db.execute("CREATE TABLE meta (name TEXT PRIMARY KEY, value TEXT)")
@@ -155,10 +168,10 @@ def main():
         if rows[code].get(key, 0) >= MAX_ROWS_PER_WORD:
             continue
         rows[code][key] = rows[code].get(key, 0) + 1
-        ipa = pick_ipa(entry.get("sounds"), code)
+        ipa, variants = pick_ipa(entry.get("sounds"), code)
         dbs[code].execute(
-            "INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?)",
-            (key, word, entry.get("pos"), ipa, "\n".join(meanings), form_of),
+            "INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (key, word, entry.get("pos"), ipa, "\t".join(variants) or None, "\n".join(meanings), form_of),
         )
         stats[code]["entries"] += 1
         stats[code]["with_ipa"] += ipa is not None
