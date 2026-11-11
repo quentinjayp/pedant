@@ -12,6 +12,7 @@ import com.google.ai.edge.litertlm.SamplerConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onCompletion
 import java.io.File
 
 enum class Mode(val title: String, val description: String) {
@@ -45,22 +46,40 @@ class Tutor(context: Context, modelFile: File) {
     ).also { it.initialize() }
     private var conversation: Conversation? = null
 
+    /** One message in the main conversation: from the learner, or Gemma's answer. */
+    data class Turn(val fromLearner: Boolean, val text: String)
+
+    private var mode = Mode.Learning
+    private val turns = mutableListOf<Turn>()
+
     /**
-     * Starts a new conversation. With [opening] (Gemma's saved answer to [startMessage]), the
-     * conversation begins as if Gemma had just said it, so there is nothing to generate.
+     * What has been said in the main conversation, in the language being learned only (no English
+     * translations, corrections or sounds), so it can be picked up again later.
      */
-    fun startConversation(language: Language, mode: Mode, scenario: Scenario, opening: String? = null) {
+    val history: List<Turn> get() = synchronized(turns) { turns.toList() }
+
+    /**
+     * Starts a new conversation. [earlier] (a saved opening, or a conversation being continued) is
+     * given to Gemma as already said: as much of the most recent part as fits.
+     */
+    fun startConversation(language: Language, mode: Mode, scenario: Scenario, earlier: List<Turn> = emptyList()) {
         conversation?.close()
         conversation = null
-        val key = openingKey(language, mode, scenario) + if (opening != null) "+opening" else ""
+        this.mode = mode
+        val kept = fitting(earlier.map { if (it.fromLearner) it else Turn(false, compact(it.text)) })
+        synchronized(turns) {
+            turns.clear()
+            turns += kept
+        }
+        val key = openingKey(language, mode, scenario) + "|" + kept.hashCode()
         val base = ready?.takeIf { it.first == key }?.second ?: run {
             ready?.second?.close()
             ready = null
-            // Gemma reads the instructions (and the saved opening) now, not on the first message.
+            // Gemma reads the instructions (and what was said before) now, not on the first message.
             engine.createConversation(
                 ConversationConfig(
                     systemInstruction = Contents.of(systemPrompt(language, mode, scenario)),
-                    initialMessages = opening?.let { listOf(Message.user(startMessage(mode)), Message.model(it)) }.orEmpty(),
+                    initialMessages = kept.map { if (it.fromLearner) Message.user(it.text) else Message.model(it.text) },
                     samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.7),
                     prefillPrefaceOnInit = true,
                 ),
@@ -69,23 +88,57 @@ class Tutor(context: Context, modelFile: File) {
         conversation = base.clone()
     }
 
+    /** The most recent [turns] that fit Gemma's memory, starting with one of the learner's. */
+    private fun fitting(turns: List<Turn>): List<Turn> {
+        var total = 0
+        val kept = turns.asReversed().takeWhile { total += it.text.length; total <= HISTORY_CHARS }.asReversed()
+        return kept.dropWhile { !it.fromLearner }
+    }
+
+    /** Gemma's answer reduced to its reply in the language being learned, in the expected format. */
+    private fun compact(raw: String): String {
+        val reply = parse(raw).reply
+        return when (mode) {
+            Mode.Conversation -> "CORRECTION: none\nREPLY: $reply"
+            Mode.Learning -> "REPLY: $reply"
+        }
+    }
+
     /**
      * The last conversation's start, with the instructions already read, kept so starting the same
      * choices again skips that step. Only one is kept: each holds memory.
      */
     private var ready: Pair<String, Conversation>? = null
 
-    /** Streams the tutor's raw answer to [userText] as it is generated (cumulative text). */
-    fun respond(userText: String): Flow<String> {
+    /**
+     * Streams the tutor's raw answer to [userText] as it is generated (cumulative text). Once the
+     * answer is complete, [remember] (what to keep of the message; [userText] by default) and the
+     * reply are added to [history].
+     */
+    fun respond(userText: String, remember: String = userText): Flow<String> {
         val conv = checkNotNull(conversation) { "No conversation started" }
         val sb = StringBuilder()
-        return conv.sendMessageAsync(Message.user(userText)).map { chunk ->
-            sb.append(chunk.toString())
-            sb.toString()
-        }
+        return conv.sendMessageAsync(Message.user(userText))
+            .map { chunk ->
+                sb.append(chunk.toString())
+                sb.toString()
+            }
+            .onCompletion { error ->
+                if (error == null) synchronized(turns) {
+                    turns += Turn(true, remember)
+                    turns += Turn(false, compact(sb.toString()))
+                }
+            }
     }
 
-    /** The lookup conversation in progress, so it can be stopped. */
+    /**
+     * Translates what the learner wants to say, in its own short conversation so the main one only
+     * ever holds the language being learned. [onText] gets the answer as it is written.
+     */
+    suspend fun translate(language: Language, english: String, onText: (String) -> Unit): String =
+        ask(translatePrompt(language), english, onText)
+
+    /** The one-off conversation in progress (a lookup or translation), so it can be stopped. */
     @Volatile private var lookupConversation: Conversation? = null
 
     /** Looks up one [word] as used in [sentence]. Returns the raw answer; see [parseLookup]. */
@@ -100,7 +153,7 @@ class Tutor(context: Context, modelFile: File) {
      * Asks a one-off question in its own short conversation, so the main one is left untouched.
      * Stops early if the coroutine is cancelled.
      */
-    private suspend fun ask(instruction: String, question: String): String {
+    private suspend fun ask(instruction: String, question: String, onText: (String) -> Unit = {}): String {
         val conv = engine.createConversation(
             ConversationConfig(
                 systemInstruction = Contents.of(instruction),
@@ -110,7 +163,10 @@ class Tutor(context: Context, modelFile: File) {
         lookupConversation = conv
         try {
             val answer = StringBuilder()
-            conv.sendMessageAsync(Message.user(question)).collect { answer.append(it.toString()) }
+            conv.sendMessageAsync(Message.user(question)).collect {
+                answer.append(it.toString())
+                onText(answer.toString())
+            }
             return answer.toString()
         } catch (e: CancellationException) {
             conv.cancelProcess()
@@ -138,6 +194,12 @@ class Tutor(context: Context, modelFile: File) {
     }
 
     companion object {
+        /**
+         * How much earlier conversation Gemma is given, in characters: roughly half of its 2,048
+         * tokens, leaving room for the instructions and the next reply.
+         */
+        private const val HISTORY_CHARS = 2500
+
         /** The message that asks Gemma to open the conversation. */
         fun startMessage(mode: Mode) = when (mode) {
             Mode.Conversation -> "[START] Write CORRECTION: none"
@@ -154,7 +216,6 @@ class Tutor(context: Context, modelFile: File) {
             val hash = (systemPrompt(language, mode, scenario) + startMessage(mode)).hashCode()
             return "${language.code}-${mode.name}-${scenario.name}-${Integer.toHexString(hash)}"
         }
-        fun learningTranslate(english: String) = "[TRANSLATE] $english"
         fun learningSaid(phrase: String) = "[SAID] $phrase"
 
         /** Formats what the learner said for Gemma: the words heard plus the sounds heard. */
@@ -192,18 +253,21 @@ class Tutor(context: Context, modelFile: File) {
 
         private fun learningPrompt(language: Language) = """
             You are a friendly ${language.englishName} tutor running a speaking drill with an English speaker.
-            You receive three kinds of messages:
+            The learner says something in English, gets it translated, and practises saying it. You
+            receive two kinds of messages:
             - [START]: open the conversation in ${language.englishName} as described below.
-            - [TRANSLATE] <English>: the learner wants to say this. It may be a raw speech transcript
-              without punctuation. Translate it into natural, simple ${language.englishName}.
             - [SAID] <phrase>: the learner has just said this phrase in ${language.englishName}. Reply to it
               naturally in ${language.englishName} to continue the conversation.
 
-            Answer in exactly one of these formats and nothing else.
-            For [START] and [SAID]:
+            Answer in exactly this format and nothing else:
             REPLY: <one or two short, simple sentences in ${language.englishName}>
             ENGLISH: <the English translation of your reply>
-            For [TRANSLATE]:
+        """.trimIndent()
+
+        private fun translatePrompt(language: Language) = """
+            You translate what an English speaker wants to say into natural, simple ${language.englishName}.
+            The English may be a raw speech transcript without punctuation.
+            Answer in exactly this format and nothing else:
             SAY: <the ${language.englishName} translation only>
         """.trimIndent()
 

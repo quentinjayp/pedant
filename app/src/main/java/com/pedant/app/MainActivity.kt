@@ -108,6 +108,7 @@ class MainActivity : ComponentActivity() {
                             Screen.Setup -> SetupScreen(vm)
                             Screen.Loading -> ModelLoadingScreen(vm)
                             Screen.Crashed -> CrashScreen(vm)
+                            Screen.Home -> HomeScreen(vm)
                             Screen.PickLanguage -> LanguageScreen(vm)
                             Screen.Conversation -> ConversationScreen(vm)
                         }
@@ -214,8 +215,26 @@ private fun ModelLoadingScreen(vm: AppViewModel) {
     }
 }
 
+/** The home page: continue the last conversation (when there is one) or start a new one. */
+@Composable
+private fun HomeScreen(vm: AppViewModel) {
+    Column(
+        Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Button(onClick = vm::continueConversation, enabled = vm.canContinue, modifier = Modifier.fillMaxWidth()) {
+            Text("Continue conversation")
+        }
+        Button(onClick = vm::startNewConversation, modifier = Modifier.fillMaxWidth()) {
+            Text("New conversation")
+        }
+    }
+}
+
 @Composable
 private fun LanguageScreen(vm: AppViewModel) {
+    BackHandler(onBack = vm::goHome)
     Column(Modifier.fillMaxSize()) {
         Text(
             "New conversation",
@@ -290,7 +309,7 @@ private fun ConversationScreen(vm: AppViewModel) {
         if (vm.chat.isNotEmpty()) listState.animateScrollToItem(vm.chat.size - 1)
     }
 
-    BackHandler(onBack = vm::newConversation)
+    BackHandler(onBack = vm::goHome)
     vm.lookup?.let { WordBubble(it, appBusy = vm.busy != Busy.Idle, onHear = vm::hearWord, onClose = vm::closeLookup) }
     var editing by remember { mutableStateOf<Pair<Int, String>?>(null) }
     editing?.let { (index, original) ->

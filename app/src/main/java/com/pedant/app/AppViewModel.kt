@@ -31,6 +31,7 @@ sealed interface Screen {
     data object Setup : Screen
     data object Loading : Screen
     data object Crashed : Screen
+    data object Home : Screen
     data object PickLanguage : Screen
     data object Conversation : Screen
 }
@@ -254,7 +255,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 loadProgress = 1f
                 // Let the bar fill to 100% before moving on.
                 delay(LOADING_BAR_FILL_MS + 100L)
-                screen = Screen.PickLanguage
+                screen = Screen.Home
             } catch (e: Throwable) {
                 ticker.cancel()
                 diagnostics.step = null
@@ -264,7 +265,68 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun pickLanguage(lang: Language) {
+    /** Starts a new conversation in [lang]; the saved one is replaced once this one is under way. */
+    fun pickLanguage(lang: Language) = startSession(lang, resume = null)
+
+    /** Whether there is a saved conversation to continue. */
+    var canContinue by mutableStateOf(SavedConversation.file(app.filesDir).exists())
+        private set
+
+    /** Continues the saved conversation exactly where it was left. */
+    fun continueConversation() {
+        val saved = SavedConversation.load(getApplication<Application>().filesDir)
+        val lang = saved?.let { s -> LANGUAGES.firstOrNull { it.code == s.languageCode } }
+        if (saved == null || lang == null) {
+            canContinue = false
+            return
+        }
+        mode = saved.mode
+        scenario = saved.scenario
+        startSession(lang, resume = saved)
+    }
+
+    /** Saves the conversation on screen, replacing the saved one. */
+    private fun saveConversation() {
+        val lang = language ?: return
+        if (screen != Screen.Conversation) return
+        val d = drill
+        val saved = SavedConversation(
+            languageCode = lang.code,
+            mode = mode,
+            scenario = scenario,
+            chat = chat.toList(),
+            history = tutor?.history.orEmpty(),
+            drillPhrase = d?.phrase,
+            drillWords = d?.refWords.orEmpty(),
+            drillAttempts = drillAttempts,
+            editableIndex = editableIndex,
+        )
+        val dir = getApplication<Application>().filesDir
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { saved.save(dir) }.onFailure { diagnostics.log("Couldn't save the conversation: ${it.message}") }
+        }
+        canContinue = true
+    }
+
+    /** From the home page: choose the language (and mode and scenario) for a new conversation. */
+    fun startNewConversation() {
+        screen = Screen.PickLanguage
+    }
+
+    /** Goes back to the home page, stopping whatever the conversation is doing. */
+    fun goHome() {
+        viewModelScope.launch {
+            stopConversationWork()
+            lookup = null
+            screen = Screen.Home
+        }
+    }
+
+    /**
+     * Opens a conversation in [lang]: a new one, or [resume] (the saved one). The page opens straight
+     * away; Gemma and the voice get ready behind it, and talking waits until they are.
+     */
+    private fun startSession(lang: Language, resume: SavedConversation?) {
         error = null
         viewModelScope.launch {
             // Stop anything left from the last conversation before its voice is released.
@@ -280,15 +342,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
                 val openingKey = Tutor.openingKey(lang, mode, scenario)
-                val opening = withContext(Dispatchers.IO) { openings.text(openingKey) }?.let { it to Tutor.parse(it) }
+                val opening = if (resume != null) null else {
+                    withContext(Dispatchers.IO) { openings.text(openingKey) }?.let { it to Tutor.parse(it) }
+                }
 
-                // Open the conversation straight away (with the saved opening, if there is one);
-                // Gemma and the voice get ready behind it, and talking waits until they are.
+                // Open the conversation straight away (with the saved opening, or the conversation
+                // being continued).
                 openDictionary(lang)
                 language = lang
                 chat.clear()
+                resume?.let { chat.addAll(it.chat) }
                 startDrill(null)
-                editableIndex = null
+                editableIndex = resume?.editableIndex
                 busy = Busy.Starting
                 screen = Screen.Conversation
                 opening?.let { (_, turn) -> chat += ChatItem.Tutor(turn.correction, turn.reply, turn.english) }
@@ -299,7 +364,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     coroutineScope {
                         // Gemma reads its instructions while the voice loads and the opening plays.
                         val started = async(Dispatchers.Default) {
-                            checkNotNull(tutor).startConversation(lang, mode, scenario, opening?.first)
+                            val earlier = resume?.history
+                                ?: opening?.let { listOf(Tutor.Turn(true, Tutor.startMessage(mode)), Tutor.Turn(false, it.first)) }
+                                ?: emptyList()
+                            checkNotNull(tutor).startConversation(lang, mode, scenario, earlier)
                             diagnostics.log("Gemma ready for the ${lang.englishName} ${mode.title} session")
                         }
                         withContext(Dispatchers.Default) {
@@ -311,7 +379,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                 diagnostics.log("Loaded the $voice voice")
                             }
                         }
-                        if (opening != null) {
+                        if (resume != null) {
+                            // Back to the phrase being practised, with the tries made so far.
+                            resume.drillPhrase?.let { phrase ->
+                                val audio = withContext(Dispatchers.Default) { checkNotNull(tts).synthesize(phrase) }
+                                drill = Drill(phrase, audio, resume.drillWords)
+                                drillAttempts = resume.drillAttempts
+                            }
+                            started.await()
+                            diagnostics.step = null
+                        } else if (opening != null) {
                             playOpening(openingKey, voice, opening.second.reply)
                             busy = Busy.Starting
                             started.await()
@@ -721,7 +798,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (transcript.isBlank() && sounds.isEmpty()) return
         val soundText = SoundRecognizer.display(sounds)
         chat += ChatItem.User(transcript, soundText)
-        runTurn(Tutor.heardMessage(transcript, soundText))
+        // Gemma's memory keeps only the words, in the language being learned.
+        runTurn(Tutor.heardMessage(transcript, soundText), remember = "Transcript: $transcript")
     }
 
     /** Learning mode: translates what the learner wants to say and starts drilling it. */
@@ -734,11 +812,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val index = chat.size
         chat += ChatItem.Say(english, "")
         diagnostics.step = "Translating with Gemma"
-        var phrase = ""
-        checkNotNull(tutor).respond(Tutor.learningTranslate(english)).collect { raw ->
-            phrase = Tutor.parse(raw).say ?: ""
-            chat[index] = ChatItem.Say(english, phrase)
+        val raw = checkNotNull(tutor).translate(checkNotNull(language), english) { partial ->
+            chat[index] = ChatItem.Say(english, Tutor.parse(partial).say ?: "")
         }
+        val phrase = Tutor.parse(raw).say ?: ""
+        chat[index] = ChatItem.Say(english, phrase)
         if (phrase.isBlank()) {
             chat[index] = ChatItem.Note("Couldn't translate that. Try saying it another way.")
             return
@@ -806,7 +884,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * Sends [message] to the tutor, shows the answer as it streams in and speaks the reply.
      * [saveOpening] (key, voice) saves the answer and its audio as the opening for those choices.
      */
-    private suspend fun runTurn(message: String, saveOpening: Pair<String, String>? = null) {
+    private suspend fun runTurn(message: String, saveOpening: Pair<String, String>? = null, remember: String = message) {
         busy = Busy.Thinking
         val index = chat.size
         chat += ChatItem.Tutor(null, "")
@@ -814,7 +892,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             var raw = ""
             var latest = TutorTurn()
             diagnostics.step = "Generating a reply with Gemma"
-            checkNotNull(tutor).respond(message).collect {
+            checkNotNull(tutor).respond(message, remember).collect {
                 raw = it
                 latest = Tutor.parse(it)
                 chat[index] = ChatItem.Tutor(latest.correction, latest.reply, latest.english)
@@ -852,8 +930,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // Startup comes last, after every field: viewModelScope runs coroutines straight away, so
     // anything started here during construction must not find a field still uninitialized.
     init {
-        // Resume background lookups whenever the app becomes idle.
-        viewModelScope.launch { snapshotFlow { busy }.collect { if (it == Busy.Idle) startBackground() } }
+        // Whenever the app becomes idle: resume background lookups, and save the conversation so
+        // it can be continued later.
+        viewModelScope.launch {
+            snapshotFlow { busy }.collect {
+                if (it == Busy.Idle) {
+                    startBackground()
+                    saveConversation()
+                }
+            }
+        }
         crashReport = diagnostics.takeCrashReport()
         when {
             crashReport != null -> screen = Screen.Crashed
