@@ -9,6 +9,7 @@ Offline AI language learning app for Android.
 - **Pronunciation:** ZIPA (Zipa-Cr-large)
 - **Text-to-speech:** Piper
 - **Text to phonemes:** espeak-ng
+- **Word dictionaries:** English Wiktionary, via kaikki.org (Wiktextract)
 - **Lesson structure:** CEFR levels
 - **Review scheduling:** FSRS
 - **Lesson content:** FSI courses, Peace Corps language manuals, Tatoeba, Wiktionary, UniMorph, frequency lists
@@ -17,3 +18,11 @@ Offline AI language learning app for Android.
 ## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
+
+The word dictionaries are a separate download, not part of the app. They are built from
+[English Wiktionary](https://en.wiktionary.org), text by Wiktionary contributors, and are licensed
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). They were extracted with
+Wiktextract via [kaikki.org](https://kaikki.org) (Tatu Ylonen, "Wiktextract: Wiktionary as
+Machine-Readable Structured Data", LREC 2022) and cut down to each word's spelling, part of
+speech, IPA, a few short English meanings, and the word it is a form of. They are rebuilt monthly
+by `.github/workflows/dictionaries.yml`; `dictionaries/manifest.json` lists the current files.

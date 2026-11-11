@@ -53,6 +53,8 @@ data class WordLookup(
     val sounds: String? = null,
     val error: String? = null,
     val loading: Boolean = true,
+    /** The meaning comes from the downloaded dictionary, not Gemma. */
+    val fromDictionary: Boolean = false,
 )
 
 sealed interface ChatItem {
@@ -124,6 +126,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var lookup by mutableStateOf<WordLookup?>(null)
         private set
     private val lookupCache = mutableMapOf<Pair<String, String>, WordLookup>()
+
+    /** The current language's downloaded dictionary, the first place word lookups look. */
+    @Volatile private var dictionary: Dictionary? = null
+
+    /** A newer dictionary for the current language, offered to the learner. */
+    var dictionaryOffer by mutableStateOf<DictionaryInfo?>(null)
+        private set
+
+    /** Progress (0 to 1) of a dictionary download in progress, or null. */
+    var dictionaryProgress by mutableStateOf<Float?>(null)
+        private set
 
     /** What to do next, shown above the talk button. */
     val hint: String
@@ -290,6 +303,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         started.await()
                     }
                     diagnostics.step = null
+                    openDictionary(lang)
+                    conversationScope.launch { checkDictionary(lang) }
                     language = lang
                     chat.clear()
                     startDrill(null)
@@ -435,6 +450,80 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { snapshotFlow { busy }.collect { if (it == Busy.Idle) startBackground() } }
     }
 
+    private fun openDictionary(lang: Language) {
+        dictionary?.close()
+        dictionary = store.dictionaryFile(lang)?.let { file ->
+            runCatching { Dictionary(file) }.onFailure { diagnostics.log("Dictionary: couldn't open (${it.message})") }.getOrNull()
+        }
+        dictionaryOffer = null
+        lookupCache.clear()
+        doneSentences.clear()
+        triedAlone.clear()
+    }
+
+    /**
+     * Looks for a newer dictionary for [lang]: downloads it straight away the first time, and
+     * offers it once one is installed. Without a connection (or a published dictionary), does nothing.
+     */
+    private suspend fun checkDictionary(lang: Language) {
+        val latest = try {
+            store.latestDictionary(lang)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            diagnostics.log("Dictionary: couldn't check for one (${e.message})")
+            null
+        } ?: return
+        when (store.dictionaryVersion(lang)) {
+            latest.version -> Unit
+            null -> installDictionary(lang, latest)
+            else -> dictionaryOffer = latest
+        }
+    }
+
+    /** Downloads the newer dictionary on offer. */
+    fun updateDictionary() {
+        val offer = dictionaryOffer ?: return
+        val lang = language ?: return
+        dictionaryOffer = null
+        conversationScope.launch { installDictionary(lang, offer) }
+    }
+
+    private suspend fun installDictionary(lang: Language, info: DictionaryInfo) {
+        dictionaryProgress = 0f
+        try {
+            diagnostics.log("Dictionary: downloading ${lang.englishName} ${info.version}")
+            store.downloadDictionary(lang, info) { done, total -> dictionaryProgress = done.toFloat() / total }
+            if (language == lang) {
+                pauseBackground()
+                openDictionary(lang)
+                startBackground()
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            chat += ChatItem.Note("Couldn't download the ${lang.englishName} dictionary: ${e.message}")
+        } finally {
+            dictionaryProgress = null
+        }
+    }
+
+    /** The dictionary's description of [word], or null if it isn't there (or there is no dictionary). */
+    private fun fromDictionary(word: String): Dictionary.Description? =
+        runCatching { dictionary?.describe(word) }.getOrNull()
+
+    private fun dictionaryLookup(word: String, sentence: String, d: Dictionary.Description, zipaSounds: String? = null): WordLookup {
+        val sounds = d.ipa ?: zipaSounds
+        return WordLookup(
+            word, sentence,
+            meaning = d.meaning,
+            soundsLike = sounds?.let(Respell::fromIpa)?.ifEmpty { null },
+            sounds = sounds,
+            loading = false,
+            fromDictionary = true,
+        )
+    }
+
     /** Queues [sentence]'s words to be explained in the background; [first] puts it at the front. */
     private fun queueLookups(sentence: String, first: Boolean = false) {
         if (sentence.isBlank() || sentence in doneSentences) return
@@ -476,11 +565,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Works out the meaning and sounds of every word in [sentence] and stores them. */
     private suspend fun lookUpSentence(lang: Language, sentence: String) {
         val words = tappableWords(sentence).distinctBy { it.lowercase() }
-        // Sounds first: quick, and they don't need Gemma.
+        // The dictionary first; ZIPA only for words it has no IPA for, Gemma only for words it lacks.
+        val known = words.associateWith { fromDictionary(it) }
         val sounds = withContext(Dispatchers.Default) {
-            words.associateWith { w -> SoundRecognizer.display(wordSounds(w)) }
+            words.filter { known[it]?.ipa == null }.associateWith { w -> SoundRecognizer.display(wordSounds(w)) }
         }
-        val meanings = try {
+        val meanings = if (words.all { known[it] != null }) emptyMap() else try {
             Tutor.parseSentenceLookup(checkNotNull(tutor).lookUpSentence(lang, sentence))
         } catch (e: CancellationException) {
             throw e
@@ -488,8 +578,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             emptyMap()
         }
         for (w in words) {
+            val d = known[w]
             val wordSounds = sounds[w]
-            lookupCache[w.lowercase() to sentence] = WordLookup(
+            lookupCache[w.lowercase() to sentence] = if (d != null) dictionaryLookup(w, sentence, d, wordSounds) else WordLookup(
                 w, sentence,
                 meaning = meanings[w.lowercase()],
                 soundsLike = wordSounds?.let(Respell::fromIpa)?.ifEmpty { null },
@@ -544,7 +635,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * and its sounds from ZIPA listening to Piper say it, with an English-style respelling of them.
      */
     fun lookUp(word: String, sentence: String) {
-        lookup = WordLookup(word, sentence)
+        val d = fromDictionary(word)
+        if (d != null) {
+            lookup = lookupCache[word.lowercase() to sentence] ?: dictionaryLookup(word, sentence, d)
+            // Everything is from the dictionary already; only missing IPA needs the background work.
+            if (d.ipa != null) return
+        } else {
+            lookup = WordLookup(word, sentence)
+        }
         if (sentence in doneSentences) {
             refreshOpenLookup()
             startBackground()
@@ -763,6 +861,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        dictionary?.close()
         tutor?.close()
         stt?.release()
         zipa?.release()

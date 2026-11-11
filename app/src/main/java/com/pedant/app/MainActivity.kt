@@ -321,6 +321,7 @@ private fun ConversationScreen(vm: AppViewModel) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 6.dp),
         )
+        DictionaryStatus(vm)
         HorizontalDivider()
 
         LazyColumn(
@@ -610,6 +611,32 @@ private fun tappableAnnotated(text: String, onWord: (String) -> Unit): Pair<Anno
     return annotated to wordRanges
 }
 
+/** A dictionary download in progress, or the offer of a newer dictionary. */
+@Composable
+private fun DictionaryStatus(vm: AppViewModel) {
+    val progress = vm.dictionaryProgress
+    val offer = vm.dictionaryOffer
+    if (progress != null) {
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 6.dp)) {
+            Text("Downloading the dictionary…", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+        }
+    } else if (offer != null) {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "A newer dictionary is available (${"%.0f".format(offer.bytes / 1e6)} MB).",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = vm::updateDictionary) { Text("Update") }
+        }
+    }
+}
+
 /** The bubble for a tapped word: meaning, pronunciation guide and Normal/Slow playback. */
 @Composable
 private fun WordBubble(
@@ -634,6 +661,9 @@ private fun WordBubble(
                 lookup.soundsLike?.let { Text("Sounds like: $it", fontSize = 15.sp) }
                 lookup.sounds?.let { Text("Sounds (IPA): /$it/", fontSize = 14.sp) }
                 lookup.error?.let { Text(it, color = MaterialTheme.colorScheme.error, fontSize = 14.sp) }
+                if (lookup.fromDictionary) {
+                    Text(Dictionary.CREDIT, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 HearButtons("Hear it:", onHear = { slow -> onHear(lookup.word, slow) })
                 Text(
                     "From: ${lookup.sentence}",

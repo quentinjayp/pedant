@@ -6,15 +6,23 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
+import java.util.zip.GZIPInputStream
 import kotlin.coroutines.coroutineContext
 
 /** A file in a Hugging Face model repository. */
-data class HfFile(val repo: String, val path: String, val size: Long)
+data class HfFile(val repo: String, val path: String, val size: Long) {
+    val url get() = "https://huggingface.co/$repo/resolve/main/$path"
+}
+
+/** A language's dictionary as listed in the published manifest. */
+data class DictionaryInfo(val version: String, val url: String, val bytes: Long, val sha256: String)
 
 /**
  * Downloads the models from Hugging Face into app storage and tells the rest of the app
@@ -94,27 +102,87 @@ class ModelStore(context: Context) {
             voice
         }
 
+    private val dictionaryDir = File(root, "dictionaries")
+
+    /** The downloaded dictionary for [language], if any. */
+    fun dictionaryFile(language: Language): File? =
+        File(dictionaryDir, "${language.code}.db").takeIf { it.exists() }
+
+    /** The version of the downloaded dictionary for [language], if any. */
+    fun dictionaryVersion(language: Language): String? =
+        File(dictionaryDir, "${language.code}.version").takeIf { it.exists() }?.readText()?.trim()
+
+    /** The newest published dictionary for [language], or null if there is none (or no connection). */
+    suspend fun latestDictionary(language: Language): DictionaryInfo? = withContext(Dispatchers.IO) {
+        val conn = (URL(DICTIONARY_MANIFEST).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 10_000
+            readTimeout = 20_000
+        }
+        try {
+            if (conn.responseCode != HttpURLConnection.HTTP_OK) return@withContext null
+            val manifest = JSONObject(conn.inputStream.use { it.readBytes().toString(Charsets.UTF_8) })
+            val release = manifest.optString("release").ifEmpty { return@withContext null }
+            val entry = manifest.optJSONObject("languages")?.optJSONObject(language.code) ?: return@withContext null
+            DictionaryInfo(
+                version = manifest.getString("version"),
+                url = "$DICTIONARY_RELEASES/$release/${entry.getString("file")}",
+                bytes = entry.getLong("bytes"),
+                sha256 = entry.getString("sha256"),
+            )
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** Downloads [info] for [language], replacing any older dictionary, and returns the file. */
+    suspend fun downloadDictionary(language: Language, info: DictionaryInfo, onProgress: (Long, Long) -> Unit): File =
+        withContext(Dispatchers.IO) {
+            val gz = File(dictionaryDir, "${language.code}-${info.version}.db.gz")
+            download(info.url, info.bytes, gz) { onProgress(it, info.bytes) }
+            try {
+                val digest = MessageDigest.getInstance("SHA-256")
+                gz.inputStream().use { input ->
+                    val buf = ByteArray(1 shl 16)
+                    while (true) {
+                        val n = input.read(buf)
+                        if (n < 0) break
+                        digest.update(buf, 0, n)
+                    }
+                }
+                val hash = digest.digest().joinToString("") { "%02x".format(it) }
+                if (hash != info.sha256) throw IOException("The ${language.englishName} dictionary download was damaged")
+                val tmp = File(dictionaryDir, "${language.code}.db.tmp")
+                GZIPInputStream(gz.inputStream()).use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                val dest = File(dictionaryDir, "${language.code}.db")
+                if (!tmp.renameTo(dest)) throw IOException("Could not save the ${language.englishName} dictionary")
+                File(dictionaryDir, "${language.code}.version").writeText(info.version)
+                dest
+            } finally {
+                gz.delete()
+            }
+        }
+
     private suspend fun downloadAll(jobs: List<Pair<HfFile, File>>, onProgress: (Long, Long, String) -> Unit) {
         val total = jobs.sumOf { it.first.size }
         var done = 0L
         for ((file, dest) in jobs) {
             val label = file.path.substringAfterLast('/')
-            download(file, dest) { fileDone -> onProgress(done + fileDone, total, label) }
+            download(file.url, file.size, dest) { fileDone -> onProgress(done + fileDone, total, label) }
             done += file.size
             onProgress(done, total, label)
         }
     }
 
-    private suspend fun download(file: HfFile, dest: File, onBytes: (Long) -> Unit) {
-        if (dest.exists() && dest.length() == file.size) return
+    /** Downloads [url] ([size] bytes, or 0 if unknown) to [dest], resuming a partial download. */
+    private suspend fun download(url: String, size: Long, dest: File, onBytes: (Long) -> Unit) {
+        if (dest.exists() && dest.length() == size) return
         dest.parentFile?.mkdirs()
         val part = File(dest.path + ".part")
-        val url = "https://huggingface.co/${file.repo}/resolve/main/${file.path}"
         var attempt = 0
         while (true) {
             try {
                 val have = if (part.exists()) part.length() else 0L
-                if (have < file.size || file.size == 0L) {
+                if (have < size || size == 0L) {
                     val conn = open(url, have)
                     val append = have > 0 && conn.responseCode == HttpURLConnection.HTTP_PARTIAL
                     var written = if (append) have else 0L
@@ -132,8 +200,8 @@ class ModelStore(context: Context) {
                         }
                     }
                 }
-                if (file.size > 0 && part.length() != file.size) {
-                    throw IOException("Incomplete download of ${file.path}")
+                if (size > 0 && part.length() != size) {
+                    throw IOException("Incomplete download of ${dest.name}")
                 }
                 if (!part.renameTo(dest)) throw IOException("Could not save ${dest.name}")
                 return
@@ -190,6 +258,10 @@ class ModelStore(context: Context) {
     companion object {
         private const val MODEL_FILE = "model.int8.onnx"
         private const val TOKENS_FILE = "tokens.txt"
+        /** Lists the published dictionaries; see .github/workflows/dictionaries.yml. */
+        private const val DICTIONARY_MANIFEST =
+            "https://raw.githubusercontent.com/quentinjayp/pedant/HEAD/dictionaries/manifest.json"
+        private const val DICTIONARY_RELEASES = "https://github.com/quentinjayp/pedant/releases/download"
         const val GEMMA_REPO = "litert-community/gemma-4-E4B-it-litert-lm"
         const val ZIPA_REPO = "anyspeech/zipa-large-crctc-500k"
         val ASR_REPOS = listOf(
