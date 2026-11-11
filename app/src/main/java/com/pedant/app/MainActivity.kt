@@ -1433,7 +1433,7 @@ private fun HearButtons(label: String, onHear: (slow: Boolean) -> Unit, extra: @
         Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Pastel.InkSoft)
         Spacer(Modifier.width(2.dp))
         PillButton("▶ Normal", { onHear(false) })
-        PillButton("🐢 Slow", { onHear(true) }, PillStyle.Secondary)
+        PillButton("Slow", { onHear(true) }, PillStyle.Secondary)
         extra()
     }
 }

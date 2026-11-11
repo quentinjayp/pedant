@@ -982,8 +982,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     companion object {
-        /** Speaking rate for "Slow": a bit over half normal speed, still natural-sounding. */
-        private const val SLOW_SPEED = 0.6f
+        /** Speaking rate for "Slow": 40% of normal speed. */
+        private const val SLOW_SPEED = 0.4f
 
         /** How long the loading bar takes to move to a new amount. */
         const val LOADING_BAR_FILL_MS = 500
