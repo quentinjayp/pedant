@@ -729,6 +729,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** A word tapped in the conversation: opens its bubble and says it at normal speed. */
+    fun openWord(word: String, sentence: String) {
+        lookUp(word, sentence)
+        hearWord(word, slow = false)
+    }
+
     fun closeLookup() {
         lookup = null
     }

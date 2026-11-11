@@ -694,7 +694,7 @@ private fun ConversationScreen(vm: AppViewModel) {
                             mine = true,
                             label = if (vm.mode == Mode.Learning) "You said in English" else "You said",
                             detail = item.sounds?.let { "/$it/" },
-                            onWord = if (vm.mode == Mode.Conversation) vm::lookUp else null,
+                            onWord = if (vm.mode == Mode.Conversation) vm::openWord else null,
                             menu = if (!editable) null else listOf(
                                 "Edit" to { editing = index to item.text },
                                 "Delete" to { vm.deleteEnglish(index) },
@@ -704,10 +704,10 @@ private fun ConversationScreen(vm: AppViewModel) {
                     is ChatItem.Tutor -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         item.correction?.let { CorrectionCard(it) }
                         if (item.reply.isNotEmpty()) {
-                            Bubble(item.reply, mine = false, label = "Tutor", detail = item.english, onWord = vm::lookUp)
+                            Bubble(item.reply, mine = false, label = "Tutor", detail = item.english, onWord = vm::openWord)
                         }
                     }
-                    is ChatItem.Say -> SayCard(item, vm.language?.englishName, onWord = vm::lookUp)
+                    is ChatItem.Say -> SayCard(item, vm.language?.englishName, onWord = vm::openWord)
                     is ChatItem.Attempt -> AttemptCard(
                         item,
                         enabled = vm.busy == Busy.Idle,
