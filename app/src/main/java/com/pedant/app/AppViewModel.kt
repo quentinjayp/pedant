@@ -44,6 +44,8 @@ enum class Busy(val label: String) {
     Speaking("Speaking…"),
     Preparing("Preparing the phrase…"),
     Starting("Getting ready…"),
+    Translating("Translating the reply…"),
+    Checking("Checking what you said…"),
 }
 
 /** A tapped word: its meaning in context and how to say it. Null fields are still loading. */
@@ -821,7 +823,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val soundText = SoundRecognizer.display(sounds)
         chat += ChatItem.User(transcript, soundText)
         // Gemma's memory keeps only the words, in the language being learned.
-        runTurn(Tutor.heardMessage(transcript, soundText), remember = "Transcript: $transcript")
+        val message = Tutor.heardMessage(transcript, soundText)
+        runTurn(message, remember = "Transcript: $transcript", check = message)
     }
 
     /** Learning mode: translates what the learner wants to say and starts drilling it. */
@@ -907,33 +910,68 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * Sends [message] to the tutor, shows the answer as it streams in and speaks the reply.
+     * Then, as their own steps, written while the reply plays: in Learning mode the English
+     * translation of the reply; for [check] (what the learner said, in Conversation mode) any
+     * corrections. Neither is kept in Gemma's conversation memory.
      * [saveOpening] (key, voice) saves the answer and its audio as the opening for those choices.
      */
-    private suspend fun runTurn(message: String, saveOpening: Pair<String, String>? = null, remember: String = message) {
+    private suspend fun runTurn(
+        message: String,
+        saveOpening: Pair<String, String>? = null,
+        remember: String = message,
+        check: String? = null,
+    ) {
         busy = Busy.Thinking
         val index = chat.size
         chat += ChatItem.Tutor(null, "")
+        fun update(change: (ChatItem.Tutor) -> ChatItem.Tutor) {
+            (chat.getOrNull(index) as? ChatItem.Tutor)?.let { chat[index] = change(it) }
+        }
         try {
-            var raw = ""
-            var latest = TutorTurn()
+            val lang = checkNotNull(language)
+            var reply = ""
             diagnostics.step = "Generating a reply with Gemma"
-            checkNotNull(tutor).respond(message, remember).collect {
-                raw = it
-                latest = Tutor.parse(it)
-                chat[index] = ChatItem.Tutor(latest.correction, latest.reply, latest.english)
+            checkNotNull(tutor).respond(message, remember).collect { raw ->
+                reply = Tutor.parse(raw).reply
+                update { it.copy(reply = reply) }
             }
-            busy = Busy.Speaking
             diagnostics.step = "Speaking the reply with Piper"
-            withContext(Dispatchers.Default) {
-                val voice = checkNotNull(tts)
-                val audio = voice.synthesize(latest.reply)
-                if (saveOpening != null && latest.reply.isNotBlank()) {
-                    openings.saveText(saveOpening.first, raw)
-                    openings.saveAudio(saveOpening.first, saveOpening.second, audio)
+            val voice = checkNotNull(tts)
+            val audio = withContext(Dispatchers.Default) { voice.synthesize(reply) }
+            var english: String? = null
+            coroutineScope {
+                val extra = async {
+                    try {
+                        when {
+                            reply.isBlank() -> Unit
+                            mode == Mode.Learning -> {
+                                val raw = checkNotNull(tutor).translateReply(lang, reply) { partial ->
+                                    update { it.copy(english = Tutor.parse(partial).english) }
+                                }
+                                english = Tutor.parse(raw).english
+                            }
+                            check != null -> {
+                                checkNotNull(tutor).checkSaid(lang, check) { partial ->
+                                    update { it.copy(correction = Tutor.parse(partial).correction) }
+                                }
+                            }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        diagnostics.log("Couldn't add the English: ${e.message}")
+                    }
                 }
-                voice.play(audio)
+                busy = Busy.Speaking
+                withContext(Dispatchers.Default) { voice.play(audio) }
+                if (extra.isActive) busy = if (mode == Mode.Learning) Busy.Translating else Busy.Checking
+                extra.await()
             }
-            queueLookups(latest.reply)
+            if (saveOpening != null && reply.isNotBlank()) {
+                openings.saveText(saveOpening.first, "REPLY: $reply" + english?.let { "\nENGLISH: $it" }.orEmpty())
+                openings.saveAudio(saveOpening.first, saveOpening.second, audio)
+            }
+            queueLookups(reply)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {

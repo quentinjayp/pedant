@@ -95,14 +95,8 @@ class Tutor(context: Context, modelFile: File) {
         return kept.dropWhile { !it.fromLearner }
     }
 
-    /** Gemma's answer reduced to its reply in the language being learned, in the expected format. */
-    private fun compact(raw: String): String {
-        val reply = parse(raw).reply
-        return when (mode) {
-            Mode.Conversation -> "CORRECTION: none\nREPLY: $reply"
-            Mode.Learning -> "REPLY: $reply"
-        }
-    }
+    /** Gemma's answer reduced to its reply in the language being learned. */
+    private fun compact(raw: String): String = "REPLY: ${parse(raw).reply}"
 
     /**
      * The last conversation's start, with the instructions already read, kept so starting the same
@@ -137,6 +131,17 @@ class Tutor(context: Context, modelFile: File) {
      */
     suspend fun translate(language: Language, english: String, onText: (String) -> Unit): String =
         ask(translatePrompt(language), english, onText)
+
+    /**
+     * Translates Gemma's [reply] into English, in its own short conversation: the English is written
+     * fresh each time and never kept in the main conversation. See [parse] for the answer's parts.
+     */
+    suspend fun translateReply(language: Language, reply: String, onText: (String) -> Unit): String =
+        ask(replyTranslatePrompt(language), reply, onText)
+
+    /** Checks what the learner said (see [heardMessage]) for mistakes, in its own short conversation. */
+    suspend fun checkSaid(language: Language, message: String, onText: (String) -> Unit): String =
+        ask(correctionPrompt(language), message, onText)
 
     /** The one-off conversation in progress (a lookup or translation), so it can be stopped. */
     @Volatile private var lookupConversation: Conversation? = null
@@ -202,7 +207,7 @@ class Tutor(context: Context, modelFile: File) {
 
         /** The message that asks Gemma to open the conversation. */
         fun startMessage(mode: Mode) = when (mode) {
-            Mode.Conversation -> "[START] Write CORRECTION: none"
+            Mode.Conversation -> "[START]"
             Mode.Learning -> "[START]"
         }
 
@@ -232,11 +237,27 @@ class Tutor(context: Context, modelFile: File) {
             Use both to work out what the user said. Never correct capitalization or punctuation.
 
             Always answer in exactly this format and nothing else:
-            CORRECTION: <in English. If the user's last message had grammar or word-choice mistakes, give the
-            corrected sentence in ${language.englishName} and a one-sentence explanation in English. If a word
-            was clearly mispronounced, mention it briefly. If there were no mistakes, write: none>
             REPLY: <your reply in ${language.englishName} only. Keep it short and simple (one to three
             sentences) and usually end with a question to keep the conversation going.>
+        """.trimIndent()
+
+        private fun correctionPrompt(language: Language) = """
+            You check what a learner of ${language.englishName} said by voice. You get two readings of the
+            same recording:
+            - Transcript: the words a speech recognizer heard, written exactly as spoken (lowercase, no
+              punctuation, mistakes kept, sometimes misheard).
+            - Sounds heard (IPA): the sounds a phonetic recognizer heard, with ▁ between words.
+            Use both to work out what the learner said. Never correct capitalization or punctuation.
+            Answer in exactly this format and nothing else:
+            CORRECTION: <in English. If there were grammar or word-choice mistakes, give the corrected
+            sentence in ${language.englishName} and a one-sentence explanation in English. If a word was
+            clearly mispronounced, mention it briefly. If there were no mistakes, write: none>
+        """.trimIndent()
+
+        private fun replyTranslatePrompt(language: Language) = """
+            You translate ${language.englishName} into natural, simple English.
+            Answer in exactly this format and nothing else:
+            ENGLISH: <the English translation only>
         """.trimIndent()
 
         /** How to open the conversation, and who to play in a scenario. */
@@ -261,7 +282,6 @@ class Tutor(context: Context, modelFile: File) {
 
             Answer in exactly this format and nothing else:
             REPLY: <one or two short, simple sentences in ${language.englishName}>
-            ENGLISH: <the English translation of your reply>
         """.trimIndent()
 
         private fun translatePrompt(language: Language) = """
