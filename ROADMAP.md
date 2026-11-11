@@ -16,6 +16,14 @@ Ideas for later. Nothing here is being built yet.
 - **Word grades as labels.** Show each word's grade as Right / Close / Off instead of a percentage,
   once scoring is settled.
 
+## Models
+
+- **A/B test Gemma sizes.** Compare the current Gemma 4 E4B with a smaller, lower-quality Gemma
+  (such as E2B) for speed, memory and the quality of replies, translations and word meanings.
+- **Evals with Langfuse.** Set up evaluations, logged to Langfuse, to see whether a different model
+  is better or worse. They would run off the phone (in CI or on a computer) on fixed test
+  conversations, since the app itself stays offline.
+
 ## Settings
 
 - **Your own language.** Choose the language you speak (English today) for translations, meanings
