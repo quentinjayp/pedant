@@ -1,0 +1,91 @@
+name: Openings
+
+# Writes Gemma's openings for every language, mode and built-in scenario into
+# app/src/main/assets/openings.json, so the app can open a conversation without waiting for Gemma.
+# Runs whenever Gemma's instructions (or the language list) change, and on demand. Only openings
+# whose instructions changed are written again. When done, it commits the file and starts a new
+# APK build so the app ships with them.
+
+on:
+  push:
+    branches: [claude/offline-ai-language-app-v3widq, main]
+    paths:
+      - app/src/main/assets/instructions.json
+      - app/src/main/java/com/pedant/app/Languages.kt
+      - tools/build_openings.py
+      - .github/workflows/openings.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: openings
+  cancel-in-progress: true
+
+env:
+  SHARDS: 4
+  GEMMA_URL: https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      missing: ${{ steps.count.outputs.missing }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: count
+        run: echo "missing=$(python3 tools/build_openings.py --count)" >> "$GITHUB_OUTPUT"
+
+  write:
+    needs: plan
+    if: needs.plan.outputs.missing != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Gemma's library (the version the app uses)
+        run: pip install --quiet litert-lm-api==0.19.1
+      - name: Download Gemma
+        run: curl -fsSL --retry 3 -o gemma.litertlm "$GEMMA_URL" && ls -l gemma.litertlm
+      - name: Write this shard's openings
+        run: |
+          python3 tools/build_openings.py --model gemma.litertlm \
+            --shard ${{ matrix.shard }} --shards "$SHARDS" --out openings-part-${{ matrix.shard }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openings-part-${{ matrix.shard }}
+          path: openings-part-${{ matrix.shard }}.json
+
+  merge:
+    needs: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: openings-part-*
+          merge-multiple: true
+      - name: Add them to the app
+        run: python3 tools/build_openings.py --merge "openings-part-*.json"
+      - name: Commit and build the app with them
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/assets/openings.json
+          if git diff --cached --quiet; then echo "No new openings"; exit 0; fi
+          git commit -m "Openings written for the current instructions"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          # A push made by this workflow doesn't start other workflows, so start the app build directly.
+          gh workflow run android.yml --repo "$GITHUB_REPOSITORY" --ref "${GITHUB_REF_NAME}"

@@ -130,29 +130,29 @@ class Tutor(context: Context, modelFile: File) {
      * ever holds the language being learned. [onText] gets the answer as it is written.
      */
     suspend fun translate(language: Language, english: String, onText: (String) -> Unit): String =
-        ask(translatePrompt(language), english, onText)
+        ask(Instructions.translate(language), english, onText)
 
     /**
      * Translates Gemma's [reply] into English, in its own short conversation: the English is written
      * fresh each time and never kept in the main conversation. See [parse] for the answer's parts.
      */
     suspend fun translateReply(language: Language, reply: String, onText: (String) -> Unit): String =
-        ask(replyTranslatePrompt(language), reply, onText)
+        ask(Instructions.replyTranslate(language), reply, onText)
 
     /** Checks what the learner said (see [heardMessage]) for mistakes, in its own short conversation. */
     suspend fun checkSaid(language: Language, message: String, onText: (String) -> Unit): String =
-        ask(correctionPrompt(language), message, onText)
+        ask(Instructions.correction(language), message, onText)
 
     /** The one-off conversation in progress (a lookup or translation), so it can be stopped. */
     @Volatile private var lookupConversation: Conversation? = null
 
     /** Looks up one [word] as used in [sentence]. Returns the raw answer; see [parseLookup]. */
     suspend fun lookUp(language: Language, word: String, sentence: String): String =
-        ask(lookupPrompt(language), "Word: $word\nSentence: $sentence")
+        ask(Instructions.lookup(language), "Word: $word\nSentence: $sentence")
 
     /** Explains every word of [sentence] at once. Returns the raw answer; see [parseSentenceLookup]. */
     suspend fun lookUpSentence(language: Language, sentence: String): String =
-        ask(sentenceLookupPrompt(language), sentence)
+        ask(Instructions.sentenceLookup(language), sentence)
 
     /**
      * Asks a one-off question in its own short conversation, so the main one is left untouched.
@@ -206,103 +206,32 @@ class Tutor(context: Context, modelFile: File) {
         private const val HISTORY_CHARS = 2500
 
         /** The message that asks Gemma to open the conversation. */
-        fun startMessage(mode: Mode) = when (mode) {
-            Mode.Conversation -> "[START]"
-            Mode.Learning -> "[START]"
-        }
+        fun startMessage(mode: Mode) = Instructions.start
 
-        private fun systemPrompt(language: Language, mode: Mode, scenario: Scenario) = when (mode) {
-            Mode.Conversation -> conversationPrompt(language)
-            Mode.Learning -> learningPrompt(language)
-        } + "\n\n" + scenarioPrompt(language, scenario)
+        private fun systemPrompt(language: Language, mode: Mode, scenario: Scenario) =
+            Instructions.system(language, mode, scenario)
 
-        /** Names the saved opening for these choices; it changes whenever the instructions change. */
+        /**
+         * Names the opening for these choices; it changes whenever the instructions change.
+         * tools/build_openings.py names the openings that ship with the app the same way.
+         */
         fun openingKey(language: Language, mode: Mode, scenario: Scenario): String {
             val hash = (systemPrompt(language, mode, scenario) + startMessage(mode)).hashCode()
             return "${language.code}-${mode.name}-${scenario.name}-${Integer.toHexString(hash)}"
         }
-        fun learningSaid(phrase: String) = "[SAID] $phrase"
+
+        fun learningSaid(phrase: String) = Instructions.said(phrase)
 
         /** Formats what the learner said for Gemma: the words heard plus the sounds heard. */
-        fun heardMessage(transcript: String, sounds: String) =
-            "Transcript: $transcript\nSounds heard (IPA): $sounds"
+        fun heardMessage(transcript: String, sounds: String) = Instructions.heard(transcript, sounds)
 
-        private fun conversationPrompt(language: Language) = """
-            You are a friendly conversation partner helping the user practise ${language.englishName}.
-            The user is a language learner talking to you by voice.
-            Each of their messages gives two readings of the same recording:
-            - Transcript: the words a speech recognizer heard, written exactly as spoken (lowercase, no
-              punctuation, mistakes kept, sometimes misheard).
-            - Sounds heard (IPA): the sounds a phonetic recognizer heard, with ▁ between words.
-            Use both to work out what the user said. Never correct capitalization or punctuation.
 
-            Always answer in exactly this format and nothing else:
-            REPLY: <your reply in ${language.englishName} only. Keep it short and simple (one to three
-            sentences) and usually end with a question to keep the conversation going.>
-        """.trimIndent()
 
-        private fun correctionPrompt(language: Language) = """
-            You check what a learner of ${language.englishName} said by voice. You get two readings of the
-            same recording:
-            - Transcript: the words a speech recognizer heard, written exactly as spoken (lowercase, no
-              punctuation, mistakes kept, sometimes misheard).
-            - Sounds heard (IPA): the sounds a phonetic recognizer heard, with ▁ between words.
-            Use both to work out what the learner said. Never correct capitalization or punctuation.
-            Answer in exactly this format and nothing else:
-            CORRECTION: <in English. If there were grammar or word-choice mistakes, give the corrected
-            sentence in ${language.englishName} and a one-sentence explanation in English. If a word was
-            clearly mispronounced, mention it briefly. If there were no mistakes, write: none>
-        """.trimIndent()
 
-        private fun replyTranslatePrompt(language: Language) = """
-            You translate ${language.englishName} into natural, simple English.
-            Answer in exactly this format and nothing else:
-            ENGLISH: <the English translation only>
-        """.trimIndent()
 
-        /** How to open the conversation, and who to play in a scenario. */
-        private fun scenarioPrompt(language: Language, scenario: Scenario): String {
-            val role = scenario.role
-            return if (role == null) {
-                "When you receive [START], open the conversation by asking, in ${language.englishName}: " +
-                    "\"Are you ready to learn some ${language.englishName}? What would you like to talk about today?\""
-            } else {
-                "Role-play: $role Stay in character as that person throughout, speaking naturally. " +
-                    "When you receive [START], open the scene in character with one or two short, simple sentences."
-            }
-        }
 
-        private fun learningPrompt(language: Language) = """
-            You are a friendly ${language.englishName} tutor running a speaking drill with an English speaker.
-            The learner says something in English, gets it translated, and practises saying it. You
-            receive two kinds of messages:
-            - [START]: open the conversation in ${language.englishName} as described below.
-            - [SAID] <phrase>: the learner has just said this phrase in ${language.englishName}. Reply to it
-              naturally in ${language.englishName} to continue the conversation.
 
-            Answer in exactly this format and nothing else:
-            REPLY: <one or two short, simple sentences in ${language.englishName}>
-        """.trimIndent()
 
-        private fun translatePrompt(language: Language) = """
-            You translate what an English speaker wants to say into natural, simple ${language.englishName}.
-            The English may be a raw speech transcript without punctuation.
-            Answer in exactly this format and nothing else:
-            SAY: <the ${language.englishName} translation only>
-        """.trimIndent()
-
-        private fun lookupPrompt(language: Language) = """
-            You explain ${language.englishName} words to an English-speaking learner.
-            You get a word and the sentence it appears in. Answer in exactly this format and nothing else:
-            MEANING: <a short English definition of the word as used in this sentence, with its part of speech>
-        """.trimIndent()
-
-        private fun sentenceLookupPrompt(language: Language) = """
-            You explain ${language.englishName} words to an English-speaking learner.
-            You get a ${language.englishName} sentence. For every word in it, in order, write one line in
-            exactly this format and nothing else:
-            word | short English meaning of the word as used in this sentence, with its part of speech
-        """.trimIndent()
 
         /** Splits a sentence lookup into word (lower case) → meaning. */
         fun parseSentenceLookup(raw: String): Map<String, String> =

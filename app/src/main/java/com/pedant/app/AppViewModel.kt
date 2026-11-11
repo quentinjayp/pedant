@@ -82,9 +82,13 @@ data class Progress(val done: Long, val total: Long, val label: String)
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
+    init {
+        Instructions.load(app)
+    }
+
     private val store = ModelStore(app)
     private val diagnostics = Diagnostics(app)
-    private val openings = OpeningCache(app.filesDir)
+    private val openings = OpeningCache(app.filesDir, app.assets)
     private val recorder = MicRecorder()
     private var tutor: Tutor? = null
     private var stt: SpeechToText? = null
