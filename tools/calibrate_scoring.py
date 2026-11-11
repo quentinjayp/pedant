@@ -9,7 +9,6 @@ Usage: python calibrate_scoring.py <models dir>
 The models dir holds the reference vits-piper-* voices, the Omnilingual ASR model, ZIPA, the word
 dictionaries (dict/) and FLEURS (fleurs/<code>/); see the CI job.
 """
-import wave
 from array import array
 import glob
 import os
@@ -351,11 +350,26 @@ class Clip:
 
 
 def read_wav(path):
-    with wave.open(path) as w:
-        frames = array("h", w.readframes(w.getnframes()))
-        if w.getnchannels() > 1:
-            frames = frames[::w.getnchannels()]
-        return Clip([x / 32768.0 for x in frames], w.getframerate())
+    """A WAV file's first channel as floats: 16-bit PCM or 32-bit float (as FLEURS uses)."""
+    data = open(path, "rb").read()
+    pos, fmt, samples = 12, None, None
+    while pos + 8 <= len(data):
+        cid, size = data[pos:pos + 4], int.from_bytes(data[pos + 4:pos + 8], "little")
+        body = data[pos + 8:pos + 8 + size]
+        if cid == b"fmt ":
+            fmt = (int.from_bytes(body[0:2], "little"), int.from_bytes(body[2:4], "little"),
+                   int.from_bytes(body[4:8], "little"), int.from_bytes(body[14:16], "little"))
+        elif cid == b"data":
+            samples = body
+        pos += 8 + size + (size & 1)
+    tag, channels, rate, bits = fmt
+    if tag == 3 and bits == 32:
+        values = list(array("f", samples[: len(samples) // 4 * 4]))
+    elif tag == 1 and bits == 16:
+        values = [x / 32768.0 for x in array("h", samples[: len(samples) // 2 * 2])]
+    else:
+        raise ValueError(f"Unsupported WAV format {tag}/{bits} in {path}")
+    return Clip(values[::channels], rate)
 
 
 def fleurs_sentences(code):
