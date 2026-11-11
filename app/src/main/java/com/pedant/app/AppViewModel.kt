@@ -1103,6 +1103,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 if (better && old != null) chat[p.chatIndex] = old.copy(heard = graded.transcript, sounds = graded.heardText, result = r)
                 keepRecording(p.chatIndex, graded.recording, r)
+                // Getting the phrase being practised right here counts as getting it right: the
+                // window closes and the conversation moves on, as from the main button.
+                val d = drill
+                val current = d != null && d.phrase == p.phrase &&
+                    chat.drop(p.chatIndex + 1).none { it is ChatItem.Say }
+                if (current && r.passed && old?.result?.passed == false) {
+                    practice = null
+                    startDrill(null)
+                    editableIndex = null
+                    runTurn(Tutor.learningSaid(p.phrase))
+                    return
+                }
                 val scores = "Words ${(r.wordScore * 100).toInt()}% · Sounds ${(r.soundScore * 100).toInt()}%"
                 practice = p.copy(
                     transcript = graded.transcript,
