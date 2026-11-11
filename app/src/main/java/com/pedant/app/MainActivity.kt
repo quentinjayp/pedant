@@ -1111,10 +1111,12 @@ private fun WordBubble(
     var position by remember(lookup.sentence) {
         mutableStateOf(words.indexOfFirst { it.equals(lookup.word, ignoreCase = true) }.coerceAtLeast(0))
     }
+    // Shows the word at [i] (wrapping around) and says it at normal speed.
     fun show(i: Int) {
         if (words.isEmpty()) return
         position = Math.floorMod(i, words.size)
         onLookUp(words[position], lookup.sentence)
+        onHear(words[position], false)
     }
     // Nearly as wide as the screen, like a card laid over the conversation.
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
