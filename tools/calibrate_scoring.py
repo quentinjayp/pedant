@@ -276,7 +276,8 @@ for lang, cfg in LANGS.items():
                 # Sound-alike check: the reference voice says what Omnilingual heard.
                 alike = word_ratios(ref_words, sounds(ref_tts.generate(transcript, sid=0, speed=1.0))) \
                     if transcript.strip() else [1.0] * len(per_word)
-                per_word = [(heard, min(ratio, alike_ratio)) for (heard, ratio), alike_ratio in zip(per_word, alike)]
+                # Per word: (Omnilingual heard it, ZIPA's sound error ratio, the sound-alike ratio).
+                per_word = [(heard, ratio, alike_ratio) for (heard, ratio), alike_ratio in zip(per_word, alike)]
                 rows.append((lang, kind, voice, sid, ws, ss, per_word))
                 print(f"{lang} {kind:18} {voice}#{sid:<2} words {ws:.2f} sounds {ss:.2f} | {transcript}", flush=True)
 
@@ -286,21 +287,34 @@ for kind in ["correct", "swap one word", "drop one word", "different sentence"]:
         vals = [r[idx] for r in rows if r[1] == kind]
         print(f"{kind:18} {metric:6} min {min(vals):.2f} mean {sum(vals) / len(vals):.2f} max {max(vals):.2f}")
 
-# The app's rule: a word is right if Omnilingual heard it OR its sound error ratio <= WORD_SOUND_LIMIT.
+# The app's rule: a word is right if Omnilingual heard it, OR ZIPA's sounds for it are close
+# enough, OR what Omnilingual heard sounds like it (the sound-alike check). Each part alone and in
+# pairs shows how much each recognizer adds.
 LIMIT = 0.5
 KINDS = ["correct", "swap one word", "drop one word", "different sentence"]
+RULES = {
+    "ZIPA alone": lambda heard, ratio, alike: ratio <= LIMIT,
+    "Omnilingual alone": lambda heard, ratio, alike: heard,
+    "Omnilingual + sound-alike": lambda heard, ratio, alike: heard or alike <= LIMIT,
+    "ZIPA + Omnilingual": lambda heard, ratio, alike: heard or ratio <= LIMIT,
+    "All three (the app)": lambda heard, ratio, alike: heard or ratio <= LIMIT or alike <= LIMIT,
+}
 
 
-def bad_words(r):
-    return [i for i, (heard, ratio) in enumerate(r[6]) if not (heard or ratio <= LIMIT)]
+def bad_words(r, rule=RULES["All three (the app)"]):
+    return [i for i, w in enumerate(r[6]) if not rule(*w)]
 
 
-print(f"\n== Per-word rule (limit {LIMIT}): share of attempts that pass ==")
-for kind in KINDS:
-    group = [r for r in rows if r[1] == kind]
-    print(f"{kind:18} {sum(not bad_words(r) for r in group) / max(1, len(group)):.0%}")
+print(f"\n== Share of attempts that pass, by rule (limit {LIMIT}) ==")
+print(f"{'rule':28}" + "".join(f"{k:>20}" for k in KINDS))
+for name, rule in RULES.items():
+    cells = []
+    for kind in KINDS:
+        group = [r for r in rows if r[1] == kind]
+        cells.append(f"{sum(not bad_words(r, rule) for r in group) / max(1, len(group)):>20.0%}")
+    print(f"{name:28}" + "".join(cells))
 
-print("\n== Correct attempts that fail the per-word rule ==")
+print("\n== Correct attempts that fail the app's rule ==")
 for r in rows:
     if r[1] == "correct" and bad_words(r):
         print(r[0], r[2], r[3], "bad word indexes", bad_words(r))
