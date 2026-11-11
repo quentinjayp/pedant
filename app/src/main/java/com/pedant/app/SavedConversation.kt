@@ -71,8 +71,6 @@ data class SavedConversation(
                     score = it.getDouble("score"),
                     heardWord = it.optStringOrNull("heardWord"),
                     passed = it.getBoolean("passed"),
-                    heardFrom = it.optInt("heardFrom", -1),
-                    heardTo = it.optInt("heardTo", -1),
                 )
             }.orEmpty(),
         )
@@ -120,6 +118,5 @@ data class SavedConversation(
         .put("words", JSONArray(r.words.map {
             JSONObject().put("word", it.word).put("expected", JSONArray(it.expected)).put("heard", it.heard)
                 .put("score", it.score).put("heardWord", it.heardWord).put("passed", it.passed)
-                .put("heardFrom", it.heardFrom).put("heardTo", it.heardTo)
         }))
 }

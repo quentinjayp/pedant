@@ -823,23 +823,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Hears the recording with both Omnilingual (words) and ZIPA (sounds), side by side. */
-    private suspend fun hear(audio: Audio): Pair<String, List<String>> =
-        hearTimed(audio).let { (words, sounds) -> words to sounds.map { it.first } }
-
-    /** What Omnilingual heard, and the sounds ZIPA heard with when each was heard. */
-    private suspend fun hearTimed(audio: Audio): Pair<String, List<Pair<String, Float>>> = withContext(Dispatchers.Default) {
+    private suspend fun hear(audio: Audio): Pair<String, List<String>> = withContext(Dispatchers.Default) {
         diagnostics.step = "Hearing ${audio.samples.size / audio.sampleRate.toDouble()} s of speech"
         coroutineScope {
             val words = async { checkNotNull(stt).transcribe(audio.samples) }
-            val sounds = async { checkNotNull(zipa).timedSounds(audio) }
+            val sounds = async { checkNotNull(zipa).sounds(audio) }
             words.await() to sounds.await()
         }
     }
 
-    /** Grades an attempt at [phrase]: what was heard, the sounds heard with their times, and the result. */
+    /** Grades an attempt at [phrase]: what was heard, the sounds heard, the result and the recording. */
     private suspend fun grade(phrase: String, refWords: List<RefWord>, audio: Audio): Graded {
-        val (transcript, timed) = hearTimed(audio)
-        val sounds = timed.map { it.first }
+        val (transcript, sounds) = hear(audio)
         var result = Matching.check(phrase, transcript, refWords, sounds)
         if (!result.passed && transcript.isNotBlank()) {
             // Sound-alike check: Piper says what Omnilingual heard and ZIPA listens, so a word
@@ -850,7 +845,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // The heard sounds, split into words by how they lined up with the phrase's words.
         val heardText = result.words.map { it.heard }.filter { it.isNotEmpty() }.joinToString(" ")
             .ifEmpty { SoundRecognizer.display(sounds) }
-        return Graded(transcript, heardText, result, Recording(audio, wordTimes(result, timed, audio)))
+        return Graded(transcript, heardText, result, Recording(audio))
     }
 
     private class Graded(val transcript: String, val heardText: String, val result: AttemptResult, val recording: Recording)
@@ -1022,17 +1017,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- Practice window: an attempt word by word, with retries ---------------------------------
 
-    /** A recording of an attempt, with where each word of the phrase was said (seconds), if found. */
-    class Recording(val audio: Audio, val wordTimes: List<ClosedFloatingPointRange<Float>?>)
-
-    /** Where each word was said in [audio]: from its first heard sound to just after its last. */
-    private fun wordTimes(result: AttemptResult, timed: List<Pair<String, Float>>, audio: Audio) =
-        result.words.map { w ->
-            if (w.heardFrom < 0 || w.heardTo >= timed.size) null else {
-                val length = audio.samples.size.toFloat() / audio.sampleRate
-                (timed[w.heardFrom].second - 0.08f).coerceIn(0f, length)..(timed[w.heardTo].second + 0.2f).coerceIn(0f, length)
-            }
-        }
+    /** A recording of an attempt, to play back. */
+    class Recording(val audio: Audio)
 
     /**
      * The latest recording only: its attempt's place in [chat], the result it was graded as (so it
@@ -1047,9 +1033,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
                 val a = recording.audio
-                val buf = ByteBuffer.allocate(16 + recording.wordTimes.size * 8 + a.samples.size * 4).order(ByteOrder.LITTLE_ENDIAN)
-                buf.putInt(chatIndex).putInt(result.hashCode()).putInt(a.sampleRate).putInt(recording.wordTimes.size)
-                recording.wordTimes.forEach { buf.putFloat(it?.start ?: -1f).putFloat(it?.endInclusive ?: -1f) }
+                val buf = ByteBuffer.allocate(12 + a.samples.size * 4).order(ByteOrder.LITTLE_ENDIAN)
+                buf.putInt(chatIndex).putInt(result.hashCode()).putInt(a.sampleRate)
                 buf.asFloatBuffer().put(a.samples)
                 file.writeBytes(buf.array())
             }
@@ -1061,9 +1046,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val index = buf.int
         val hash = buf.int
         val rate = buf.int
-        val times = List(buf.int) { val a = buf.float; val b = buf.float; if (a < 0) null else a..b }
         val samples = FloatArray(buf.remaining() / 4).also { buf.asFloatBuffer().get(it) }
-        Triple(index, hash, Recording(Audio(samples, rate), times))
+        Triple(index, hash, Recording(Audio(samples, rate)))
     }.getOrNull()
 
     /** A word practised on its own in the window: the latest and best scores (percent) and what was heard. */
@@ -1113,17 +1097,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         practice = p.copy(position = Math.floorMod(position, p.result.words.size.coerceAtLeast(1)))
     }
 
-    /** Plays the learner's own recording: the word at [position], or the whole try if null. */
-    fun playMyRecording(position: Int?) {
+    /** Plays back the learner's whole try. */
+    fun playMyRecording() {
         val p = practice ?: return
-        val recording = recordingFor(p) ?: return
-        val audio = recording.audio
-        val clip = if (position == null) audio else {
-            val range = recording.wordTimes.getOrNull(position) ?: return
-            val from = (range.start * audio.sampleRate).toInt().coerceIn(0, audio.samples.size)
-            val to = (range.endInclusive * audio.sampleRate).toInt().coerceIn(from, audio.samples.size)
-            Audio(audio.samples.copyOfRange(from, to), audio.sampleRate)
-        }
+        val clip = recordingFor(p)?.audio ?: return
         if (busy != Busy.Idle) return
         launchAction(Busy.Speaking) { withContext(Dispatchers.Default) { checkNotNull(tts).play(clip) } }
     }

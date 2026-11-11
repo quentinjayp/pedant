@@ -1015,7 +1015,7 @@ private fun AttemptCard(
 
 /**
  * The practice window for an attempt: each word's expected and heard sounds and its score, with
- * the correct word, the learner's own recording of it, and what was heard to play; and hold-to-talk
+ * the correct word and what was heard to play, the learner's whole try to play back, and hold-to-talk
  * buttons to say the picked word or the whole phrase again. Tries here are graded only.
  */
 @Composable
@@ -1046,7 +1046,7 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
                     ScoreMeter("Sounds", p.result.soundScore, Pastel.VioletDark, Modifier.weight(1f))
                 }
                 p.note?.let { Text(it, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Pastel.PrimaryInk) }
-                if (p.hasRecording) PillButton("▶ My whole try", { vm.playMyRecording(null) }, PillStyle.Outline, idle)
+                if (p.hasRecording) PillButton("▶ My whole try", { vm.playMyRecording() }, PillStyle.Outline, idle)
             }
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 // The picked word.
@@ -1076,7 +1076,6 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
                 SoundChip("Heard /${w.heard.ifEmpty { "—" }}/", Pastel.VioletContainer, null, Pastel.VioletDark)
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     PillButton("▶ Correct", { vm.hearWord(w.word, false) }, PillStyle.Primary, idle)
-                    if (p.hasRecording) PillButton("▶ My recording", { vm.playMyRecording(i) }, PillStyle.Secondary, idle)
                     if (w.heard.isNotEmpty()) PillButton("▶ Heard sounds", { vm.saySounds(w.heard) }, PillStyle.Secondary, idle)
                     val heardWord = w.heardWord
                     if (heardWord != null && Matching.normalize(heardWord) != Matching.normalize(w.word)) {

@@ -16,8 +16,7 @@ data class AttemptResult(
 /**
  * One word of an attempt. [expected] are its expected sounds; [heard] what ZIPA heard in its place
  * (the sounds that lined up with it); [score] how close those sounds were, 0 to 1; [heardWord] what
- * Omnilingual heard in its place, if anything. [heardFrom]..[heardTo] are the positions of the
- * heard sounds in the recording's sounds, or -1 if none lined up.
+ * Omnilingual heard in its place, if anything.
  */
 data class WordResult(
     val word: String,
@@ -26,8 +25,6 @@ data class WordResult(
     val score: Double,
     val heardWord: String?,
     val passed: Boolean,
-    val heardFrom: Int = -1,
-    val heardTo: Int = -1,
 )
 
 /**
@@ -46,8 +43,6 @@ private data class WordSounds(
     val expected: String,
     val heard: String,
     val ratio: Double,
-    val heardFrom: Int = -1,
-    val heardTo: Int = -1,
 )
 
 private data class SoundComparison(val score: Double, val words: List<WordSounds>)
@@ -156,8 +151,6 @@ object Matching {
             score = (1.0 - ws.ratio).coerceIn(0.0, 1.0),
             heardWord = heardWord,
             passed = passed,
-            heardFrom = ws.heardFrom,
-            heardTo = ws.heardTo,
         )
     }
 
@@ -222,16 +215,10 @@ object Matching {
         val expected = Array(refWords.size) { StringBuilder() }
         val heard = Array(refWords.size) { StringBuilder() }
         val wordCost = DoubleArray(refWords.size)
-        val from = IntArray(refWords.size) { -1 }
-        val to = IntArray(refWords.size) { -1 }
         var lastWord = 0
         for (step in steps) {
             step.ref?.let { lastWord = refWordOf[it]; expected[lastWord].append(refPhones[it]) }
-            step.hyp?.let {
-                heard[lastWord].append(heardSounds[it])
-                if (from[lastWord] < 0) from[lastWord] = it
-                to[lastWord] = it
-            }
+            step.hyp?.let { heard[lastWord].append(heardSounds[it]) }
             wordCost[lastWord] += step.cost
         }
         return SoundComparison(
@@ -241,8 +228,6 @@ object Matching {
                     expected = expected[w].toString(),
                     heard = heard[w].toString(),
                     ratio = wordCost[w] / refWords[w].sounds.size.coerceAtLeast(1),
-                    heardFrom = from[w],
-                    heardTo = to[w],
                 )
             },
         )
