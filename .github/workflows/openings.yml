@@ -85,7 +85,11 @@ jobs:
           git add app/src/main/assets/openings.json
           if git diff --cached --quiet; then echo "No new openings"; exit 0; fi
           git commit -m "Openings written for the current instructions"
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          # Someone may push at the same moment; take their commits and try again.
+          for attempt in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break
+            if [ "$attempt" = 5 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
           # A push made by this workflow doesn't start other workflows, so start the app build directly.
           gh workflow run android.yml --repo "$GITHUB_REPOSITORY" --ref "${GITHUB_REF_NAME}"

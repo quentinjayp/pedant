@@ -76,8 +76,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add dictionaries/manifest.json
           git commit -m "Dictionaries checked $(date -u +%Y-%m-%d)"
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push origin "HEAD:${GITHUB_REF_NAME}"
+          # Someone may push at the same moment; take their commits and try again.
+          for attempt in 1 2 3 4 5; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break
+            if [ "$attempt" = 5 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
 
       - name: Remove older dictionary releases (keeps the newest two)
         if: steps.manifest.outputs.publish == 'true'
