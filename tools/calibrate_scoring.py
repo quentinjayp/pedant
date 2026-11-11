@@ -261,15 +261,57 @@ def dict_ipa(db, word):
     return None
 
 
+def dict_candidates(db, word):
+    """Every pronunciation the dictionary lists for [word], as symbols (elided words by their parts)."""
+    def whole(w):
+        rows = db.execute("SELECT ipas FROM entries WHERE key = ? AND ipas IS NOT NULL", (dict_key(w),)).fetchall()
+        out = []
+        for (ipas,) in rows:
+            for v in ipas.split("\t"):
+                syms = ipa_symbols(v)
+                if syms and syms not in out:
+                    out.append(syms)
+        return out
+    found = whole(word)
+    if found:
+        return found
+    cut = next((i for i, c in enumerate(word) if c in "'’"), -1)
+    if 0 < cut < len(word) - 1:
+        parts, mains = whole(word[:cut + 1]), whole(word[cut + 1:])
+        return [p + m for p in parts for m in mains]
+    return []
+
+
+# Piper's sounds for a word count as agreeing with the dictionary when they're this close to one of
+# its pronunciations (cost per expected sound).
+AGREE = 0.15
+
+
+def pron_ratio(said, expected):
+    return sum(c for _, _, c in align(expected, said, sound_cost, sound_indel)) / max(1, len(expected))
+
+
 def is_consonant(s):
     return bool(s) and not is_mark(s) and s not in VOWELS and s != "▁"
 
 
-def dict_reference(db, phrase_sounds, current):
+def dict_reference(db, phrase_sounds, current, check=False):
     """Option B: each word's sounds from the dictionary (Piper's where it has none), plus the
-    consonants Piper carries over from one word to a next word that starts with a vowel."""
+    consonants Piper carries over from one word to a next word that starts with a vowel.
+
+    Option B2 ([check]): Piper's sounds for a word are kept when they agree with one of the
+    dictionary's pronunciations, and replaced by the closest one when they don't."""
     refs = []
     for w, piper in current:
+        piper = [x for x in piper if x != "▁"]
+        if check:
+            cands = dict_candidates(db, w) if db else []
+            best = min(cands, key=lambda c: pron_ratio(piper, c)) if cands else None
+            if best is None or pron_ratio(piper, best) <= AGREE:
+                refs.append((w, piper, False))
+            else:
+                refs.append((w, best, True))
+            continue
         ipa = dict_ipa(db, w) if db else None
         refs.append((w, ipa if ipa else list(piper), ipa is not None))
     ref = [s for _, ss, _ in refs for s in ss]
@@ -342,6 +384,7 @@ def variants(phrase, swap):
 
 rows = []
 coverage = {}
+replacements = {}
 for lang, cfg in LANGS.items():
     db_path = os.path.join(DICTS, f"{lang}.db")
     db = sqlite3.connect(db_path) if os.path.exists(db_path) else None
@@ -353,11 +396,14 @@ for lang, cfg in LANGS.items():
         phrase_sounds = sounds(audio)
         ref_words = segment(phrase_sounds, isolated)
         dict_words, cov = dict_reference(db, phrase_sounds, ref_words)
+        checked_words, replaced = dict_reference(db, phrase_sounds, ref_words, check=True)
         coverage.setdefault(lang, []).append(cov)
+        replacements.setdefault(lang, []).append(replaced)
         print(f"{lang} {phrase}")
         print("   current:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in ref_words))
-        print("   dictionary: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in dict_words), flush=True)
-        references = [("current", ref_words), ("dictionary", dict_words)]
+        print("   dictionary: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in dict_words))
+        print("   checked:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in checked_words), flush=True)
+        references = [("current", ref_words), ("dictionary", dict_words), ("checked", checked_words)]
         others = cfg["phrases"][(p_i + 1) % len(cfg["phrases"])]
         cases = [("correct", phrase)] + list(variants(phrase, cfg["swap"][p_i % len(cfg["swap"])])) + [("different sentence", others)]
         for engine, voice, sid in learners:
@@ -378,6 +424,9 @@ for lang, cfg in LANGS.items():
 print("\n== Words with dictionary IPA, by language ==")
 for lang, covs in coverage.items():
     print(f"{lang} {sum(covs) / len(covs):.0%}")
+print("\n== Words where Piper disagreed with the dictionary and were replaced (checked) ==")
+for lang, reps in replacements.items():
+    print(f"{lang} {sum(reps) / len(reps):.0%}")
 
 # The app's rule: a word is right if Omnilingual heard it, OR ZIPA's sounds for it are close
 # enough, OR what Omnilingual heard sounds like it (the sound-alike check). Each part alone and in
@@ -397,7 +446,7 @@ def bad_words(r, rule=RULES["All three (the app)"]):
     return [i for i, w in enumerate(r[6]) if not rule(*w)]
 
 
-for method in ["current", "dictionary"]:
+for method in ["current", "dictionary", "checked"]:
     group_rows = [r for r in rows if r[7] == method]
     print(f"\n== Expected sounds: {method} ==")
     for kind in KINDS:
