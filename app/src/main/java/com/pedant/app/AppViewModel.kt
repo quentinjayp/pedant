@@ -1050,8 +1050,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     enum class PracticeTarget { Phrase, Word }
     private var practiceTarget: PracticeTarget? = null
 
+    /** The place in [chat] of the latest attempt: the only one whose recording is kept. */
+    private fun latestAttemptIndex() = chat.indexOfLast { it is ChatItem.Attempt }
+
     private fun recordingFor(p: Practice): Recording? =
-        lastRecording?.takeIf { it.first == p.chatIndex && it.second == p.result.hashCode() }?.third
+        lastRecording?.takeIf {
+            it.first == p.chatIndex && it.first == latestAttemptIndex() && it.second == p.result.hashCode()
+        }?.third
 
     /** Opens the practice window for the attempt at [index], on its first wrong word. */
     fun openPractice(index: Int) {
@@ -1102,7 +1107,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     else -> r.wordScore + r.soundScore > old.result.wordScore + old.result.soundScore
                 }
                 if (better && old != null) chat[p.chatIndex] = old.copy(heard = graded.transcript, sounds = graded.heardText, result = r)
-                keepRecording(p.chatIndex, graded.recording, r)
+                // Only the latest attempt keeps a recording, so retries of older ones aren't kept.
+                val latest = p.chatIndex == latestAttemptIndex()
+                if (latest) keepRecording(p.chatIndex, graded.recording, r)
                 // Getting the phrase being practised right here counts as getting it right: the
                 // window closes and the conversation moves on, as from the main button.
                 val d = drill
@@ -1119,7 +1126,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 practice = p.copy(
                     transcript = graded.transcript,
                     result = r,
-                    hasRecording = true,
+                    hasRecording = latest,
                     note = when {
                         better && r.passed && old?.result?.passed == false -> "Correct! $scores. The conversation now shows it as correct."
                         better -> "New best: $scores. Saved to the conversation."
