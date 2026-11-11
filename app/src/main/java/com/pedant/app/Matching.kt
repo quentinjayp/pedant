@@ -9,6 +9,8 @@ data class AttemptResult(
     val passed: Boolean,
     /** The target words that went wrong, in phrase order. */
     val issues: List<WordIssue>,
+    /** What ZIPA heard, split up by the target word each sound lined up with. */
+    val heardByWord: List<String> = emptyList(),
 )
 
 /**
@@ -92,6 +94,7 @@ object Matching {
                 soundScore = sounds.score,
                 passed = wordScore >= PASS_WORDS && sounds.score >= PASS_SOUNDS,
                 issues = issues.take(6),
+                heardByWord = sounds.words.map { it.heard },
             )
         }
         // Both recognizers slip now and then on correct speech, but rarely on the same word, so a
@@ -111,6 +114,7 @@ object Matching {
                 val sound = sounds.words.getOrNull(i)
                 WordIssue(targetWords[i], heardFor[i], sound?.expected, sound?.heard)
             }.take(6),
+            heardByWord = sounds.words.map { it.heard },
         )
     }
 

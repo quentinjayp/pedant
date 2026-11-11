@@ -851,7 +851,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val transcriptSounds = withContext(Dispatchers.Default) { soundsOf(transcript) }
             result = Matching.check(d.phrase, transcript, d.refWords, sounds, transcriptSounds)
         }
-        chat += ChatItem.Attempt(transcript, SoundRecognizer.display(sounds), result)
+        // The heard sounds, split into words by how they lined up with the phrase's words.
+        val heardText = result.heardByWord.map { it.replace("▁", "") }.filter { it.isNotEmpty() }.joinToString(" ")
+            .ifEmpty { SoundRecognizer.display(sounds) }
+        chat += ChatItem.Attempt(transcript, heardText, result)
         if (result.passed) {
             startDrill(null)
             editableIndex = null
