@@ -15,6 +15,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,6 +37,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -77,6 +79,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.RectangleShape
@@ -87,6 +90,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -199,14 +203,22 @@ private fun Modifier.card(
     borderWidth: Dp = 1.dp,
 ): Modifier = clip(shape).background(background).then(if (border != null) Modifier.border(borderWidth, border, shape) else Modifier)
 
-/** The app's mark: a sky-blue tile with a P. */
+/** The logo's background, as on the app icon: bright orange to bright blue. */
+private val LogoGradient = Brush.linearGradient(0.33f to Color(0xFFFF7615), 0.67f to Color(0xFF159EFF))
+
+/** The logo: the app icon's P (Potta One) on its gradient, cut to a rounded tile. */
 @Composable
 private fun LogoTile() {
     Box(
-        Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Pastel.Sky),
+        Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(LogoGradient),
         contentAlignment = Alignment.Center,
     ) {
-        Text("P", color = Pastel.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+        // The icon's drawing is 108 units with the visible part in the middle 72, as launchers show it.
+        Image(
+            painterResource(R.drawable.ic_launcher_foreground),
+            contentDescription = "Pedant",
+            modifier = Modifier.requiredSize(44.dp * 108 / 72),
+        )
     }
 }
 
