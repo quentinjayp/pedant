@@ -2,7 +2,7 @@
 
 Learners are real people reading sentences, from Google's FLEURS dataset (CC-BY). Each recording
 is scored against its own sentence (should pass) and against wrong versions of it: one word
-swapped, one word dropped, and a different sentence (should fail). The scores use the same rules
+swapped, one word added that the speaker skipped, and a different sentence (should fail). The scores use the same rules
 as app/src/main/java/com/pedant/app/Matching.kt, which this file mirrors; keep the two in step.
 
 Usage: python calibrate_scoring.py <models dir>
@@ -30,7 +30,7 @@ LANGS = {
 }
 # Sentences per language, and their length in words (the app's phrases are short).
 PER_LANGUAGE = 25
-MIN_WORDS, MAX_WORDS = 4, 10
+MIN_WORDS, MAX_WORDS = 4, 12
 
 # ---- Scoring: mirrors Matching.kt -------------------------------------------------------------
 
@@ -341,7 +341,8 @@ def variants(phrase, swap):
     ws = phrase.split()
     k = len(ws) // 2
     yield "swap one word", " ".join(ws[:k] + [swap] + ws[k + 1:])
-    yield "drop one word", " ".join(ws[:k] + ws[k + 1:])
+    # The recording can't lose a word, so the target gains one the speaker never said.
+    yield "skip one word", " ".join(ws[:k] + [swap] + ws[k:])
 
 
 class Clip:
@@ -377,7 +378,8 @@ def fleurs_sentences(code):
     d = os.path.join(MODELS, "fleurs", code)
     wavs = {os.path.basename(p): p for p in glob.glob(f"{d}/**/*.wav", recursive=True)}
     out, seen = [], set()
-    for line in open(os.path.join(d, "dev.tsv"), encoding="utf-8"):
+    lines = [l for split in ("dev", "test") for l in open(os.path.join(d, f"{split}.tsv"), encoding="utf-8")]
+    for line in lines:
         cols = line.rstrip("\n").split("\t")
         if len(cols) < 3:
             continue
@@ -451,7 +453,7 @@ for lang, reps in replacements.items():
 # enough, OR what Omnilingual heard sounds like it (the sound-alike check). Each part alone and in
 # pairs shows how much each recognizer adds.
 LIMIT = 0.5
-KINDS = ["correct", "swap one word", "drop one word", "different sentence"]
+KINDS = ["correct", "swap one word", "skip one word", "different sentence"]
 RULES = {
     "ZIPA alone": lambda heard, ratio, alike: ratio <= LIMIT,
     "Omnilingual alone": lambda heard, ratio, alike: heard,

@@ -145,12 +145,14 @@ jobs:
           for l in fr es de en; do
             curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/download/$release/$l.db.gz" | gunzip > dict/$l.db
           done
-          # Real speech: FLEURS (Google, CC-BY), people reading sentences, from its dev split.
+          # Real speech: FLEURS (Google, CC-BY), people reading sentences, from its dev and test splits.
           for code in fr_fr es_419 de_de en_us; do
             mkdir -p fleurs/$code
             base=https://huggingface.co/datasets/google/fleurs/resolve/main/data/$code
-            curl -fsSL -o fleurs/$code/dev.tsv "$base/dev.tsv"
-            curl -fsSL "$base/audio/dev.tar.gz" | tar xz -C fleurs/$code
+            for split in dev test; do
+              curl -fsSL -o fleurs/$code/$split.tsv "$base/$split.tsv"
+              curl -fsSL "$base/audio/$split.tar.gz" | tar xz -C fleurs/$code
+            done
           done
       - name: Score learner voices
         run: |
