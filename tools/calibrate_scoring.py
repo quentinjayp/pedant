@@ -9,6 +9,8 @@ The models dir holds vits-piper-* voices, the Omnilingual ASR model and ZIPA (se
 """
 import glob
 import os
+import re
+import sqlite3
 import sys
 import unicodedata
 
@@ -92,11 +94,23 @@ def is_mark(s):
     return bool(s) and all(unicodedata.category(c) == "Mn" or c in "ˈˌːˑ˞ʰʲʷ" for c in s)
 
 
+# A carried consonant (French liaison, like the z of "les enfants") is written "‿z". It's expected,
+# but leaving it out costs half a sound, since some liaisons are optional.
+CARRIED = "‿"
+
+
+def base(s):
+    return s[1:] if s.startswith(CARRIED) else s
+
+
 def sound_indel(s):
+    if s.startswith(CARRIED):
+        return 0.5
     return 0.3 if is_mark(s) else 1.0
 
 
 def sound_cost(a, b):
+    a, b = base(a), base(b)
     if a == b:
         return 0.0
     if is_mark(a) or is_mark(b):
@@ -213,6 +227,74 @@ def check(target, transcript, ref_words, heard_sounds):
     return word_score, sound_score, list(zip(word_ok, ratios_from_steps(ref_words, sound_steps)))
 
 
+# ---- Expected sounds from the dictionary (option B) --------------------------------------------
+
+DICTS = os.path.join(MODELS, "dict")
+VOWELS = set("aeiouyøœɛɔəɑɐɒæɪʊʏɨʉɯɤɜɞʌɘɵ")
+IPA_DROP = set("/[].ˈˌ‿͜͡ -")
+
+
+def ipa_symbols(ipa):
+    """Dictionary IPA as ZIPA-style symbols: one per character, combining marks on their own,
+    without syllable dots, stress marks, link marks, tie bars or optional (bracketed) sounds."""
+    ipa = re.sub(r"\([^)]*\)", "", unicodedata.normalize("NFD", ipa))
+    return [c for c in ipa if c not in IPA_DROP and not c.isspace()]
+
+
+def dict_key(word):
+    return unicodedata.normalize("NFC", word).lower().replace("’", "'")
+
+
+def dict_ipa(db, word):
+    """The dictionary's IPA for [word] as symbols, as the app finds it (elided words by their parts)."""
+    def whole(w):
+        row = db.execute("SELECT ipa FROM entries WHERE key = ? AND ipa IS NOT NULL LIMIT 1", (dict_key(w),)).fetchone()
+        return ipa_symbols(row[0]) if row else None
+    found = whole(word)
+    if found:
+        return found
+    cut = next((i for i, c in enumerate(word) if c in "'’"), -1)
+    if 0 < cut < len(word) - 1:
+        part, main = whole(word[:cut + 1]), whole(word[cut + 1:])
+        if part and main:
+            return part + main
+    return None
+
+
+def is_consonant(s):
+    return bool(s) and not is_mark(s) and s not in VOWELS and s != "▁"
+
+
+def dict_reference(db, phrase_sounds, current):
+    """Option B: each word's sounds from the dictionary (Piper's where it has none), plus the
+    consonants Piper carries over from one word to a next word that starts with a vowel."""
+    refs = []
+    for w, piper in current:
+        ipa = dict_ipa(db, w) if db else None
+        refs.append((w, ipa if ipa else list(piper), ipa is not None))
+    ref = [s for _, ss, _ in refs for s in ss]
+    word_of = [i for i, (_, ss, _) in enumerate(refs) for _ in ss]
+    carried = {}
+    last_ref = None
+    for r, h, _ in align(ref, [s for s in phrase_sounds if s != "▁"], sound_cost, sound_indel):
+        if r is not None:
+            last_ref = r
+            continue
+        # A sound Piper said between the end of one word and the start of the next.
+        if last_ref is None or last_ref + 1 >= len(ref):
+            continue
+        w = word_of[last_ref]
+        if word_of[last_ref + 1] != w + 1 or last_ref != max(i for i, x in enumerate(word_of) if x == w):
+            continue
+        sound = [s for s in phrase_sounds if s != "▁"][h]
+        nxt = refs[w + 1][1]
+        if is_consonant(sound) and nxt and base(nxt[0]) in VOWELS:
+            carried[w] = CARRIED + sound
+    out = [(w, ss + ([carried[i]] if i in carried else [])) for i, (w, ss, _) in enumerate(refs)]
+    coverage = sum(1 for _, _, from_dict in refs if from_dict) / max(1, len(refs))
+    return out, coverage
+
+
 # ---- Models -----------------------------------------------------------------------------------
 
 def tts(voice):
@@ -259,33 +341,43 @@ def variants(phrase, swap):
 
 
 rows = []
+coverage = {}
 for lang, cfg in LANGS.items():
+    db_path = os.path.join(DICTS, f"{lang}.db")
+    db = sqlite3.connect(db_path) if os.path.exists(db_path) else None
     ref_tts = tts(cfg["ref"])
     learners = [(tts(v), v, sid) for v, sid in cfg["learners"]]
     for p_i, phrase in enumerate(cfg["phrases"]):
         audio = ref_tts.generate(phrase, sid=0, speed=1.0)
         isolated = [(w, sounds(ref_tts.generate(w, sid=0, speed=1.0))) for w in words(phrase)]
-        ref_words = segment(sounds(audio), isolated)
+        phrase_sounds = sounds(audio)
+        ref_words = segment(phrase_sounds, isolated)
+        dict_words, cov = dict_reference(db, phrase_sounds, ref_words)
+        coverage.setdefault(lang, []).append(cov)
+        print(f"{lang} {phrase}")
+        print("   current:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in ref_words))
+        print("   dictionary: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in dict_words), flush=True)
+        references = [("current", ref_words), ("dictionary", dict_words)]
         others = cfg["phrases"][(p_i + 1) % len(cfg["phrases"])]
         cases = [("correct", phrase)] + list(variants(phrase, cfg["swap"][p_i % len(cfg["swap"])])) + [("different sentence", others)]
         for engine, voice, sid in learners:
             for kind, text in cases:
                 a = engine.generate(text, sid=sid, speed=1.0)
                 transcript = recognize(asr, a).text
-                ws, ss, per_word = check(phrase, transcript, ref_words, sounds(a))
-                # Sound-alike check: the reference voice says what Omnilingual heard.
-                alike = word_ratios(ref_words, sounds(ref_tts.generate(transcript, sid=0, speed=1.0))) \
-                    if transcript.strip() else [1.0] * len(per_word)
-                # Per word: (Omnilingual heard it, ZIPA's sound error ratio, the sound-alike ratio).
-                per_word = [(heard, ratio, alike_ratio) for (heard, ratio), alike_ratio in zip(per_word, alike)]
-                rows.append((lang, kind, voice, sid, ws, ss, per_word))
-                print(f"{lang} {kind:18} {voice}#{sid:<2} words {ws:.2f} sounds {ss:.2f} | {transcript}", flush=True)
+                heard_sounds = sounds(a)
+                alike_sounds = sounds(ref_tts.generate(transcript, sid=0, speed=1.0)) if transcript.strip() else None
+                for method, refs in references:
+                    ws, ss, per_word = check(phrase, transcript, refs, heard_sounds)
+                    # Sound-alike check: the reference voice says what Omnilingual heard.
+                    alike = word_ratios(refs, alike_sounds) if alike_sounds else [1.0] * len(per_word)
+                    # Per word: (Omnilingual heard it, ZIPA's sound error ratio, the sound-alike ratio).
+                    per_word = [(heard, ratio, alike_ratio) for (heard, ratio), alike_ratio in zip(per_word, alike)]
+                    rows.append((lang, kind, voice, sid, ws, ss, per_word, method))
+                print(f"{lang} {kind:18} {voice}#{sid:<2} | {transcript}", flush=True)
 
-print("\n== Summary (min / mean / max) ==")
-for kind in ["correct", "swap one word", "drop one word", "different sentence"]:
-    for metric, idx in [("words", 4), ("sounds", 5)]:
-        vals = [r[idx] for r in rows if r[1] == kind]
-        print(f"{kind:18} {metric:6} min {min(vals):.2f} mean {sum(vals) / len(vals):.2f} max {max(vals):.2f}")
+print("\n== Words with dictionary IPA, by language ==")
+for lang, covs in coverage.items():
+    print(f"{lang} {sum(covs) / len(covs):.0%}")
 
 # The app's rule: a word is right if Omnilingual heard it, OR ZIPA's sounds for it are close
 # enough, OR what Omnilingual heard sounds like it (the sound-alike check). Each part alone and in
@@ -305,16 +397,24 @@ def bad_words(r, rule=RULES["All three (the app)"]):
     return [i for i, w in enumerate(r[6]) if not rule(*w)]
 
 
-print(f"\n== Share of attempts that pass, by rule (limit {LIMIT}) ==")
-print(f"{'rule':28}" + "".join(f"{k:>20}" for k in KINDS))
-for name, rule in RULES.items():
-    cells = []
+for method in ["current", "dictionary"]:
+    group_rows = [r for r in rows if r[7] == method]
+    print(f"\n== Expected sounds: {method} ==")
     for kind in KINDS:
-        group = [r for r in rows if r[1] == kind]
-        cells.append(f"{sum(not bad_words(r, rule) for r in group) / max(1, len(group)):>20.0%}")
-    print(f"{name:28}" + "".join(cells))
-
-print("\n== Correct attempts that fail the app's rule ==")
-for r in rows:
-    if r[1] == "correct" and bad_words(r):
-        print(r[0], r[2], r[3], "bad word indexes", bad_words(r))
+        for metric, idx in [("words", 4), ("sounds", 5)]:
+            vals = [r[idx] for r in group_rows if r[1] == kind]
+            print(f"{kind:18} {metric:6} min {min(vals):.2f} mean {sum(vals) / len(vals):.2f} max {max(vals):.2f}")
+    print(f"{'rule':28}" + "".join(f"{k:>20}" for k in KINDS))
+    for name, rule in RULES.items():
+        cells = []
+        for kind in KINDS:
+            group = [r for r in group_rows if r[1] == kind]
+            cells.append(f"{sum(not bad_words(r, rule) for r in group) / max(1, len(group)):>20.0%}")
+        print(f"{name:28}" + "".join(cells))
+    print("By language, correct attempts passing the app's rule: " + ", ".join(
+        f"{lang} {sum(not bad_words(r) for r in group_rows if r[0] == lang and r[1] == 'correct') / max(1, sum(1 for r in group_rows if r[0] == lang and r[1] == 'correct')):.0%}"
+        for lang in LANGS))
+    print("Correct attempts that fail the app's rule:")
+    for r in group_rows:
+        if r[1] == "correct" and bad_words(r):
+            print("  ", r[0], r[2], r[3], "bad word indexes", bad_words(r))
