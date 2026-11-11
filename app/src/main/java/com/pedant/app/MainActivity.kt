@@ -2,6 +2,7 @@ package com.pedant.app
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
@@ -9,6 +10,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
@@ -109,9 +111,27 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
 
 class MainActivity : ComponentActivity() {
+    private val vm: AppViewModel by viewModels()
+
+    override fun onPause() {
+        super.onPause()
+        // Leaving mid-turn: keep running until the turn is done. This has to start while the app
+        // is still on screen; Android doesn't allow it once the app is in the background.
+        if (vm.busy != Busy.Idle) KeepWorkingService.start(this)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        vm.appHidden()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        vm.appShown()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // The app is light: dark icons in the status and navigation bars.
         val bars = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
@@ -121,7 +141,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             PedantTheme {
                 Surface(Modifier.fillMaxSize(), color = Pastel.Bg, contentColor = Pastel.Ink) {
-                    val vm: AppViewModel = viewModel()
                     // Keep the screen on during long downloads so they aren't interrupted.
                     LaunchedEffect(vm.progress != null) {
                         if (vm.progress != null) {
@@ -633,6 +652,16 @@ private fun LanguageScreen(vm: AppViewModel) {
 
 @Composable
 private fun ConversationScreen(vm: AppViewModel) {
+    // The "finishing a reply" notice needs permission to show on Android 13 and later.
+    val context = LocalContext.current
+    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     val listState = rememberLazyListState()
     LaunchedEffect(vm.chat.size, vm.chat.lastOrNull()) {
         if (vm.chat.isNotEmpty()) listState.animateScrollToItem(vm.chat.size - 1)

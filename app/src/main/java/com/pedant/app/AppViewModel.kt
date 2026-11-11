@@ -610,8 +610,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         startBackground()
     }
 
+    /** Whether the app is on screen. Background lookups only run while it is. */
+    private var appVisible = true
+
+    /** The app went off screen: stop the background lookups so a turn in progress gets the phone. */
+    fun appHidden() {
+        appVisible = false
+        viewModelScope.launch { pauseBackground() }
+    }
+
+    /** The app is back on screen: the turn no longer needs keeping alive, and lookups can resume. */
+    fun appShown() {
+        appVisible = true
+        KeepWorkingService.stop(getApplication())
+        startBackground()
+    }
+
     private fun startBackground() {
-        if (backgroundJob?.isActive == true || busy != Busy.Idle) return
+        if (backgroundJob?.isActive == true || busy != Busy.Idle || !appVisible) return
         if (pendingSentences.isEmpty() && pendingWord == null) return
         val lang = language ?: return
         diagnostics.log("Background lookups: start (${diagnostics.memorySummary()})")
@@ -944,6 +960,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             snapshotFlow { busy }.collect {
                 if (it == Busy.Idle) {
+                    // A turn finished while the learner was away: nothing more to keep alive.
+                    KeepWorkingService.stop(getApplication())
                     startBackground()
                     saveConversation()
                 }
