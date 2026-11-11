@@ -9,8 +9,25 @@ data class AttemptResult(
     val passed: Boolean,
     /** The target words that went wrong, in phrase order. */
     val issues: List<WordIssue>,
-    /** What ZIPA heard, split up by the target word each sound lined up with. */
-    val heardByWord: List<String> = emptyList(),
+    /** Every word of the phrase, right or wrong, in order. */
+    val words: List<WordResult> = emptyList(),
+)
+
+/**
+ * One word of an attempt. [expected] are its expected sounds; [heard] what ZIPA heard in its place
+ * (the sounds that lined up with it); [score] how close those sounds were, 0 to 1; [heardWord] what
+ * Omnilingual heard in its place, if anything. [heardFrom]..[heardTo] are the positions of the
+ * heard sounds in the recording's sounds, or -1 if none lined up.
+ */
+data class WordResult(
+    val word: String,
+    val expected: List<String>,
+    val heard: String,
+    val score: Double,
+    val heardWord: String?,
+    val passed: Boolean,
+    val heardFrom: Int = -1,
+    val heardTo: Int = -1,
 )
 
 /**
@@ -25,7 +42,13 @@ data class WordIssue(
 )
 
 /** Per word: expected and heard sounds, and the share of the expected sounds that went wrong. */
-private data class WordSounds(val expected: String, val heard: String, val ratio: Double)
+private data class WordSounds(
+    val expected: String,
+    val heard: String,
+    val ratio: Double,
+    val heardFrom: Int = -1,
+    val heardTo: Int = -1,
+)
 
 private data class SoundComparison(val score: Double, val words: List<WordSounds>)
 
@@ -94,7 +117,7 @@ object Matching {
                 soundScore = sounds.score,
                 passed = wordScore >= PASS_WORDS && sounds.score >= PASS_SOUNDS,
                 issues = issues.take(6),
-                heardByWord = sounds.words.map { it.heard },
+                words = wordResults(refWords, sounds) { i, ws -> null to (ws.ratio <= WORD_SOUND_LIMIT) },
             )
         }
         // Both recognizers slip now and then on correct speech, but rarely on the same word, so a
@@ -114,8 +137,37 @@ object Matching {
                 val sound = sounds.words.getOrNull(i)
                 WordIssue(targetWords[i], heardFor[i], sound?.expected, sound?.heard)
             }.take(6),
-            heardByWord = sounds.words.map { it.heard },
+            words = wordResults(refWords, sounds) { i, _ -> heardFor.getOrNull(i) to (i !in wrong) },
         )
+    }
+
+    /** Each word's result; [judge] gives what Omnilingual heard in its place and whether it passed. */
+    private fun wordResults(
+        refWords: List<RefWord>,
+        sounds: SoundComparison,
+        judge: (Int, WordSounds) -> Pair<String?, Boolean>,
+    ): List<WordResult> = refWords.mapIndexed { i, ref ->
+        val ws = sounds.words.getOrNull(i) ?: WordSounds("", "", 1.0)
+        val (heardWord, passed) = judge(i, ws)
+        WordResult(
+            word = ref.word,
+            expected = ref.sounds,
+            heard = ws.heard.replace("▁", ""),
+            score = (1.0 - ws.ratio).coerceIn(0.0, 1.0),
+            heardWord = heardWord,
+            passed = passed,
+            heardFrom = ws.heardFrom,
+            heardTo = ws.heardTo,
+        )
+    }
+
+    /**
+     * Scores one word said on its own against its expected sounds: how close the sounds were (0 to
+     * 1) and the sounds heard.
+     */
+    fun checkWord(ref: RefWord, heardSounds: List<String>): Pair<Double, String> {
+        val ws = compareSounds(listOf(ref), heardSounds.filter { it != "▁" }).words.first()
+        return (1.0 - ws.ratio).coerceIn(0.0, 1.0) to ws.heard
     }
 
     /**
@@ -170,10 +222,16 @@ object Matching {
         val expected = Array(refWords.size) { StringBuilder() }
         val heard = Array(refWords.size) { StringBuilder() }
         val wordCost = DoubleArray(refWords.size)
+        val from = IntArray(refWords.size) { -1 }
+        val to = IntArray(refWords.size) { -1 }
         var lastWord = 0
         for (step in steps) {
             step.ref?.let { lastWord = refWordOf[it]; expected[lastWord].append(refPhones[it]) }
-            step.hyp?.let { heard[lastWord].append(heardSounds[it]) }
+            step.hyp?.let {
+                heard[lastWord].append(heardSounds[it])
+                if (from[lastWord] < 0) from[lastWord] = it
+                to[lastWord] = it
+            }
             wordCost[lastWord] += step.cost
         }
         return SoundComparison(
@@ -183,6 +241,8 @@ object Matching {
                     expected = expected[w].toString(),
                     heard = heard[w].toString(),
                     ratio = wordCost[w] / refWords[w].sounds.size.coerceAtLeast(1),
+                    heardFrom = from[w],
+                    heardTo = to[w],
                 )
             },
         )

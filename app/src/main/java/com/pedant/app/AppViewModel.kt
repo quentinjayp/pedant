@@ -24,6 +24,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import kotlin.math.roundToInt
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
@@ -67,8 +70,8 @@ sealed interface ChatItem {
     data class Tutor(val correction: String?, val reply: String, val english: String? = null) : ChatItem
     /** Learning mode: the phrase to say, translated from what the learner wanted to say. */
     data class Say(val english: String, val phrase: String) : ChatItem
-    /** Learning mode: one try at saying the phrase. */
-    data class Attempt(val heard: String, val sounds: String, val result: AttemptResult) : ChatItem
+    /** Learning mode: one try at saying [phrase]. */
+    data class Attempt(val heard: String, val sounds: String, val result: AttemptResult, val phrase: String = "") : ChatItem
     data class Note(val text: String) : ChatItem
 }
 
@@ -358,6 +361,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 language = lang
                 chat.clear()
                 resume?.let { chat.addAll(it.chat) }
+                practice = null
+                lastRecording = if (resume != null) withContext(Dispatchers.IO) { loadRecording() } else null
+                if (resume == null) withContext(Dispatchers.IO) { recordingFile.delete() }
                 startDrill(null)
                 editableIndex = resume?.editableIndex
                 busy = Busy.Starting
@@ -441,6 +447,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * lookups and any download, and waits until it has all actually stopped.
      */
     private suspend fun stopConversationWork() {
+        practice = null
+        practiceTarget = null
         tutor?.cancelGeneration()
         tts?.stopPlayback()
         if (busy == Busy.Listening) withContext(Dispatchers.Default) { recorder.stop() }
@@ -486,7 +494,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         launchAction(Busy.Transcribing) {
             val audio = withContext(Dispatchers.Default) { Audio(recorder.stop(), SAMPLE_RATE) }
             val d = drill
+            val target = practiceTarget
+            practiceTarget = null
             when {
+                target != null -> practiceTry(target, audio)
                 mode == Mode.Conversation -> conversationTurn(audio)
                 d == null -> {
                     // Learning mode, waiting for English: only the words matter here.
@@ -812,14 +823,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Hears the recording with both Omnilingual (words) and ZIPA (sounds), side by side. */
-    private suspend fun hear(audio: Audio): Pair<String, List<String>> = withContext(Dispatchers.Default) {
+    private suspend fun hear(audio: Audio): Pair<String, List<String>> =
+        hearTimed(audio).let { (words, sounds) -> words to sounds.map { it.first } }
+
+    /** What Omnilingual heard, and the sounds ZIPA heard with when each was heard. */
+    private suspend fun hearTimed(audio: Audio): Pair<String, List<Pair<String, Float>>> = withContext(Dispatchers.Default) {
         diagnostics.step = "Hearing ${audio.samples.size / audio.sampleRate.toDouble()} s of speech"
         coroutineScope {
             val words = async { checkNotNull(stt).transcribe(audio.samples) }
-            val sounds = async { checkNotNull(zipa).sounds(audio) }
+            val sounds = async { checkNotNull(zipa).timedSounds(audio) }
             words.await() to sounds.await()
         }
     }
+
+    /** Grades an attempt at [phrase]: what was heard, the sounds heard with their times, and the result. */
+    private suspend fun grade(phrase: String, refWords: List<RefWord>, audio: Audio): Graded {
+        val (transcript, timed) = hearTimed(audio)
+        val sounds = timed.map { it.first }
+        var result = Matching.check(phrase, transcript, refWords, sounds)
+        if (!result.passed && transcript.isNotBlank()) {
+            // Sound-alike check: Piper says what Omnilingual heard and ZIPA listens, so a word
+            // spelled differently but pronounced the same (like "sava" for "Ça va") still counts.
+            val transcriptSounds = withContext(Dispatchers.Default) { soundsOf(transcript) }
+            result = Matching.check(phrase, transcript, refWords, sounds, transcriptSounds)
+        }
+        // The heard sounds, split into words by how they lined up with the phrase's words.
+        val heardText = result.words.map { it.heard }.filter { it.isNotEmpty() }.joinToString(" ")
+            .ifEmpty { SoundRecognizer.display(sounds) }
+        return Graded(transcript, heardText, result, Recording(audio, wordTimes(result, timed, audio)))
+    }
+
+    private class Graded(val transcript: String, val heardText: String, val result: AttemptResult, val recording: Recording)
 
     private suspend fun conversationTurn(audio: Audio) {
         val (transcript, sounds) = hear(audio)
@@ -872,18 +906,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun checkAttempt(d: Drill, audio: Audio) {
-        val (transcript, sounds) = hear(audio)
-        var result = Matching.check(d.phrase, transcript, d.refWords, sounds)
-        if (!result.passed && transcript.isNotBlank()) {
-            // Sound-alike check: Piper says what Omnilingual heard and ZIPA listens, so a word
-            // spelled differently but pronounced the same (like "sava" for "Ça va") still counts.
-            val transcriptSounds = withContext(Dispatchers.Default) { soundsOf(transcript) }
-            result = Matching.check(d.phrase, transcript, d.refWords, sounds, transcriptSounds)
-        }
-        // The heard sounds, split into words by how they lined up with the phrase's words.
-        val heardText = result.heardByWord.map { it.replace("▁", "") }.filter { it.isNotEmpty() }.joinToString(" ")
-            .ifEmpty { SoundRecognizer.display(sounds) }
-        chat += ChatItem.Attempt(transcript, heardText, result)
+        val graded = grade(d.phrase, d.refWords, audio)
+        val result = graded.result
+        chat += ChatItem.Attempt(graded.transcript, graded.heardText, result, d.phrase)
+        keepRecording(chat.lastIndex, graded.recording)
         if (result.passed) {
             startDrill(null)
             editableIndex = null
@@ -992,6 +1018,153 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         /** How long the loading bar takes to move to a new amount. */
         const val LOADING_BAR_FILL_MS = 500
+    }
+
+    // ---- Practice window: an attempt word by word, with retries ---------------------------------
+
+    /** A recording of an attempt, with where each word of the phrase was said (seconds), if found. */
+    class Recording(val audio: Audio, val wordTimes: List<ClosedFloatingPointRange<Float>?>)
+
+    /** Where each word was said in [audio]: from its first heard sound to just after its last. */
+    private fun wordTimes(result: AttemptResult, timed: List<Pair<String, Float>>, audio: Audio) =
+        result.words.map { w ->
+            if (w.heardFrom < 0 || w.heardTo >= timed.size) null else {
+                val length = audio.samples.size.toFloat() / audio.sampleRate
+                (timed[w.heardFrom].second - 0.08f).coerceIn(0f, length)..(timed[w.heardTo].second + 0.2f).coerceIn(0f, length)
+            }
+        }
+
+    /**
+     * The latest recording only: its attempt's place in [chat], the result it was graded as (so it
+     * isn't shown with a different result) and the recording. Kept on the phone for Continue.
+     */
+    private var lastRecording: Triple<Int, Int, Recording>? = null
+    private val recordingFile get() = File(getApplication<Application>().filesDir, "last-attempt.bin")
+
+    private fun keepRecording(chatIndex: Int, recording: Recording, result: AttemptResult = (chat[chatIndex] as ChatItem.Attempt).result) {
+        lastRecording = Triple(chatIndex, result.hashCode(), recording)
+        val file = recordingFile
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val a = recording.audio
+                val buf = ByteBuffer.allocate(16 + recording.wordTimes.size * 8 + a.samples.size * 4).order(ByteOrder.LITTLE_ENDIAN)
+                buf.putInt(chatIndex).putInt(result.hashCode()).putInt(a.sampleRate).putInt(recording.wordTimes.size)
+                recording.wordTimes.forEach { buf.putFloat(it?.start ?: -1f).putFloat(it?.endInclusive ?: -1f) }
+                buf.asFloatBuffer().put(a.samples)
+                file.writeBytes(buf.array())
+            }
+        }
+    }
+
+    private fun loadRecording(): Triple<Int, Int, Recording>? = runCatching {
+        val buf = ByteBuffer.wrap(recordingFile.readBytes()).order(ByteOrder.LITTLE_ENDIAN)
+        val index = buf.int
+        val hash = buf.int
+        val rate = buf.int
+        val times = List(buf.int) { val a = buf.float; val b = buf.float; if (a < 0) null else a..b }
+        val samples = FloatArray(buf.remaining() / 4).also { buf.asFloatBuffer().get(it) }
+        Triple(index, hash, Recording(Audio(samples, rate), times))
+    }.getOrNull()
+
+    /** A word practised on its own in the window: the latest and best scores (percent) and what was heard. */
+    data class WordTry(val latest: Int, val best: Int, val heard: String)
+
+    /**
+     * The practice window for the attempt at [chatIndex]: the result shown (the attempt's, or a
+     * retry's), the word picked, what happened on the last whole-phrase retry, and the words
+     * practised on their own.
+     */
+    data class Practice(
+        val chatIndex: Int,
+        val phrase: String,
+        val transcript: String,
+        val result: AttemptResult,
+        val position: Int,
+        val hasRecording: Boolean,
+        val note: String? = null,
+        val wordTries: Map<Int, WordTry> = emptyMap(),
+    )
+
+    var practice by mutableStateOf<Practice?>(null)
+        private set
+
+    /** What the next recording is for, when it's made in the practice window. */
+    enum class PracticeTarget { Phrase, Word }
+    private var practiceTarget: PracticeTarget? = null
+
+    private fun recordingFor(p: Practice): Recording? =
+        lastRecording?.takeIf { it.first == p.chatIndex && it.second == p.result.hashCode() }?.third
+
+    /** Opens the practice window for the attempt at [index], on its first wrong word. */
+    fun openPractice(index: Int) {
+        val item = chat.getOrNull(index) as? ChatItem.Attempt ?: return
+        if (item.result.words.isEmpty() || item.phrase.isBlank()) return
+        val first = item.result.words.indexOfFirst { !it.passed }.coerceAtLeast(0)
+        val p = Practice(index, item.phrase, item.heard, item.result, first, hasRecording = false)
+        practice = p.copy(hasRecording = recordingFor(p) != null)
+    }
+
+    fun closePractice() {
+        practice = null
+    }
+
+    fun practiceSelect(position: Int) {
+        val p = practice ?: return
+        practice = p.copy(position = Math.floorMod(position, p.result.words.size.coerceAtLeast(1)))
+    }
+
+    /** Plays the learner's own recording: the word at [position], or the whole try if null. */
+    fun playMyRecording(position: Int?) {
+        val p = practice ?: return
+        val recording = recordingFor(p) ?: return
+        val audio = recording.audio
+        val clip = if (position == null) audio else {
+            val range = recording.wordTimes.getOrNull(position) ?: return
+            val from = (range.start * audio.sampleRate).toInt().coerceIn(0, audio.samples.size)
+            val to = (range.endInclusive * audio.sampleRate).toInt().coerceIn(from, audio.samples.size)
+            Audio(audio.samples.copyOfRange(from, to), audio.sampleRate)
+        }
+        if (busy != Busy.Idle) return
+        launchAction(Busy.Speaking) { withContext(Dispatchers.Default) { checkNotNull(tts).play(clip) } }
+    }
+
+    /** Starts recording in the practice window: the whole phrase again, or just the picked word. */
+    fun startPracticeTalking(target: PracticeTarget) {
+        if (practice == null || busy != Busy.Idle) return
+        practiceTarget = target
+        startTalking()
+    }
+
+    /** Grades a try made in the practice window. Nothing is said back, and the conversation doesn't move on. */
+    private suspend fun practiceTry(target: PracticeTarget, audio: Audio) {
+        val p = practice ?: return
+        val refWords = p.result.words.map { RefWord(it.word, it.expected) }
+        when (target) {
+            PracticeTarget.Phrase -> {
+                val graded = grade(p.phrase, refWords, audio)
+                val r = graded.result
+                val old = chat.getOrNull(p.chatIndex) as? ChatItem.Attempt
+                val better = old != null && r.wordScore + r.soundScore > old.result.wordScore + old.result.soundScore
+                // A better try replaces the attempt's scores in the conversation.
+                if (better && old != null) chat[p.chatIndex] = old.copy(heard = graded.transcript, sounds = graded.heardText, result = r)
+                keepRecording(p.chatIndex, graded.recording, r)
+                val scores = "Words ${(r.wordScore * 100).toInt()}% · Sounds ${(r.soundScore * 100).toInt()}%"
+                practice = p.copy(
+                    transcript = graded.transcript,
+                    result = r,
+                    hasRecording = true,
+                    note = if (better) "New best: $scores. Saved to the conversation." else "This try: $scores. Your best stays in the conversation.",
+                )
+            }
+            PracticeTarget.Word -> {
+                val ref = refWords.getOrNull(p.position) ?: return
+                val sounds = withContext(Dispatchers.Default) { checkNotNull(zipa).sounds(audio) }
+                val (score, heard) = Matching.checkWord(ref, sounds)
+                val percent = (score * 100).roundToInt()
+                val before = p.wordTries[p.position]
+                practice = p.copy(wordTries = p.wordTries + (p.position to WordTry(percent, maxOf(percent, before?.best ?: 0), heard)))
+            }
+        }
     }
 
     // Startup comes last, after every field: viewModelScope runs coroutines straight away, so

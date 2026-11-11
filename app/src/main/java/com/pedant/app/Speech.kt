@@ -116,14 +116,22 @@ class SoundRecognizer(store: ModelStore) {
         ),
     )
 
-    fun sounds(audio: Audio): List<String> {
+    fun sounds(audio: Audio): List<String> = timedSounds(audio).map { it.first }
+
+    /** The sounds ZIPA hears in [audio], each with when it was heard, in seconds into [audio]. */
+    fun timedSounds(audio: Audio): List<Pair<String, Float>> {
         if (audio.samples.isEmpty()) return emptyList()
         // ZIPA misses sounds right at the start of a clip with no lead-in (as in Piper's audio) and
         // fails on very short clips, so add silence before and after, and pad to at least a second.
         val margin = audio.sampleRate / 4
         val length = maxOf(audio.samples.size + 2 * margin, audio.sampleRate)
         val samples = FloatArray(length).also { audio.samples.copyInto(it, destinationOffset = margin) }
-        return recognizer.recognize(samples, audio.sampleRate).tokens.map { it.trim() }.filter { it.isNotEmpty() }
+        val result = recognizer.recognize(samples, audio.sampleRate)
+        val lead = margin.toFloat() / audio.sampleRate
+        return result.tokens.mapIndexedNotNull { i, token ->
+            val t = token.trim()
+            if (t.isEmpty()) null else t to ((result.timestamps.getOrNull(i) ?: 0f) - lead).coerceAtLeast(0f)
+        }
     }
 
     fun release() = recognizer.release()

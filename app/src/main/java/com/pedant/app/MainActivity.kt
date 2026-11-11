@@ -112,6 +112,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 
+import kotlin.math.roundToInt
+
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
 
@@ -707,6 +709,7 @@ private fun ConversationScreen(vm: AppViewModel) {
     }
 
     BackHandler(onBack = vm::goHome)
+    vm.practice?.let { PracticeWindow(vm, it) }
     vm.lookup?.let {
         WordBubble(it, appBusy = vm.busy != Busy.Idle, onLookUp = vm::lookUp, onHear = vm::hearWord, onClose = vm::closeLookup)
     }
@@ -781,6 +784,7 @@ private fun ConversationScreen(vm: AppViewModel) {
                         enabled = vm.busy == Busy.Idle,
                         onSay = { vm.hearWord(it, false) },
                         onSaySounds = vm::saySounds,
+                        onOpen = { vm.openPractice(index) },
                     )
                     is ChatItem.Note -> Text(
                         item.text,
@@ -949,14 +953,18 @@ private fun AttemptCard(
     enabled: Boolean,
     onSay: (String) -> Unit,
     onSaySounds: (String) -> Unit,
+    onOpen: () -> Unit,
 ) {
     val r = item.result
     val accent = if (r.passed) Pastel.Primary else Pastel.Cta
     val ink = if (r.passed) Pastel.PrimaryInk else Pastel.CtaInk
+    // Attempts saved before word-by-word practice existed have no per-word results.
+    val byWord = r.words.isNotEmpty() && item.phrase.isNotBlank()
     Column(
         Modifier
             .fillMaxWidth()
             .card(if (r.passed) Pastel.PrimarySoft else Pastel.CtaContainer, accent, RoundedCornerShape(26.dp), borderWidth = if (r.passed) 2.dp else 1.dp)
+            .clickable(enabled = byWord && enabled, onClick = onOpen)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -987,13 +995,182 @@ private fun AttemptCard(
                 fontSize = 13.sp,
                 color = ink,
             )
-            Text("Sounds: /${item.sounds}/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.VioletDark)
+            if (byWord) {
+                val expected = r.words.joinToString(" ") { it.expected.joinToString("").replace("▁", "") }
+                Text("Expected: /$expected/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.PrimaryDark)
+            }
+            Text("Heard: /${item.sounds}/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.VioletDark)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ScoreMeter("Words", r.wordScore, Pastel.PrimaryDark, Modifier.weight(1f))
             ScoreMeter("Sounds", r.soundScore, Pastel.VioletDark, Modifier.weight(1f))
         }
-        r.issues.forEach { issue -> IssueCard(issue, enabled, onSay, onSaySounds) }
+        if (byWord) {
+            Text("Tap for word by word and practice ›", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Pastel.InkSoft)
+        } else {
+            r.issues.forEach { issue -> IssueCard(issue, enabled, onSay, onSaySounds) }
+        }
+    }
+}
+
+/**
+ * The practice window for an attempt: each word's expected and heard sounds and its score, with
+ * the correct word, the learner's own recording of it, and what was heard to play; and hold-to-talk
+ * buttons to say the picked word or the whole phrase again. Tries here are graded only.
+ */
+@Composable
+private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
+    val words = p.result.words
+    val i = p.position.coerceIn(0, (words.size - 1).coerceAtLeast(0))
+    val w = words.getOrNull(i) ?: return
+    val idle = vm.busy == Busy.Idle
+    Dialog(onDismissRequest = vm::closePractice, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
+                .card(Pastel.White, Pastel.Primary, RoundedCornerShape(30.dp), borderWidth = 2.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            // The whole try: its scores, and what happened on the last retry.
+            Column(
+                Modifier.fillMaxWidth().background(Pastel.PrimaryContainer).padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(Pastel.PrimaryDark))
+                    SmallLabel(if (p.result.passed) "Practice · Correct" else "Practice · Not quite")
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    ScoreMeter("Words", p.result.wordScore, Pastel.PrimaryDark, Modifier.weight(1f))
+                    ScoreMeter("Sounds", p.result.soundScore, Pastel.VioletDark, Modifier.weight(1f))
+                }
+                p.note?.let { Text(it, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Pastel.PrimaryInk) }
+                if (p.hasRecording) PillButton("▶ My whole try", { vm.playMyRecording(null) }, PillStyle.Outline, idle)
+            }
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // The picked word.
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(w.word, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Pastel.PrimaryInk, modifier = Modifier.weight(1f))
+                    if (words.size > 1) {
+                        ChevronButton(pointsLeft = true, onClick = { vm.practiceSelect(i - 1) })
+                        ChevronButton(pointsLeft = false, onClick = { vm.practiceSelect(i + 1) })
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Sounds ${(w.score * 100).roundToInt()}%",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Pastel.VioletDark,
+                    )
+                    val heardWord = w.heardWord
+                    when {
+                        w.passed -> Tag("right", Pastel.PrimaryContainer, Pastel.PrimaryDark)
+                        heardWord == null -> Tag("not heard", Pastel.SurfaceContainer, Pastel.InkSoft)
+                        Matching.normalize(heardWord) != Matching.normalize(w.word) -> Tag("heard “$heardWord”", Pastel.CtaContainer, Pastel.CtaDark)
+                        else -> Tag("word right, sounds off", Pastel.CtaContainer, Pastel.CtaDark)
+                    }
+                }
+                SoundChip("Expected /${w.expected.joinToString("").replace("▁", "")}/", Pastel.PrimaryContainer, null, Pastel.PrimaryDark)
+                SoundChip("Heard /${w.heard.ifEmpty { "—" }}/", Pastel.VioletContainer, null, Pastel.VioletDark)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    PillButton("▶ Correct", { vm.hearWord(w.word, false) }, PillStyle.Primary, idle)
+                    if (p.hasRecording) PillButton("▶ My recording", { vm.playMyRecording(i) }, PillStyle.Secondary, idle)
+                    if (w.heard.isNotEmpty()) PillButton("▶ Heard sounds", { vm.saySounds(w.heard) }, PillStyle.Secondary, idle)
+                    val heardWord = w.heardWord
+                    if (heardWord != null && Matching.normalize(heardWord) != Matching.normalize(w.word)) {
+                        PillButton("▶ Heard word", { vm.hearWord(heardWord, false) }, PillStyle.Secondary, idle)
+                    }
+                }
+                p.wordTries[i]?.let { t ->
+                    Column(
+                        Modifier.fillMaxWidth().card(Pastel.VioletContainer, Pastel.Violet, RoundedCornerShape(16.dp)).padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text("This word on its own: ${t.latest}% · best ${t.best}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Pastel.VioletInk)
+                        Text("Heard /${t.heard.ifEmpty { "—" }}/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.VioletDark)
+                    }
+                }
+                // The phrase: tap a word to pick it.
+                Column(Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(16.dp)).padding(12.dp)) {
+                    SmallLabel("The phrase:", Pastel.InkSoft)
+                    Spacer(Modifier.height(4.dp))
+                    TappableText(p.phrase, fontSize = 15.sp, color = Pastel.Ink, highlight = i, onWord = { _, _, at -> vm.practiceSelect(at) })
+                }
+                // Practise: the picked word on its own, or the whole phrase again.
+                Text(
+                    if (idle) "Hold a button and speak" else vm.busy.label,
+                    fontSize = 12.sp,
+                    color = Pastel.InkSoft,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    HoldToTalk(
+                        "Say “${w.word}”", Pastel.Cta, Pastel.CtaInk, vm, Modifier.weight(1f),
+                    ) { vm.startPracticeTalking(AppViewModel.PracticeTarget.Word) }
+                    HoldToTalk(
+                        "Say the phrase", Pastel.Primary, Pastel.PrimaryInk, vm, Modifier.weight(1f),
+                    ) { vm.startPracticeTalking(AppViewModel.PracticeTarget.Phrase) }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    PillButton("Close", vm::closePractice, PillStyle.Outline)
+                }
+            }
+        }
+    }
+}
+
+/** A hold-to-talk button for the practice window: speaks while held, then [vm] grades it. */
+@Composable
+private fun HoldToTalk(label: String, fill: Color, ink: Color, vm: AppViewModel, modifier: Modifier, onStart: () -> Unit) {
+    val context = LocalContext.current
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    var held by remember { mutableStateOf(false) }
+    val enabled = vm.busy == Busy.Idle || (held && vm.busy == Busy.Listening)
+    val currentStart by rememberUpdatedState(onStart)
+    Column(
+        modifier
+            .height(72.dp)
+            .card(
+                background = when {
+                    held -> if (fill == Pastel.Cta) Pastel.CtaPressed else Pastel.PrimarySoft
+                    enabled -> fill
+                    else -> Pastel.White
+                },
+                border = if (enabled) Pastel.White else Pastel.OutlineSoft,
+                shape = RoundedCornerShape(22.dp),
+                borderWidth = 2.dp,
+            )
+            .pointerInput(enabled) {
+                detectTapGestures(onPress = {
+                    val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                        PackageManager.PERMISSION_GRANTED
+                    if (!granted) {
+                        permission.launch(Manifest.permission.RECORD_AUDIO)
+                        return@detectTapGestures
+                    }
+                    if (!enabled) return@detectTapGestures
+                    held = true
+                    currentStart()
+                    tryAwaitRelease()
+                    held = false
+                    vm.stopTalking()
+                })
+            },
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        val content = if (enabled) ink else Pastel.Outline
+        MicIcon(content, Modifier.size(22.dp))
+        Text(
+            if (held) "Release" else label,
+            color = content,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        )
     }
 }
 

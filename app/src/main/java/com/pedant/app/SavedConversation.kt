@@ -50,7 +50,9 @@ data class SavedConversation(
             "user" -> ChatItem.User(o.getString("text"), o.optStringOrNull("sounds"))
             "tutor" -> ChatItem.Tutor(o.optStringOrNull("correction"), o.getString("reply"), o.optStringOrNull("english"))
             "say" -> ChatItem.Say(o.getString("english"), o.getString("phrase"))
-            "attempt" -> ChatItem.Attempt(o.getString("heard"), o.getString("sounds"), attemptResult(o.getJSONObject("result")))
+            "attempt" -> ChatItem.Attempt(
+                o.getString("heard"), o.getString("sounds"), attemptResult(o.getJSONObject("result")), o.optString("phrase"),
+            )
             else -> ChatItem.Note(o.getString("text"))
         }
 
@@ -61,6 +63,18 @@ data class SavedConversation(
             issues = o.getJSONArray("issues").objects().map {
                 WordIssue(it.getString("word"), it.optStringOrNull("heardWord"), it.optStringOrNull("expectedSounds"), it.optStringOrNull("heardSounds"))
             },
+            words = o.optJSONArray("words")?.objects()?.map {
+                WordResult(
+                    word = it.getString("word"),
+                    expected = it.getJSONArray("expected").strings(),
+                    heard = it.getString("heard"),
+                    score = it.getDouble("score"),
+                    heardWord = it.optStringOrNull("heardWord"),
+                    passed = it.getBoolean("passed"),
+                    heardFrom = it.optInt("heardFrom", -1),
+                    heardTo = it.optInt("heardTo", -1),
+                )
+            }.orEmpty(),
         )
 
         private fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }
@@ -91,7 +105,7 @@ data class SavedConversation(
             .put("english", item.english)
         is ChatItem.Say -> JSONObject().put("type", "say").put("english", item.english).put("phrase", item.phrase)
         is ChatItem.Attempt -> JSONObject().put("type", "attempt").put("heard", item.heard).put("sounds", item.sounds)
-            .put("result", json(item.result))
+            .put("result", json(item.result)).put("phrase", item.phrase)
         is ChatItem.Note -> JSONObject().put("type", "note").put("text", item.text)
     }
 
@@ -102,5 +116,10 @@ data class SavedConversation(
         .put("issues", JSONArray(r.issues.map {
             JSONObject().put("word", it.word).put("heardWord", it.heardWord)
                 .put("expectedSounds", it.expectedSounds).put("heardSounds", it.heardSounds)
+        }))
+        .put("words", JSONArray(r.words.map {
+            JSONObject().put("word", it.word).put("expected", JSONArray(it.expected)).put("heard", it.heard)
+                .put("score", it.score).put("heardWord", it.heardWord).put("passed", it.passed)
+                .put("heardFrom", it.heardFrom).put("heardTo", it.heardTo)
         }))
 }
