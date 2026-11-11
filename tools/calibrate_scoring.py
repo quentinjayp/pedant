@@ -1,12 +1,16 @@
-"""Calibrates Learning mode's pass marks.
+"""Calibrates Learning mode's pass marks with real speech.
 
-Other Piper voices stand in for learners: each "learner" voice says the target phrase (should
-pass) and some wrong versions of it (should fail). The scores use the same rules as
-app/src/main/java/com/pedant/app/Matching.kt, which this file mirrors; keep the two in step.
+Learners are real people reading sentences, from Google's FLEURS dataset (CC-BY). Each recording
+is scored against its own sentence (should pass) and against wrong versions of it: one word
+swapped, one word dropped, and a different sentence (should fail). The scores use the same rules
+as app/src/main/java/com/pedant/app/Matching.kt, which this file mirrors; keep the two in step.
 
 Usage: python calibrate_scoring.py <models dir>
-The models dir holds vits-piper-* voices, the Omnilingual ASR model and ZIPA (see the CI job).
+The models dir holds the reference vits-piper-* voices, the Omnilingual ASR model, ZIPA, the word
+dictionaries (dict/) and FLEURS (fleurs/<code>/); see the CI job.
 """
+import wave
+from array import array
 import glob
 import os
 import re
@@ -18,57 +22,16 @@ import sherpa_onnx
 
 MODELS = sys.argv[1]
 
+# Per language: the app's voice (the reference), FLEURS's code for it, and words to swap in.
 LANGS = {
-    "fr": {
-        "ref": "fr_FR-siwis-medium",
-        "learners": [("fr_FR-tom-medium", 0), ("fr_FR-upmc-medium", 0), ("fr_FR-upmc-medium", 1), ("fr_FR-gilles-low", 0)],
-        "phrases": [
-            "Je vais bien, et toi ?",
-            "Ça va, et toi ?",
-            "Je voudrais un café, s'il vous plaît.",
-            "Où est la gare ?",
-            "J'aime beaucoup cette ville.",
-            "Nous allons au marché demain matin.",
-        ],
-        "swap": ["chien", "rouge", "jamais", "maison"],
-    },
-    "es": {
-        "ref": "es_ES-davefx-medium",
-        "learners": [("es_ES-sharvard-medium", 0), ("es_ES-sharvard-medium", 1), ("es_MX-ald-medium", 0), ("es_MX-claude-high", 0)],
-        "phrases": [
-            "Estoy bien, ¿y tú?",
-            "Quisiera un café, por favor.",
-            "¿Dónde está la estación?",
-            "Me gusta mucho esta ciudad.",
-            "Mañana vamos al mercado.",
-        ],
-        "swap": ["perro", "rojo", "nunca", "casa"],
-    },
-    "de": {
-        "ref": "de_DE-thorsten-medium",
-        "learners": [("de_DE-thorsten_emotional-medium", 0), ("de_DE-kerstin-low", 0), ("de_DE-eva_k-x_low", 0)],
-        "phrases": [
-            "Mir geht es gut, und dir?",
-            "Ich hätte gern einen Kaffee, bitte.",
-            "Wo ist der Bahnhof?",
-            "Ich mag diese Stadt sehr.",
-            "Morgen gehen wir auf den Markt.",
-        ],
-        "swap": ["Hund", "rot", "niemals", "Haus"],
-    },
-    "en": {
-        "ref": "en_US-lessac-medium",
-        "learners": [("en_US-amy-medium", 0), ("en_US-ryan-medium", 0), ("en_GB-alan-medium", 0)],
-        "phrases": [
-            "I'm doing well, and you?",
-            "I would like a coffee, please.",
-            "Where is the train station?",
-            "I really like this city.",
-            "Tomorrow we are going to the market.",
-        ],
-        "swap": ["dog", "red", "never", "house"],
-    },
+    "fr": {"ref": "fr_FR-siwis-medium", "fleurs": "fr_fr", "swap": ["chien", "rouge", "jamais", "maison"]},
+    "es": {"ref": "es_ES-davefx-medium", "fleurs": "es_419", "swap": ["perro", "rojo", "nunca", "casa"]},
+    "de": {"ref": "de_DE-thorsten-medium", "fleurs": "de_de", "swap": ["Hund", "rot", "niemals", "Haus"]},
+    "en": {"ref": "en_US-lessac-medium", "fleurs": "en_us", "swap": ["dog", "red", "never", "house"]},
 }
+# Sentences per language, and their length in words (the app's phrases are short).
+PER_LANGUAGE = 25
+MIN_WORDS, MAX_WORDS = 4, 10
 
 # ---- Scoring: mirrors Matching.kt -------------------------------------------------------------
 
@@ -382,6 +345,40 @@ def variants(phrase, swap):
     yield "drop one word", " ".join(ws[:k] + ws[k + 1:])
 
 
+class Clip:
+    def __init__(self, samples, sample_rate):
+        self.samples, self.sample_rate = samples, sample_rate
+
+
+def read_wav(path):
+    with wave.open(path) as w:
+        frames = array("h", w.readframes(w.getnframes()))
+        if w.getnchannels() > 1:
+            frames = frames[::w.getnchannels()]
+        return Clip([x / 32768.0 for x in frames], w.getframerate())
+
+
+def fleurs_sentences(code):
+    """Short FLEURS sentences without numbers, with their recordings."""
+    d = os.path.join(MODELS, "fleurs", code)
+    wavs = {os.path.basename(p): p for p in glob.glob(f"{d}/**/*.wav", recursive=True)}
+    out, seen = [], set()
+    for line in open(os.path.join(d, "dev.tsv"), encoding="utf-8"):
+        cols = line.rstrip("\n").split("\t")
+        if len(cols) < 3:
+            continue
+        file, text = cols[1], cols[2]
+        if file not in wavs or text in seen or any(c.isdigit() for c in text):
+            continue
+        if not MIN_WORDS <= len(words(text)) <= MAX_WORDS:
+            continue
+        seen.add(text)
+        out.append((text, wavs[file]))
+        if len(out) >= PER_LANGUAGE:
+            break
+    return out
+
+
 rows = []
 coverage = {}
 replacements = {}
@@ -389,37 +386,45 @@ for lang, cfg in LANGS.items():
     db_path = os.path.join(DICTS, f"{lang}.db")
     db = sqlite3.connect(db_path) if os.path.exists(db_path) else None
     ref_tts = tts(cfg["ref"])
-    learners = [(tts(v), v, sid) for v, sid in cfg["learners"]]
-    for p_i, phrase in enumerate(cfg["phrases"]):
-        audio = ref_tts.generate(phrase, sid=0, speed=1.0)
-        isolated = [(w, sounds(ref_tts.generate(w, sid=0, speed=1.0))) for w in words(phrase)]
-        phrase_sounds = sounds(audio)
-        ref_words = segment(phrase_sounds, isolated)
-        dict_words, cov = dict_reference(db, phrase_sounds, ref_words)
-        checked_words, replaced = dict_reference(db, phrase_sounds, ref_words, check=True)
-        coverage.setdefault(lang, []).append(cov)
-        replacements.setdefault(lang, []).append(replaced)
-        print(f"{lang} {phrase}")
-        print("   current:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in ref_words))
-        print("   dictionary: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in dict_words))
-        print("   checked:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in checked_words), flush=True)
-        references = [("current", ref_words), ("dictionary", dict_words), ("checked", checked_words)]
-        others = cfg["phrases"][(p_i + 1) % len(cfg["phrases"])]
-        cases = [("correct", phrase)] + list(variants(phrase, cfg["swap"][p_i % len(cfg["swap"])])) + [("different sentence", others)]
-        for engine, voice, sid in learners:
-            for kind, text in cases:
-                a = engine.generate(text, sid=sid, speed=1.0)
-                transcript = recognize(asr, a).text
-                heard_sounds = sounds(a)
-                alike_sounds = sounds(ref_tts.generate(transcript, sid=0, speed=1.0)) if transcript.strip() else None
-                for method, refs in references:
-                    ws, ss, per_word = check(phrase, transcript, refs, heard_sounds)
-                    # Sound-alike check: the reference voice says what Omnilingual heard.
-                    alike = word_ratios(refs, alike_sounds) if alike_sounds else [1.0] * len(per_word)
-                    # Per word: (Omnilingual heard it, ZIPA's sound error ratio, the sound-alike ratio).
-                    per_word = [(heard, ratio, alike_ratio) for (heard, ratio), alike_ratio in zip(per_word, alike)]
-                    rows.append((lang, kind, voice, sid, ws, ss, per_word, method))
-                print(f"{lang} {kind:18} {voice}#{sid:<2} | {transcript}", flush=True)
+    references_cache = {}
+
+    def references(phrase):
+        """The expected sounds for [phrase], by each method."""
+        if phrase not in references_cache:
+            audio = ref_tts.generate(phrase, sid=0, speed=1.0)
+            isolated = [(w, sounds(ref_tts.generate(w, sid=0, speed=1.0))) for w in words(phrase)]
+            phrase_sounds = sounds(audio)
+            ref_words = segment(phrase_sounds, isolated)
+            dict_words, cov = dict_reference(db, phrase_sounds, ref_words)
+            checked_words, replaced = dict_reference(db, phrase_sounds, ref_words, check=True)
+            coverage.setdefault(lang, []).append(cov)
+            replacements.setdefault(lang, []).append(replaced)
+            print(f"{lang} {phrase}")
+            print("   current:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in ref_words))
+            print("   dictionary: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in dict_words))
+            print("   checked:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in checked_words), flush=True)
+            references_cache[phrase] = [("current", ref_words), ("dictionary", dict_words), ("checked", checked_words)]
+        return references_cache[phrase]
+
+    sentences = fleurs_sentences(cfg["fleurs"])
+    print(f"== {lang}: {len(sentences)} FLEURS sentences", flush=True)
+    for i, (text, path) in enumerate(sentences):
+        clip = read_wav(path)
+        transcript = recognize(asr, clip).text
+        heard_sounds = sounds(clip)
+        alike_sounds = sounds(ref_tts.generate(transcript, sid=0, speed=1.0)) if transcript.strip() else None
+        other = sentences[(i + 1) % len(sentences)][0]
+        # The recording is always the real sentence; the wrong cases score it against a wrong target.
+        cases = [("correct", text)] + list(variants(text, cfg["swap"][i % len(cfg["swap"])])) + [("different sentence", other)]
+        for kind, target in cases:
+            for method, refs in references(target):
+                ws, ss, per_word = check(target, transcript, refs, heard_sounds)
+                # Sound-alike check: the reference voice says what Omnilingual heard.
+                alike = word_ratios(refs, alike_sounds) if alike_sounds else [1.0] * len(per_word)
+                # Per word: (Omnilingual heard it, ZIPA's sound error ratio, the sound-alike ratio).
+                per_word = [(heard, ratio, alike_ratio) for (heard, ratio), alike_ratio in zip(per_word, alike)]
+                rows.append((lang, kind, os.path.basename(path), 0, ws, ss, per_word, method))
+        print(f"{lang} heard: {transcript}", flush=True)
 
 print("\n== Words with dictionary IPA, by language ==")
 for lang, covs in coverage.items():
