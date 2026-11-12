@@ -81,7 +81,9 @@ jobs:
             contributors, licensed CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/).
             Extracted with Wiktextract via kaikki.org: Tatu Ylonen, "Wiktextract: Wiktionary as
             Machine-Readable Structured Data", LREC 2022. Changes: kept only each entry's spelling,
-            part of speech, IPA, up to three short English meanings, and the word it is a form of.
+            part of speech, IPA, up to three short English meanings, and the word it is a form of;
+            a verb form also gets its base word's English meanings put in its form ("had" for a past
+            participle of "to have"), using Wiktionary's English verb forms.
 
             Each entry also holds how often its spelling is that part of speech, counted in
             Universal Dependencies treebanks (https://universaldependencies.org) licensed CC BY-SA
