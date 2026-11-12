@@ -35,3 +35,7 @@ Ideas for later. Nothing here is being built yet.
 
 - **Your own language.** Choose the language you speak (English today) for translations, meanings
   and explanations.
+
+## Platforms
+
+- **Investigate iOS feasibility.**
