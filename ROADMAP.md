@@ -17,6 +17,10 @@ Ideas for later. Nothing here is being built yet.
 
 - **Word grades as labels.** Show each word's grade as Right / Close / Off instead of a percentage,
   once scoring is settled.
+- **IPA for both cases.** Where a word sounds different next to the following word, show both: the
+  word on its own and as it's linked in the sentence. For example French liaison (les /le/, les
+  enfants /lez‿ɑ̃fɑ̃/), Portuguese s before a vowel (os amigos /uz‿ɐˈmiɡus/), voicing changes in
+  Slavic languages, and Swedish and Norwegian r merging with the next consonant.
 
 ## Models
 
