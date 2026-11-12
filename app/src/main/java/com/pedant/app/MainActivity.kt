@@ -440,7 +440,7 @@ private fun SetupScreen(vm: AppViewModel) {
                     Text(role, fontSize = 13.sp, color = Pastel.InkSoft)
                 }
             }
-            PeachNotice("Use Wi-Fi and keep the app open.")
+            PeachNotice("Use Wi-Fi. The download keeps going if you leave the app.")
             Spacer(Modifier.height(6.dp))
             val p = vm.progress
             if (p != null) ProgressBlock(p) else CtaButton("Download models", vm::downloadCore)

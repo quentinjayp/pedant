@@ -180,7 +180,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         error = null
         viewModelScope.launch {
             try {
-                withProgress { report -> store.downloadCore(report) }
+                withProgress("Downloading Pedant's models") { report -> store.downloadCore(report) }
                 loadModels()
             } catch (e: Exception) {
                 progress = null
@@ -190,13 +190,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Runs a download, showing its progress. The download reports from a background thread, so
-     * the latest value is copied to the screen on the main thread a few times a second.
+     * Runs a download, showing its progress on screen and, titled [title], in the download
+     * notification. The download reports from a background thread, so the latest value is copied
+     * to the screen on the main thread a few times a second.
      */
     private suspend fun <T> withProgress(
+        title: String,
         show: (Progress?) -> Unit = { progress = it },
         download: suspend ((Long, Long, String) -> Unit) -> T,
-    ): T {
+    ): T = keepDownloading(title) {
         val latest = AtomicReference(Progress(0, 0, "Starting…"))
         show(latest.get())
         val ticker = viewModelScope.launch {
@@ -206,10 +208,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         try {
-            return download { done, total, label -> latest.set(Progress(done, total, label)) }
+            download { done, total, label ->
+                latest.set(Progress(done, total, label))
+                DownloadService.update(getApplication(), title, done, total)
+            }
         } finally {
             ticker.cancel()
             show(null)
+        }
+    }
+
+    /** Downloads under way. While there are any, [DownloadService] keeps them going if the app is left. */
+    private var downloads = 0
+
+    private suspend fun <T> keepDownloading(title: String, download: suspend () -> T): T {
+        if (downloads++ == 0) DownloadService.start(getApplication(), title)
+        try {
+            return download()
+        } finally {
+            if (--downloads == 0) DownloadService.stop(getApplication())
         }
     }
 
@@ -365,7 +382,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             stopConversationWork()
             conversationScope.launch {
                 val voice = try {
-                    store.installedVoice(lang) ?: withProgress { report -> store.downloadVoice(lang, report) }
+                    store.installedVoice(lang)
+                        ?: withProgress("Downloading the ${lang.englishName} voice") { report -> store.downloadVoice(lang, report) }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
@@ -497,7 +515,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         gemmaDownloading = model
         gemmaDownloadJob = viewModelScope.launch {
             try {
-                withProgress({ gemmaProgress = it }) { report -> store.downloadGemma(model, report) }
+                withProgress("Downloading ${model.title}", { gemmaProgress = it }) { report -> store.downloadGemma(model, report) }
                 downloadedGemmas = downloadedGemmas + model
             } catch (e: CancellationException) {
                 throw e
@@ -689,7 +707,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         dictionaryProgress = 0f
         try {
             diagnostics.log("Dictionary: downloading ${lang.englishName} ${info.version}")
-            store.downloadDictionary(lang, info) { done, total -> dictionaryProgress = done.toFloat() / total }
+            val title = "Downloading the ${lang.englishName} dictionary"
+            keepDownloading(title) {
+                store.downloadDictionary(lang, info) { done, total ->
+                    dictionaryProgress = done.toFloat() / total
+                    DownloadService.update(getApplication(), title, done, total)
+                }
+            }
             if (language == lang) {
                 pauseBackground()
                 openDictionary(lang)
