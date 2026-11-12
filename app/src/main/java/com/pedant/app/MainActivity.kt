@@ -887,9 +887,9 @@ private fun ConversationScreen(vm: AppViewModel) {
                     }
                     Text(vm.scenario.scene, fontSize = 12.sp, color = Pastel.InkSoft)
                 }
-                GearButton { settingsOpen = true }
-                Spacer(Modifier.width(8.dp))
                 PillButton("New conversation", vm::newConversation, PillStyle.Outline)
+                Spacer(Modifier.width(8.dp))
+                GearButton { settingsOpen = true }
             }
             DictionaryStatus(vm)
         },
