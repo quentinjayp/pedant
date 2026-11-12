@@ -398,7 +398,7 @@ private fun SetupScreen(vm: AppViewModel) {
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("Pedant runs entirely on your phone. First it needs to download its models (about 4.3 GB):")
+            Text("Pedant runs entirely on your phone. First it needs to download its models (about ${vm.gemma.setupSize}):")
             listOf(
                 vm.gemma.title to "the tutor: talks with you and explains",
                 "Omnilingual ASR" to "hears the words you say",
@@ -531,12 +531,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             SmallLabel("Tutor model", Pastel.InkSoft)
-            Text(
-                "The Gemma model that talks with you, translates and explains. E2B is smaller and faster; " +
-                    "E4B gives better replies.",
-                fontSize = 13.sp,
-                color = Pastel.InkSoft,
-            )
+            Text("The Gemma model that talks with you, translates and explains.", fontSize = 13.sp, color = Pastel.InkSoft)
             Gemma.entries.forEach { GemmaRow(vm, it) }
             vm.settingsError?.let { PeachNotice(it) }
         }
@@ -577,6 +572,7 @@ private fun GemmaRow(vm: AppViewModel, model: Gemma) {
                     fontSize = 12.sp,
                     color = Pastel.InkSoft,
                 )
+                model.about?.let { Text(it, fontSize = 12.sp, color = Pastel.Ink, modifier = Modifier.padding(top = 4.dp)) }
             }
             when {
                 downloading -> LinkButton("Cancel", vm::cancelGemmaDownload)

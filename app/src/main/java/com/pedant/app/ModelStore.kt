@@ -21,10 +21,17 @@ data class HfFile(val repo: String, val path: String, val size: Long) {
     val url get() = "https://huggingface.co/$repo/resolve/main/$path"
 }
 
-/** The Gemma models the tutor can run; chosen in Settings. */
-enum class Gemma(val title: String, val repo: String, val dirName: String) {
-    E4B("Gemma 4 E4B", "litert-community/gemma-4-E4B-it-litert-lm", "gemma"),
-    E2B("Gemma 4 E2B", "litert-community/gemma-4-E2B-it-litert-lm", "gemma-e2b"),
+/**
+ * The Gemma models the tutor can run; chosen in Settings. [about] is shown there, and [setupSize]
+ * is the whole first download (this model plus the speech models).
+ */
+enum class Gemma(val title: String, val repo: String, val dirName: String, val setupSize: String, val about: String?) {
+    E2B("Gemma 4 E2B", "litert-community/gemma-4-E2B-it-litert-lm", "gemma-e2b", "3.2 GB", null),
+    E4B(
+        "Gemma 4 E4B", "litert-community/gemma-4-E4B-it-litert-lm", "gemma", "4.3 GB",
+        "Better replies, translations and word meanings than E2B. It needs much more memory and is slower, " +
+            "so on some phones the app can close unexpectedly.",
+    ),
 }
 
 /** A language's dictionary as listed in the published manifest. */
@@ -40,9 +47,14 @@ class ModelStore(context: Context) {
 
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
-    /** The Gemma model the tutor runs. It's always one that's downloaded (or about to be, in setup). */
+    /**
+     * The Gemma model the tutor runs. It's always one that's downloaded (or about to be, in setup).
+     * E2B unless chosen otherwise, or unless E4B is the only one on the phone (set up before E2B was
+     * the default).
+     */
     var gemma: Gemma
-        get() = Gemma.entries.firstOrNull { it.name == prefs.getString("gemma", null) } ?: Gemma.E4B
+        get() = Gemma.entries.firstOrNull { it.name == prefs.getString("gemma", null) }
+            ?: if (gemmaDownloaded(Gemma.E4B) && !gemmaDownloaded(Gemma.E2B)) Gemma.E4B else Gemma.E2B
         set(value) = prefs.edit().putString("gemma", value.name).apply()
 
     private fun gemmaDir(model: Gemma) = File(root, model.dirName)
@@ -283,7 +295,7 @@ class ModelStore(context: Context) {
     private fun pickGemmaFile(files: List<HfFile>): HfFile? {
         val generic = files.filterNot { f ->
             val name = f.path.lowercase()
-            listOf("qualcomm", "mediatek", "sm8", "mt6", "npu", "web", "tpu").any { it in name }
+            listOf("qualcomm", "mediatek", "sm8", "mt6", "npu", "web", "tpu", "tensor", "intel", "gpu").any { it in name }
         }
         return (generic.ifEmpty { files }).minByOrNull { it.path.length }
     }
