@@ -23,7 +23,7 @@ data class TutorTurn(
     val say: String? = null,
 )
 
-/** Gemma 4 E4B: the tutor that talks with the learner, and translates and explains for them. */
+/** Gemma 4 (E4B or E2B, chosen in Settings): the tutor that talks with the learner, and translates and explains for them. */
 class Tutor(context: Context, modelFile: File) {
 
     // The CPU loads faster and responds better than the GPU.

@@ -63,6 +63,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -144,8 +146,9 @@ class MainActivity : ComponentActivity() {
             PedantTheme {
                 Surface(Modifier.fillMaxSize(), color = Pastel.Bg, contentColor = Pastel.Ink) {
                     // Keep the screen on during long downloads so they aren't interrupted.
-                    LaunchedEffect(vm.progress != null) {
-                        if (vm.progress != null) {
+                    val downloading = vm.progress != null || vm.gemmaProgress != null
+                    LaunchedEffect(downloading) {
+                        if (downloading) {
                             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         } else {
                             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -158,6 +161,7 @@ class MainActivity : ComponentActivity() {
                         Screen.Home -> HomeScreen(vm)
                         Screen.PickLanguage -> LanguageScreen(vm)
                         Screen.Conversation -> ConversationScreen(vm)
+                        Screen.Settings -> SettingsScreen(vm)
                     }
                 }
             }
@@ -396,7 +400,7 @@ private fun SetupScreen(vm: AppViewModel) {
         ) {
             Text("Pedant runs entirely on your phone. First it needs to download its models (about 4.3 GB):")
             listOf(
-                "Gemma 4 E4B" to "the tutor: talks with you and explains",
+                vm.gemma.title to "the tutor: talks with you and explains",
                 "Omnilingual ASR" to "hears the words you say",
                 "ZIPA" to "hears the sounds you make",
             ).forEach { (name, role) ->
@@ -496,7 +500,106 @@ private fun HomeScreen(vm: AppViewModel) {
                 enabled = true,
                 onClick = vm::startNewConversation,
             )
+            HomeButton(
+                mark = "⚙\uFE0E",
+                title = "Settings",
+                subtitle = "Tutor model: ${vm.gemma.title}",
+                color = Pastel.White,
+                ink = Pastel.Ink,
+                enabled = true,
+                onClick = vm::openSettings,
+            )
         }
+    }
+}
+
+// ---- Settings -------------------------------------------------------------------------------
+
+@Composable
+private fun SettingsScreen(vm: AppViewModel) {
+    BackHandler(onBack = vm::closeSettings)
+    AppScreen(
+        header = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                BackButton(vm::closeSettings)
+                Text("Settings", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+            }
+        },
+    ) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            SmallLabel("Tutor model", Pastel.InkSoft)
+            Text(
+                "The Gemma model that talks with you, translates and explains. E2B is smaller and faster; " +
+                    "E4B gives better replies.",
+                fontSize = 13.sp,
+                color = Pastel.InkSoft,
+            )
+            Gemma.entries.forEach { GemmaRow(vm, it) }
+            vm.settingsError?.let { PeachNotice(it) }
+        }
+    }
+}
+
+/** One Gemma model: select it (once downloaded), download it, or delete it when it's not in use. */
+@Composable
+private fun GemmaRow(vm: AppViewModel, model: Gemma) {
+    val inUse = vm.gemma == model
+    val downloaded = model in vm.downloadedGemmas
+    val downloading = vm.gemmaDownloading == model
+    var confirmDelete by remember { mutableStateOf(false) }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .card(if (inUse) Pastel.PrimaryContainer else Pastel.White, if (inUse) Pastel.Primary else Pastel.OutlineSoft, RoundedCornerShape(20.dp))
+            .clickable(enabled = downloaded && !inUse) { vm.selectGemma(model) }
+            .padding(start = 4.dp, end = 12.dp, top = 6.dp, bottom = 6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(
+                selected = inUse,
+                onClick = { vm.selectGemma(model) },
+                enabled = downloaded,
+                colors = RadioButtonDefaults.colors(selectedColor = Pastel.PrimaryDark, unselectedColor = Pastel.Outline),
+            )
+            Column(Modifier.weight(1f)) {
+                Text(model.title, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                val size = vm.gemmaBytes(model)?.let { " · %.1f GB".format(it / 1e9) } ?: ""
+                Text(
+                    when {
+                        inUse -> "In use$size"
+                        downloaded -> "Downloaded$size"
+                        downloading -> "Downloading…"
+                        else -> "Not downloaded"
+                    },
+                    fontSize = 12.sp,
+                    color = Pastel.InkSoft,
+                )
+            }
+            when {
+                downloading -> LinkButton("Cancel", vm::cancelGemmaDownload)
+                downloaded && !inUse -> LinkButton("Delete", { confirmDelete = true })
+                !downloaded -> PillButton("Download", { vm.downloadGemma(model) }, enabled = vm.gemmaDownloading == null)
+            }
+        }
+        val p = vm.gemmaProgress
+        if (downloading && p != null) {
+            Column(Modifier.padding(start = 12.dp, top = 4.dp, bottom = 6.dp)) { ProgressBlock(p) }
+        }
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            containerColor = Pastel.White,
+            titleContentColor = Pastel.Ink,
+            shape = RoundedCornerShape(28.dp),
+            title = { Text("Delete ${model.title}?", fontWeight = FontWeight.ExtraBold) },
+            text = { Text("It can be downloaded again here.") },
+            confirmButton = { PillButton("Delete", { confirmDelete = false; vm.deleteGemma(model) }) },
+            dismissButton = { LinkButton("Cancel", { confirmDelete = false }) },
+        )
     }
 }
 

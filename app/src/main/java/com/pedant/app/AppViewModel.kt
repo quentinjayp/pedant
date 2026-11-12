@@ -37,6 +37,7 @@ sealed interface Screen {
     data object Home : Screen
     data object PickLanguage : Screen
     data object Conversation : Screen
+    data object Settings : Screen
 }
 
 enum class Busy(val label: String) {
@@ -177,12 +178,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * Runs a download, showing its progress. The download reports from a background thread, so
      * the latest value is copied to the screen on the main thread a few times a second.
      */
-    private suspend fun <T> withProgress(download: suspend ((Long, Long, String) -> Unit) -> T): T {
+    private suspend fun <T> withProgress(
+        show: (Progress?) -> Unit = { progress = it },
+        download: suspend ((Long, Long, String) -> Unit) -> T,
+    ): T {
         val latest = AtomicReference(Progress(0, 0, "Starting…"))
-        progress = latest.get()
+        show(latest.get())
         val ticker = viewModelScope.launch {
             while (true) {
-                progress = latest.get()
+                show(latest.get())
                 delay(250)
             }
         }
@@ -190,7 +194,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return download { done, total, label -> latest.set(Progress(done, total, label)) }
         } finally {
             ticker.cancel()
-            progress = null
+            show(null)
         }
     }
 
@@ -224,16 +228,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return result
     }
 
-    /** Loads Gemma (on the CPU), the speech recognizer and ZIPA. */
-    private fun loadModels() {
+    /** Loads Gemma (on the CPU), the speech recognizer and ZIPA, whichever aren't loaded, then opens [then]. */
+    private fun loadModels(then: Screen = Screen.Home) {
         error = null
         screen = Screen.Loading
         viewModelScope.launch {
-            // Only a full load is a fair guide for next time.
+            // Only a full load is a fair guide for next time; otherwise the files' size is.
             val loadingAll = tutor == null && stt == null && zipa == null
+            val growthKey = "growth-${store.gemma.name}"
             val startBytes = residentBytes()
-            val expected = loadPrefs.getLong("growth", 0L).takeIf { it > 0 }
-                ?: listOfNotNull(store.gemmaModel, store.asrModel, store.zipaModel).sumOf { it.length() }.coerceAtLeast(1L)
+            val files = listOfNotNull(
+                store.gemmaFile().takeIf { tutor == null },
+                store.asrModel.takeIf { stt == null },
+                store.zipaModel.takeIf { zipa == null },
+            )
+            val expected = loadPrefs.getLong(growthKey, 0L).takeIf { it > 0 && loadingAll }
+                ?: files.sumOf { it.length() }.coerceAtLeast(1L)
             loadProgress = 0f
             val ticker = launch(Dispatchers.Default) {
                 while (true) {
@@ -248,7 +258,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     // Gemma first: it needs the most memory, so it loads while the most is free.
                     if (tutor == null) {
                         tutor = timedLoad("Gemma") {
-                            Tutor(getApplication(), checkNotNull(store.gemmaModel) { "Gemma model file is missing" })
+                            Tutor(getApplication(), checkNotNull(store.gemmaFile()) { "Gemma model file is missing" })
                         }
                     }
                     if (stt == null) stt = timedLoad("Omnilingual ASR") { SpeechToText(store) }
@@ -257,11 +267,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     loadingStep = null
                 }
                 ticker.cancel()
-                (residentBytes() - startBytes).takeIf { loadingAll && it > 0 }?.let { loadPrefs.edit().putLong("growth", it).apply() }
+                (residentBytes() - startBytes).takeIf { loadingAll && it > 0 }?.let { loadPrefs.edit().putLong(growthKey, it).apply() }
                 loadProgress = 1f
                 // Let the bar fill to 100% before moving on.
                 delay(LOADING_BAR_FILL_MS + 100L)
-                screen = Screen.Home
+                screen = then
             } catch (e: Throwable) {
                 ticker.cancel()
                 diagnostics.step = null
@@ -415,6 +425,84 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     busy = Busy.Idle
                 }
             }
+        }
+    }
+
+    // ---- Settings: which Gemma model the tutor runs ---------------------------------------------
+
+    /** The Gemma model in use. */
+    var gemma by mutableStateOf(store.gemma)
+        private set
+
+    /** The Gemma models on the phone. */
+    var downloadedGemmas by mutableStateOf(Gemma.entries.filter(store::gemmaDownloaded).toSet())
+        private set
+
+    /** The Gemma model downloading, and how far along it is. */
+    var gemmaDownloading by mutableStateOf<Gemma?>(null)
+        private set
+    var gemmaProgress by mutableStateOf<Progress?>(null)
+        private set
+    var settingsError by mutableStateOf<String?>(null)
+        private set
+    private var gemmaDownloadJob: Job? = null
+
+    /** [model]'s size on the phone, if it's downloaded. */
+    fun gemmaBytes(model: Gemma): Long? = store.gemmaFile(model)?.length()?.takeIf { model in downloadedGemmas }
+
+    fun openSettings() {
+        settingsError = null
+        screen = Screen.Settings
+    }
+
+    fun closeSettings() {
+        screen = Screen.Home
+    }
+
+    /** Switches the tutor to [model] (already downloaded), loading it in place of the one in use. */
+    fun selectGemma(model: Gemma) {
+        if (model == gemma || model !in downloadedGemmas) return
+        viewModelScope.launch {
+            stopConversationWork()
+            tutor?.close()
+            tutor = null
+            store.gemma = model
+            gemma = model
+            loadModels(then = Screen.Settings)
+        }
+    }
+
+    /** Downloads [model] (one not in use) so it can be selected. */
+    fun downloadGemma(model: Gemma) {
+        if (gemmaDownloading != null || model in downloadedGemmas) return
+        settingsError = null
+        gemmaDownloading = model
+        gemmaDownloadJob = viewModelScope.launch {
+            try {
+                withProgress({ gemmaProgress = it }) { report -> store.downloadGemma(model, report) }
+                downloadedGemmas = downloadedGemmas + model
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                settingsError = "Download failed: ${e.message}"
+            } finally {
+                gemmaDownloading = null
+            }
+        }
+    }
+
+    /** Stops the Gemma download; what's downloaded so far is kept, so it picks up from there. */
+    fun cancelGemmaDownload() {
+        gemmaDownloadJob?.cancel()
+        gemmaDownloadJob = null
+    }
+
+    /** Deletes [model] (one not in use) from the phone. */
+    fun deleteGemma(model: Gemma) {
+        if (model == gemma || model == gemmaDownloading || model !in downloadedGemmas) return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { store.deleteGemma(model) }
+            downloadedGemmas = downloadedGemmas - model
         }
     }
 

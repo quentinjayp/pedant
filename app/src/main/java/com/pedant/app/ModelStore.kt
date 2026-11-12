@@ -21,6 +21,12 @@ data class HfFile(val repo: String, val path: String, val size: Long) {
     val url get() = "https://huggingface.co/$repo/resolve/main/$path"
 }
 
+/** The Gemma models the tutor can run; chosen in Settings. */
+enum class Gemma(val title: String, val repo: String, val dirName: String) {
+    E4B("Gemma 4 E4B", "litert-community/gemma-4-E4B-it-litert-lm", "gemma"),
+    E2B("Gemma 4 E2B", "litert-community/gemma-4-E2B-it-litert-lm", "gemma-e2b"),
+}
+
 /** A language's dictionary as listed in the published manifest. */
 data class DictionaryInfo(val version: String, val url: String, val bytes: Long, val sha256: String)
 
@@ -32,13 +38,22 @@ class ModelStore(context: Context) {
 
     private val root = File(context.getExternalFilesDir(null) ?: context.filesDir, "models")
 
-    private val gemmaDir = File(root, "gemma")
+    private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+
+    /** The Gemma model the tutor runs. It's always one that's downloaded (or about to be, in setup). */
+    var gemma: Gemma
+        get() = Gemma.entries.firstOrNull { it.name == prefs.getString("gemma", null) } ?: Gemma.E4B
+        set(value) = prefs.edit().putString("gemma", value.name).apply()
+
+    private fun gemmaDir(model: Gemma) = File(root, model.dirName)
     private val asrDir = File(root, "asr")
     private val zipaDir = File(root, "zipa")
     val espeakData = File(root, "espeak-ng-data")
     private fun voiceDir(voice: String) = File(root, "piper/$voice")
 
-    val gemmaModel: File? get() = gemmaDir.listFiles { f -> f.name.endsWith(".litertlm") }?.firstOrNull()
+    /** [model]'s file, if it's been downloaded (or partly). */
+    fun gemmaFile(model: Gemma = gemma): File? =
+        gemmaDir(model).listFiles { f -> f.name.endsWith(".litertlm") }?.firstOrNull()
     val asrModel = File(asrDir, MODEL_FILE)
     val asrTokens = File(asrDir, TOKENS_FILE)
     val zipaModel = File(zipaDir, MODEL_FILE)
@@ -50,7 +65,27 @@ class ModelStore(context: Context) {
 
     private fun isReady(dir: File) = File(dir, readyMarker).exists()
 
-    fun coreReady() = listOf(gemmaDir, asrDir, zipaDir).all(::isReady)
+    fun coreReady() = listOf(gemmaDir(gemma), asrDir, zipaDir).all(::isReady)
+
+    fun gemmaDownloaded(model: Gemma) = isReady(gemmaDir(model))
+
+    /** Downloads [model] (resuming a partial download). */
+    suspend fun downloadGemma(model: Gemma, onProgress: (Long, Long, String) -> Unit) = withContext(Dispatchers.IO) {
+        downloadAll(listOf(gemmaJob(model)).filterNot { (file, dest) -> dest.exists() && dest.length() == file.size }, onProgress)
+        File(gemmaDir(model), readyMarker).createNewFile()
+    }
+
+    /** Deletes [model]'s files, partial downloads included. Never the one in use. */
+    fun deleteGemma(model: Gemma) {
+        require(model != gemma) { "Can't delete the model in use" }
+        gemmaDir(model).deleteRecursively()
+    }
+
+    private fun gemmaJob(model: Gemma): Pair<HfFile, File> {
+        val file = pickGemmaFile(listRepo(model.repo).filter { it.path.endsWith(".litertlm") })
+            ?: throw IOException("No .litertlm file found in ${model.repo}")
+        return file to File(gemmaDir(model), file.path.substringAfterLast('/'))
+    }
 
     /** The voice already downloaded for [language], if any. */
     fun installedVoice(language: Language): String? =
@@ -63,20 +98,18 @@ class ModelStore(context: Context) {
      * [onProgress] gets (bytes done, bytes total, label).
      */
     suspend fun downloadCore(onProgress: (Long, Long, String) -> Unit) = withContext(Dispatchers.IO) {
-        val gemmaFiles = listRepo(GEMMA_REPO).filter { it.path.endsWith(".litertlm") }
-        val gemma = pickGemmaFile(gemmaFiles)
-            ?: throw IOException("No .litertlm file found in $GEMMA_REPO")
+        val gemmaJob = gemmaJob(gemma)
         val asrRepo = ASR_REPOS.firstNotNullOfOrNull { repo -> runCatching { repo to listRepo(repo) }.getOrNull() }
             ?: throw IOException("Speech recognizer repository not found on Hugging Face")
         val modelFiles = setOf(MODEL_FILE, TOKENS_FILE)
         val asrFiles = asrRepo.second.filter { it.path in modelFiles }
         val zipaFiles = listRepo(ZIPA_REPO).filter { it.path in modelFiles }
 
-        val jobs = listOf(gemma to File(gemmaDir, gemma.path.substringAfterLast('/'))) +
+        val jobs = listOf(gemmaJob) +
             asrFiles.map { it to File(asrDir, it.path) } +
             zipaFiles.map { it to File(zipaDir, it.path) }
         downloadAll(jobs.filterNot { (file, dest) -> dest.exists() && dest.length() == file.size }, onProgress)
-        listOf(gemmaDir, asrDir, zipaDir).forEach { File(it, readyMarker).createNewFile() }
+        listOf(gemmaDir(gemma), asrDir, zipaDir).forEach { File(it, readyMarker).createNewFile() }
     }
 
     /**
@@ -262,7 +295,6 @@ class ModelStore(context: Context) {
         private const val DICTIONARY_MANIFEST =
             "https://raw.githubusercontent.com/quentinjayp/pedant/HEAD/dictionaries/manifest.json"
         private const val DICTIONARY_RELEASES = "https://github.com/quentinjayp/pedant/releases/download"
-        const val GEMMA_REPO = "litert-community/gemma-4-E4B-it-litert-lm"
         const val ZIPA_REPO = "anyspeech/zipa-large-crctc-500k"
         val ASR_REPOS = listOf(
             "csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12",

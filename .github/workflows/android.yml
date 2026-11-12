@@ -57,7 +57,10 @@ jobs:
           list() { curl -fsS "https://huggingface.co/api/models/$1/tree/main?recursive=true"; }
 
           echo "== Gemma"
-          list litert-community/gemma-4-E4B-it-litert-lm | jq -r '.[] | select(.type=="file") | "\(.path) \(.lfs.size // .size)"' || fail=1
+          for r in litert-community/gemma-4-E4B-it-litert-lm litert-community/gemma-4-E2B-it-litert-lm; do
+            echo "-- $r"
+            list "$r" | jq -r '.[] | select(.type=="file") | "\(.path) \(.lfs.size // .size)"' | grep litertlm || { echo "MISSING $r"; fail=1; }
+          done
 
           echo "== Speech recognizer"
           for r in csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12 \
