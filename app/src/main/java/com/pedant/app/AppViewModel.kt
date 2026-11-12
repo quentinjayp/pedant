@@ -112,6 +112,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var busy by mutableStateOf(Busy.Idle)
         private set
     var scenario by mutableStateOf(Scenario.Default)
+    /** Formal or casual: what Gemma is told with each phrase and translation, so a change applies to the next one. */
+    var register by mutableStateOf(Register.Formal)
+
+    private val uiPrefs = app.getSharedPreferences("ui", Context.MODE_PRIVATE)
+
+    /** Whether the conversation's footer is folded away, leaving only Hold to talk. Remembered. */
+    var dockCollapsed by mutableStateOf(uiPrefs.getBoolean("dockCollapsed", false))
+        private set
+
+    fun toggleDock() {
+        dockCollapsed = !dockCollapsed
+        uiPrefs.edit().putBoolean("dockCollapsed", dockCollapsed).apply()
+    }
     private var drill by mutableStateOf<Drill?>(null)
     /** Learning mode: the phrase to repeat, or null while waiting for the next English line. */
     val drillPhrase: String? get() = drill?.phrase
@@ -297,6 +310,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         scenario = saved.scenario
+        register = saved.register
         startSession(lang, resume = saved)
     }
 
@@ -308,6 +322,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val saved = SavedConversation(
             languageCode = lang.code,
             scenario = scenario,
+            register = register,
             chat = chat.toList(),
             history = tutor?.history.orEmpty(),
             drillPhrase = d?.phrase,
@@ -324,6 +339,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** From the home page: choose the scenario and language for a new conversation. */
     fun startNewConversation() {
+        register = Register.Formal
         screen = Screen.PickLanguage
     }
 
@@ -521,6 +537,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             startDrill(null)
             editableIndex = null
             lookup = null
+            register = Register.Formal
             screen = Screen.PickLanguage
         }
     }
@@ -901,7 +918,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         chat += ChatItem.Note("Skipped")
         startDrill(null)
         editableIndex = null
-        launchAction(Busy.Thinking) { runTurn(Tutor.learningSaid(d.phrase)) }
+        launchAction(Busy.Thinking) { runTurn(Tutor.learningSaid(d.phrase, register)) }
     }
 
     /** Hears the recording with both Omnilingual (words) and ZIPA (sounds), side by side. */
@@ -942,7 +959,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val index = chat.size
         chat += ChatItem.Say(english, "")
         diagnostics.step = "Translating with Gemma"
-        val raw = checkNotNull(tutor).translate(checkNotNull(language), english) { partial ->
+        val raw = checkNotNull(tutor).translate(checkNotNull(language), register, english) { partial ->
             chat[index] = ChatItem.Say(english, Tutor.parse(partial).say ?: "")
         }
         val phrase = Tutor.parse(raw).say ?: ""
@@ -980,7 +997,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (result.passed) {
             startDrill(null)
             editableIndex = null
-            runTurn(Tutor.learningSaid(d.phrase))
+            runTurn(Tutor.learningSaid(d.phrase, register))
         } else {
             drillAttempts++
             busy = Busy.Speaking
@@ -1210,7 +1227,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     practice = null
                     startDrill(null)
                     editableIndex = null
-                    runTurn(Tutor.learningSaid(p.phrase))
+                    runTurn(Tutor.learningSaid(p.phrase, register))
                     return
                 }
                 val scores = "Words ${(r.wordScore * 100).toInt()}% · Sounds ${(r.soundScore * 100).toInt()}%"

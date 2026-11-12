@@ -20,7 +20,8 @@ object Instructions {
 
     val start: String get() = json.getString("start")
 
-    fun said(phrase: String) = json.getString("said").replace("{phrase}", phrase)
+    fun said(phrase: String, register: Register) =
+        json.getString("said").replace("{register}", register.name.lowercase()).replace("{phrase}", phrase)
 
     /** What Gemma is told for a conversation: the learning instructions, then how to open it. */
     fun system(language: Language, scenario: Scenario): String {
@@ -30,7 +31,8 @@ object Instructions {
     }
 
     fun replyTranslate(language: Language) = text("replyTranslate", language)
-    fun translate(language: Language) = text("translate", language)
+    fun translate(language: Language, register: Register) =
+        text("translate", language).replace("{register}", register.name.lowercase())
     fun lookup(language: Language) = text("lookup", language)
     fun sentenceLookup(language: Language) = text("sentenceLookup", language)
 }

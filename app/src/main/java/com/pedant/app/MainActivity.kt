@@ -13,7 +13,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -27,6 +32,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -79,6 +85,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -106,6 +113,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -114,6 +122,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
@@ -183,42 +192,57 @@ private fun AppScreen(
     header: @Composable ColumnScope.() -> Unit,
     headerShape: Shape = HeaderShape,
     dock: (@Composable ColumnScope.() -> Unit)? = null,
+    dockVisible: Boolean = true,
+    overlay: @Composable BoxScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val sides = WindowInsetsSides.Horizontal
-    Column(Modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(headerShape)
-                .background(Pastel.SurfaceContainer)
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(sides + WindowInsetsSides.Top))
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            content = header,
-        )
-        Column(
-            Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .windowInsetsPadding(
-                    WindowInsets.safeDrawing.only(if (dock == null) sides + WindowInsetsSides.Bottom else sides),
-                ),
-            content = content,
-        )
-        if (dock != null) {
+    val showDock = dock != null && dockVisible
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .clip(DockShape)
+                    .clip(headerShape)
                     .background(Pastel.SurfaceContainer)
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(sides + WindowInsetsSides.Bottom))
-                    .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                content = dock,
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(sides + WindowInsetsSides.Top))
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                content = header,
             )
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(if (showDock) sides else sides + WindowInsetsSides.Bottom),
+                    ),
+                content = content,
+            )
+            if (dock != null) {
+                AnimatedVisibility(
+                    dockVisible,
+                    enter = expandVertically(tween(FOOTER_FADE_MS), expandFrom = Alignment.Top) + fadeIn(tween(FOOTER_FADE_MS)),
+                    exit = shrinkVertically(tween(FOOTER_FADE_MS), shrinkTowards = Alignment.Top) + fadeOut(tween(FOOTER_FADE_MS)),
+                ) {
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(DockShape)
+                            .background(Pastel.SurfaceContainer)
+                            .windowInsetsPadding(WindowInsets.safeDrawing.only(sides + WindowInsetsSides.Bottom))
+                            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        content = dock,
+                    )
+                }
+            }
         }
+        Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing.only(sides + WindowInsetsSides.Bottom)), content = overlay)
     }
 }
+
+/** How long the conversation's footer takes to fold away or come back, and Hold to talk to fade. */
+private const val FOOTER_FADE_MS = 200
 
 /** A filled, optionally outlined, rounded surface. */
 private fun Modifier.card(
@@ -637,21 +661,77 @@ private fun HomeButton(
 
 /** A round white button with a back arrow. */
 @Composable
-private fun BackButton(onClick: () -> Unit) = ChevronButton(pointsLeft = true, onClick = onClick)
+private fun BackButton(onClick: () -> Unit) = ChevronButton(Chevron.Left, onClick)
 
-/** A round white button with an arrow pointing left or right. */
+private enum class Chevron(val degrees: Float) { Left(0f), Up(90f), Right(180f), Down(270f) }
+
+/** A round white button with an arrow. */
 @Composable
-private fun ChevronButton(pointsLeft: Boolean, onClick: () -> Unit) {
+private fun ChevronButton(direction: Chevron, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
-        Modifier.size(36.dp).clip(CircleShape).background(Pastel.White.copy(alpha = 0.85f)).clickable(onClick = onClick),
+        modifier.size(36.dp).clip(CircleShape).background(Pastel.White.copy(alpha = 0.85f)).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(Modifier.size(14.dp).scale(scaleX = if (pointsLeft) 1f else -1f, scaleY = 1f)) {
+        // Drawn pointing left, then turned.
+        Canvas(Modifier.size(14.dp).rotate(direction.degrees)) {
             val stroke = size.width * 0.16f
             val tip = Offset(size.width * 0.25f, size.height / 2)
             drawLine(Pastel.Ink, Offset(size.width * 0.7f, size.height * 0.1f), tip, stroke, StrokeCap.Round)
             drawLine(Pastel.Ink, tip, Offset(size.width * 0.7f, size.height * 0.9f), stroke, StrokeCap.Round)
         }
+    }
+}
+
+/** One of a row of choices, like the scenarios: violet when picked. */
+@Composable
+private fun ChoiceChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    unselected: Color = Pastel.White.copy(alpha = 0.85f),
+) {
+    Text(
+        text,
+        fontSize = 13.sp,
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+        color = if (selected) Pastel.VioletInk else Pastel.Ink,
+        textAlign = TextAlign.Center,
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) Pastel.Violet else unselected)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 9.dp),
+    )
+}
+
+/** Formal or casual, side by side. */
+@Composable
+private fun RegisterChoice(vm: AppViewModel, modifier: Modifier = Modifier, unselected: Color = Pastel.White.copy(alpha = 0.85f)) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Register.entries.forEach { r ->
+            ChoiceChip(r.title, vm.register == r, { vm.register = r }, Modifier.weight(1f), unselected)
+        }
+    }
+}
+
+/** The conversation's settings, from the gear in its header. */
+@Composable
+private fun ConversationSettings(vm: AppViewModel, onClose: () -> Unit) {
+    PopupCard("Conversation settings", onClose) {
+        SmallLabel("Style", Pastel.InkSoft)
+        RegisterChoice(vm, unselected = Pastel.SurfaceLow)
+    }
+}
+
+/** A round white button with a gear. */
+@Composable
+private fun GearButton(onClick: () -> Unit) {
+    Box(
+        Modifier.size(36.dp).clip(CircleShape).background(Pastel.White.copy(alpha = 0.85f)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("⚙\uFE0E", fontSize = 18.sp, color = Pastel.Ink)
     }
 }
 
@@ -677,26 +757,17 @@ private fun LanguageScreen(vm: AppViewModel) {
         },
     ) {
         Column(Modifier.fillMaxSize().padding(top = 14.dp)) {
+            SmallLabel("Style", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
+            Spacer(Modifier.height(6.dp))
+            RegisterChoice(vm, Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(12.dp))
             SmallLabel("Scenario", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(6.dp))
             Row(
                 Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Scenario.entries.forEach { sc ->
-                    val selected = vm.scenario == sc
-                    Text(
-                        sc.title,
-                        fontSize = 13.sp,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                        color = if (selected) Pastel.VioletInk else Pastel.Ink,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (selected) Pastel.Violet else Pastel.White.copy(alpha = 0.85f))
-                            .clickable { vm.scenario = sc }
-                            .padding(horizontal = 14.dp, vertical = 9.dp),
-                    )
-                }
+                Scenario.entries.forEach { sc -> ChoiceChip(sc.title, vm.scenario == sc, { vm.scenario = sc }) }
             }
             Text(
                 vm.scenario.scene + " Then pick a language.",
@@ -769,11 +840,29 @@ private fun ConversationScreen(vm: AppViewModel) {
         if (vm.chat.isNotEmpty()) listState.animateScrollToItem(vm.chat.size - 1)
     }
 
+    // Folding the footer: it goes, then Hold to talk fades in on its own. Unfolding: that fades out
+    // first, then the footer comes back with it.
+    var dockShown by remember { mutableStateOf(!vm.dockCollapsed) }
+    var floatingShown by remember { mutableStateOf(vm.dockCollapsed) }
+    LaunchedEffect(vm.dockCollapsed) {
+        if (vm.dockCollapsed) {
+            dockShown = false
+            delay(FOOTER_FADE_MS.toLong())
+            floatingShown = true
+        } else {
+            floatingShown = false
+            delay(FOOTER_FADE_MS.toLong())
+            dockShown = true
+        }
+    }
+
     BackHandler(onBack = vm::goHome)
     vm.practice?.let { PracticeWindow(vm, it) }
     vm.lookup?.let {
         WordBubble(it, appBusy = vm.busy != Busy.Idle, onLookUp = vm::lookUp, onHear = vm::hearWord, onClose = vm::closeLookup)
     }
+    var settingsOpen by remember { mutableStateOf(false) }
+    if (settingsOpen) ConversationSettings(vm) { settingsOpen = false }
     var editing by remember { mutableStateOf<Pair<Int, String>?>(null) }
     editing?.let { (index, original) ->
         EditLineDialog(
@@ -798,21 +887,47 @@ private fun ConversationScreen(vm: AppViewModel) {
                     }
                     Text(vm.scenario.scene, fontSize = 12.sp, color = Pastel.InkSoft)
                 }
+                GearButton { settingsOpen = true }
+                Spacer(Modifier.width(8.dp))
                 PillButton("New conversation", vm::newConversation, PillStyle.Outline)
             }
             DictionaryStatus(vm)
         },
+        dockVisible = dockShown,
         dock = {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                ChevronButton(Chevron.Down, vm::toggleDock, Modifier.size(28.dp))
+            }
             LearningControls(vm)
             Text(vm.hint, fontSize = 12.sp, color = Pastel.InkSoft, modifier = Modifier.padding(vertical = 8.dp))
             MicButton(vm)
+        },
+        overlay = {
+            // Folded away: Hold to talk alone, where it sits in the footer, and a chevron to unfold it.
+            AnimatedVisibility(
+                floatingShown,
+                Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+                enter = fadeIn(tween(FOOTER_FADE_MS)),
+                exit = fadeOut(tween(FOOTER_FADE_MS)),
+            ) {
+                MicButton(vm)
+            }
+            AnimatedVisibility(
+                floatingShown,
+                Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 16.dp),
+                enter = fadeIn(tween(FOOTER_FADE_MS)),
+                exit = fadeOut(tween(FOOTER_FADE_MS)),
+            ) {
+                ChevronButton(Chevron.Up, vm::toggleDock, Modifier.border(1.dp, Pastel.OutlineSoft, CircleShape))
+            }
         },
     ) {
         HorizontalDivider(color = Pastel.OutlineSoft)
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
+            // Room at the bottom for Hold to talk when it floats over the conversation.
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = if (dockShown) 16.dp else 120.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             itemsIndexed(vm.chat) { index, item ->
@@ -1061,98 +1176,82 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
     val i = p.position.coerceIn(0, (words.size - 1).coerceAtLeast(0))
     val w = words.getOrNull(i) ?: return
     val idle = vm.busy == Busy.Idle
-    Dialog(onDismissRequest = vm::closePractice, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Column(
-            Modifier
-                .padding(16.dp)
-                .fillMaxWidth()
-                .card(Pastel.White, Pastel.Primary, RoundedCornerShape(30.dp), borderWidth = 2.dp)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            // The whole try: its scores, and what happened on the last retry.
+    PopupCard(
+        if (p.result.passed) "Practice · Correct" else "Practice · Not quite",
+        vm::closePractice,
+        closeStyle = PillStyle.Outline,
+        headerSpacing = 8.dp,
+        header = {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ScoreMeter("Words", p.result.wordScore, Pastel.PrimaryDark, Modifier.weight(1f))
+                ScoreMeter("Sounds", p.result.soundScore, Pastel.VioletDark, Modifier.weight(1f))
+            }
+            p.note?.let { Text(it, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Pastel.PrimaryInk) }
+            if (p.hasRecording) PillButton("▶ My whole try", { vm.playMyRecording() }, PillStyle.Outline, idle)
+        },
+    ) {
+        // The picked word.
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(w.word, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Pastel.PrimaryInk, modifier = Modifier.weight(1f))
+            if (words.size > 1) {
+                ChevronButton(Chevron.Left, onClick = { vm.practiceSelect(i - 1) })
+                ChevronButton(Chevron.Right, onClick = { vm.practiceSelect(i + 1) })
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Sounds ${(w.score * 100).roundToInt()}%",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Pastel.VioletDark,
+            )
+            val heardWord = w.heardWord
+            when {
+                w.passed -> Tag("right", Pastel.PrimaryContainer, Pastel.PrimaryDark)
+                heardWord == null -> Tag("not heard", Pastel.SurfaceContainer, Pastel.InkSoft)
+                Matching.normalize(heardWord) != Matching.normalize(w.word) -> Tag("heard “$heardWord”", Pastel.CtaContainer, Pastel.CtaDark)
+                else -> Tag("word right, sounds off", Pastel.CtaContainer, Pastel.CtaDark)
+            }
+        }
+        SoundChip("Expected /${w.expected.joinToString("").replace("▁", "")}/", Pastel.PrimaryContainer, null, Pastel.PrimaryDark)
+        SoundChip("Heard /${w.heard.ifEmpty { "—" }}/", Pastel.VioletContainer, null, Pastel.VioletDark)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            PillButton("▶ Correct", { vm.hearWord(w.word, false) }, PillStyle.Primary, idle)
+            if (w.heard.isNotEmpty()) PillButton("▶ Heard sounds", { vm.saySounds(w.heard) }, PillStyle.Secondary, idle)
+            val heardWord = w.heardWord
+            if (heardWord != null && Matching.normalize(heardWord) != Matching.normalize(w.word)) {
+                PillButton("▶ Heard word", { vm.hearWord(heardWord, false) }, PillStyle.Secondary, idle)
+            }
+        }
+        p.wordTries[i]?.let { t ->
             Column(
-                Modifier.fillMaxWidth().background(Pastel.PrimaryContainer).padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                Modifier.fillMaxWidth().card(Pastel.VioletContainer, Pastel.Violet, RoundedCornerShape(16.dp)).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(Pastel.PrimaryDark))
-                    SmallLabel(if (p.result.passed) "Practice · Correct" else "Practice · Not quite")
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    ScoreMeter("Words", p.result.wordScore, Pastel.PrimaryDark, Modifier.weight(1f))
-                    ScoreMeter("Sounds", p.result.soundScore, Pastel.VioletDark, Modifier.weight(1f))
-                }
-                p.note?.let { Text(it, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Pastel.PrimaryInk) }
-                if (p.hasRecording) PillButton("▶ My whole try", { vm.playMyRecording() }, PillStyle.Outline, idle)
+                Text("This word on its own: ${t.latest}% · best ${t.best}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Pastel.VioletInk)
+                Text("Heard /${t.heard.ifEmpty { "—" }}/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.VioletDark)
             }
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // The picked word.
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(w.word, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Pastel.PrimaryInk, modifier = Modifier.weight(1f))
-                    if (words.size > 1) {
-                        ChevronButton(pointsLeft = true, onClick = { vm.practiceSelect(i - 1) })
-                        ChevronButton(pointsLeft = false, onClick = { vm.practiceSelect(i + 1) })
-                    }
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "Sounds ${(w.score * 100).roundToInt()}%",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Pastel.VioletDark,
-                    )
-                    val heardWord = w.heardWord
-                    when {
-                        w.passed -> Tag("right", Pastel.PrimaryContainer, Pastel.PrimaryDark)
-                        heardWord == null -> Tag("not heard", Pastel.SurfaceContainer, Pastel.InkSoft)
-                        Matching.normalize(heardWord) != Matching.normalize(w.word) -> Tag("heard “$heardWord”", Pastel.CtaContainer, Pastel.CtaDark)
-                        else -> Tag("word right, sounds off", Pastel.CtaContainer, Pastel.CtaDark)
-                    }
-                }
-                SoundChip("Expected /${w.expected.joinToString("").replace("▁", "")}/", Pastel.PrimaryContainer, null, Pastel.PrimaryDark)
-                SoundChip("Heard /${w.heard.ifEmpty { "—" }}/", Pastel.VioletContainer, null, Pastel.VioletDark)
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    PillButton("▶ Correct", { vm.hearWord(w.word, false) }, PillStyle.Primary, idle)
-                    if (w.heard.isNotEmpty()) PillButton("▶ Heard sounds", { vm.saySounds(w.heard) }, PillStyle.Secondary, idle)
-                    val heardWord = w.heardWord
-                    if (heardWord != null && Matching.normalize(heardWord) != Matching.normalize(w.word)) {
-                        PillButton("▶ Heard word", { vm.hearWord(heardWord, false) }, PillStyle.Secondary, idle)
-                    }
-                }
-                p.wordTries[i]?.let { t ->
-                    Column(
-                        Modifier.fillMaxWidth().card(Pastel.VioletContainer, Pastel.Violet, RoundedCornerShape(16.dp)).padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        Text("This word on its own: ${t.latest}% · best ${t.best}%", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Pastel.VioletInk)
-                        Text("Heard /${t.heard.ifEmpty { "—" }}/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.VioletDark)
-                    }
-                }
-                // The phrase: tap a word to pick it.
-                Column(Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(16.dp)).padding(12.dp)) {
-                    SmallLabel("The phrase:", Pastel.InkSoft)
-                    Spacer(Modifier.height(4.dp))
-                    TappableText(p.phrase, fontSize = 15.sp, color = Pastel.Ink, highlight = i, onWord = { _, _, at -> vm.practiceSelect(at) })
-                }
-                // Practise: the picked word on its own, or the whole phrase again.
-                Text(
-                    if (idle) "Hold a button and speak" else vm.busy.label,
-                    fontSize = 12.sp,
-                    color = Pastel.InkSoft,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
-                )
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    HoldToTalk(
-                        "Say “${w.word}”", Pastel.Cta, Pastel.CtaInk, vm, Modifier.weight(1f),
-                    ) { vm.startPracticeTalking(AppViewModel.PracticeTarget.Word) }
-                    HoldToTalk(
-                        "Say the phrase", Pastel.Primary, Pastel.PrimaryInk, vm, Modifier.weight(1f),
-                    ) { vm.startPracticeTalking(AppViewModel.PracticeTarget.Phrase) }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    PillButton("Close", vm::closePractice, PillStyle.Outline)
-                }
-            }
+        }
+        // The phrase: tap a word to pick it.
+        Column(Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(16.dp)).padding(12.dp)) {
+            SmallLabel("The phrase:", Pastel.InkSoft)
+            Spacer(Modifier.height(4.dp))
+            TappableText(p.phrase, fontSize = 15.sp, color = Pastel.Ink, highlight = i, onWord = { _, _, at -> vm.practiceSelect(at) })
+        }
+        // Practise: the picked word on its own, or the whole phrase again.
+        Text(
+            if (idle) "Hold a button and speak" else vm.busy.label,
+            fontSize = 12.sp,
+            color = Pastel.InkSoft,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            HoldToTalk(
+                "Say “${w.word}”", Pastel.Cta, Pastel.CtaInk, vm, Modifier.weight(1f),
+            ) { vm.startPracticeTalking(AppViewModel.PracticeTarget.Word) }
+            HoldToTalk(
+                "Say the phrase", Pastel.Primary, Pastel.PrimaryInk, vm, Modifier.weight(1f),
+            ) { vm.startPracticeTalking(AppViewModel.PracticeTarget.Phrase) }
         }
     }
 }
@@ -1340,6 +1439,54 @@ private fun DictionaryStatus(vm: AppViewModel) {
     }
 }
 
+/** How a [PopupCard] is coloured: its border, its header's background, and the header's label. */
+private data class PopupStyle(val border: Color, val header: Color, val ink: Color)
+
+private val PrimaryPopup = PopupStyle(Pastel.Primary, Pastel.PrimaryContainer, Pastel.PrimaryDark)
+
+/**
+ * A bubble laid over the screen, nearly as wide as it: a coloured header with a [label] and
+ * [header] content, then the [body] and a Close button. The word bubble, the practice window and
+ * the conversation settings are all one of these.
+ */
+@Composable
+private fun PopupCard(
+    label: String,
+    onClose: () -> Unit,
+    style: PopupStyle = PrimaryPopup,
+    closeStyle: PillStyle = PillStyle.Cta,
+    headerSpacing: Dp = 6.dp,
+    header: @Composable ColumnScope.() -> Unit = {},
+    body: @Composable ColumnScope.() -> Unit,
+) {
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
+                .card(Pastel.White, style.border, RoundedCornerShape(30.dp), borderWidth = 2.dp)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Column(
+                Modifier.fillMaxWidth().background(style.header).padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(headerSpacing),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(style.ink))
+                    SmallLabel(label, style.ink)
+                }
+                header()
+            }
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                body()
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    PillButton("Close", onClose, closeStyle)
+                }
+            }
+        }
+    }
+}
+
 /**
  * The bubble for a tapped word: meaning, pronunciation guide and Normal/Slow playback. The other
  * words of the sentence can be tapped in it, or stepped through with the arrows (which wrap around).
@@ -1364,96 +1511,78 @@ private fun WordBubble(
         onLookUp(words[position], lookup.sentence)
         onHear(words[position], false)
     }
-    // Nearly as wide as the screen, like a card laid over the conversation.
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Column(
-            Modifier
-                .padding(16.dp)
-                .fillMaxWidth()
-                .card(Pastel.White, Pastel.Primary, RoundedCornerShape(30.dp), borderWidth = 2.dp)
-                .verticalScroll(rememberScrollState()),
+    PopupCard(
+        "Word lookup",
+        onClose,
+        closeStyle = PillStyle.Cta,
+        header = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    lookup.word,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Pastel.PrimaryInk,
+                    modifier = Modifier.weight(1f),
+                )
+                if (words.size > 1) {
+                    ChevronButton(Chevron.Left, onClick = { show(position - 1) })
+                    ChevronButton(Chevron.Right, onClick = { show(position + 1) })
+                }
+            }
+            lookup.soundsLike?.let {
+                Text(
+                    buildAnnotatedString {
+                        append("Sounds like: ")
+                        withStyle(SpanStyle(color = Pastel.Ink)) { append(it) }
+                    },
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Pastel.PrimaryDark,
+                    modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Pastel.White).padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+            }
+            lookup.sounds?.let {
+                Text(
+                    "IPA: /$it/",
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = Pastel.VioletDark,
+                    modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Pastel.VioletContainer)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+            }
+        },
+    ) {
+        when {
+            lookup.meaning != null -> Text(lookup.meaning, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Pastel.Ink)
+            lookup.loading -> Text(
+                if (appBusy) "Will look this up once the app is free…" else "Looking up the meaning…",
+                fontSize = 14.sp,
+                color = Pastel.InkSoft,
+            )
+        }
+        lookup.error?.let { PeachNotice(it) }
+        if (lookup.fromDictionary) {
+            HorizontalDivider(color = Pastel.SurfaceLow)
+            Text(Dictionary.CREDIT, fontSize = 11.sp, color = Pastel.InkSoft)
+        }
+        Row(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Pastel.Bg)
+                .padding(horizontal = 14.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // The word and how to say it.
-            Column(
-                Modifier.fillMaxWidth().background(Pastel.PrimaryContainer).padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(Pastel.PrimaryDark))
-                    SmallLabel("Word lookup")
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        lookup.word,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Pastel.PrimaryInk,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (words.size > 1) {
-                        ChevronButton(pointsLeft = true, onClick = { show(position - 1) })
-                        ChevronButton(pointsLeft = false, onClick = { show(position + 1) })
-                    }
-                }
-                lookup.soundsLike?.let {
-                    Text(
-                        buildAnnotatedString {
-                            append("Sounds like: ")
-                            withStyle(SpanStyle(color = Pastel.Ink)) { append(it) }
-                        },
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Pastel.PrimaryDark,
-                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Pastel.White).padding(horizontal = 10.dp, vertical = 4.dp),
-                    )
-                }
-                lookup.sounds?.let {
-                    Text(
-                        "IPA: /$it/",
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        color = Pastel.VioletDark,
-                        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Pastel.VioletContainer)
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                    )
-                }
-            }
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                when {
-                    lookup.meaning != null -> Text(lookup.meaning, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Pastel.Ink)
-                    lookup.loading -> Text(
-                        if (appBusy) "Will look this up once the app is free…" else "Looking up the meaning…",
-                        fontSize = 14.sp,
-                        color = Pastel.InkSoft,
-                    )
-                }
-                lookup.error?.let { PeachNotice(it) }
-                if (lookup.fromDictionary) {
-                    HorizontalDivider(color = Pastel.SurfaceLow)
-                    Text(Dictionary.CREDIT, fontSize = 11.sp, color = Pastel.InkSoft)
-                }
-                Row(
-                    Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Pastel.Bg)
-                        .padding(horizontal = 14.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    HearButtons("Hear it:", onHear = { slow -> onHear(lookup.word, slow) })
-                }
-                Column(Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(16.dp)).padding(12.dp)) {
-                    SmallLabel("From the conversation:", Pastel.InkSoft)
-                    Spacer(Modifier.height(4.dp))
-                    TappableText(
-                        lookup.sentence,
-                        fontSize = 15.sp,
-                        color = Pastel.Ink,
-                        highlight = position,
-                        onWord = { _, _, i -> show(i) },
-                    )
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    PillButton("Close", onClose, PillStyle.Cta)
-                }
-            }
+            HearButtons("Hear it:", onHear = { slow -> onHear(lookup.word, slow) })
+        }
+        Column(Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(16.dp)).padding(12.dp)) {
+            SmallLabel("From the conversation:", Pastel.InkSoft)
+            Spacer(Modifier.height(4.dp))
+            TappableText(
+                lookup.sentence,
+                fontSize = 15.sp,
+                color = Pastel.Ink,
+                highlight = position,
+                onWord = { _, _, i -> show(i) },
+            )
         }
     }
 }

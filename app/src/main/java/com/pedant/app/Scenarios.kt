@@ -1,5 +1,11 @@
 package com.pedant.app
 
+/** How formally Gemma speaks and translates: chosen for each conversation, changeable at any time. */
+enum class Register(val title: String) {
+    Formal("Formal"),
+    Casual("Casual"),
+}
+
 /**
  * A setting for a conversation; [scene] is shown to the learner at the top of the conversation.
  * Who Gemma plays in it is in assets/instructions.json, under "roles".

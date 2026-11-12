@@ -119,8 +119,8 @@ class Tutor(context: Context, modelFile: File) {
      * Translates what the learner wants to say, in its own short conversation so the main one only
      * ever holds the language being learned. [onText] gets the answer as it is written.
      */
-    suspend fun translate(language: Language, english: String, onText: (String) -> Unit): String =
-        ask(Instructions.translate(language), english, onText)
+    suspend fun translate(language: Language, register: Register, english: String, onText: (String) -> Unit): String =
+        ask(Instructions.translate(language, register), english, onText)
 
     /**
      * Translates Gemma's [reply] into English, in its own short conversation: the English is written
@@ -208,7 +208,7 @@ class Tutor(context: Context, modelFile: File) {
             return "${language.code}-Learning-${scenario.name}-${Integer.toHexString(hash)}"
         }
 
-        fun learningSaid(phrase: String) = Instructions.said(phrase)
+        fun learningSaid(phrase: String, register: Register) = Instructions.said(phrase, register)
 
 
 

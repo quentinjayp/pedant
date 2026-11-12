@@ -11,6 +11,7 @@ import java.io.File
 data class SavedConversation(
     val languageCode: String,
     val scenario: Scenario,
+    val register: Register,
     val chat: List<ChatItem>,
     /** What was said to and by Gemma, so it can pick up the conversation. */
     val history: List<Tutor.Turn>,
@@ -24,7 +25,7 @@ data class SavedConversation(
         fun file(dir: File) = File(dir, "conversation.json")
 
         /** Bumped when the saved format changes; a conversation saved in another format is discarded. */
-        private const val VERSION = 2
+        private const val VERSION = 3
 
         fun load(dir: File): SavedConversation? {
             val file = file(dir)
@@ -43,6 +44,7 @@ data class SavedConversation(
         private fun fromJson(o: JSONObject) = SavedConversation(
             languageCode = o.getString("language"),
             scenario = Scenario.valueOf(o.getString("scenario")),
+            register = Register.valueOf(o.getString("register")),
             chat = o.getJSONArray("chat").objects().map(::chatItem),
             history = o.getJSONArray("history").objects().map { Tutor.Turn(it.getBoolean("learner"), it.getString("text")) },
             drillPhrase = o.optStringOrNull("drillPhrase"),
@@ -90,6 +92,7 @@ data class SavedConversation(
             .put("version", VERSION)
             .put("language", languageCode)
             .put("scenario", scenario.name)
+            .put("register", register.name)
             .put("chat", JSONArray(chat.map { json(it) }))
             .put("history", JSONArray(history.map { JSONObject().put("learner", it.fromLearner).put("text", it.text) }))
             .put("drillPhrase", drillPhrase)
