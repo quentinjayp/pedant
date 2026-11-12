@@ -247,6 +247,17 @@ def dict_candidates(db, word):
 # Piper's sounds for a word count as agreeing with the dictionary when they're this close to one of
 # its pronunciations (cost per expected sound).
 AGREE = 0.15
+# Past this, the dictionary's closest pronunciation is likely another word spelled the same ("est",
+# east, for "est", is), so Piper's sounds are kept.
+FAR = 0.5
+# Languages whose words carry a final consonant over to a next word that starts with a vowel.
+LIAISON = {"fr"}
+
+
+def drop_liaison_forms(cands):
+    """Without the pronunciations that are another one plus a final consonant (vous /vuz/ beside
+    /vu/, un /œ̃n/ beside /œ̃/): those are the liaison forms, which carrying a consonant covers."""
+    return [c for c in cands if not (is_consonant(c[-1]) and c[:-1] in cands)]
 
 
 def pron_ratio(said, expected):
@@ -257,19 +268,23 @@ def is_consonant(s):
     return bool(s) and not is_mark(s) and s not in VOWELS and s != "▁"
 
 
-def dict_reference(db, phrase_sounds, current, check=False):
+def dict_reference(db, phrase_sounds, current, lang, check=False):
     """Option B: each word's sounds from the dictionary (Piper's where it has none), plus the
-    consonants Piper carries over from one word to a next word that starts with a vowel.
+    consonants Piper carries over from one word to a next word that starts with a vowel, in
+    languages with liaison.
 
     Option B2 ([check]): Piper's sounds for a word are kept when they agree with one of the
-    dictionary's pronunciations, and replaced by the closest one when they don't."""
+    dictionary's pronunciations, replaced by the closest one when they don't, and kept when even the
+    closest is far off."""
     refs = []
     for w, piper in current:
         piper = [x for x in piper if x != "▁"]
         if check:
             cands = dict_candidates(db, w) if db else []
+            if lang in LIAISON:
+                cands = drop_liaison_forms(cands)
             best = min(cands, key=lambda c: pron_ratio(piper, c)) if cands else None
-            if best is None or pron_ratio(piper, best) <= AGREE:
+            if best is None or not AGREE < pron_ratio(piper, best) <= FAR:
                 refs.append((w, piper, False))
             else:
                 refs.append((w, best, True))
@@ -280,7 +295,8 @@ def dict_reference(db, phrase_sounds, current, check=False):
     word_of = [i for i, (_, ss, _) in enumerate(refs) for _ in ss]
     carried = {}
     last_ref = None
-    for r, h, _ in align(ref, [s for s in phrase_sounds if s != "▁"], sound_cost, sound_indel):
+    steps = align(ref, [s for s in phrase_sounds if s != "▁"], sound_cost, sound_indel) if lang in LIAISON else []
+    for r, h, _ in steps:
         if r is not None:
             last_ref = r
             continue
@@ -292,7 +308,8 @@ def dict_reference(db, phrase_sounds, current, check=False):
             continue
         sound = [s for s in phrase_sounds if s != "▁"][h]
         nxt = refs[w + 1][1]
-        if is_consonant(sound) and nxt and base(nxt[0]) in VOWELS:
+        # A glottal stop belongs to the start of the next word, not the end of this one.
+        if is_consonant(sound) and sound != "ʔ" and nxt and base(nxt[0]) in VOWELS:
             carried[w] = CARRIED + sound
     out = [(w, ss + ([carried[i]] if i in carried else [])) for i, (w, ss, _) in enumerate(refs)]
     coverage = sum(1 for _, _, from_dict in refs if from_dict) / max(1, len(refs))
@@ -411,8 +428,8 @@ for lang, cfg in LANGS.items():
             isolated = [(w, sounds(ref_tts.generate(w, sid=0, speed=1.0))) for w in words(phrase)]
             phrase_sounds = sounds(audio)
             ref_words = segment(phrase_sounds, isolated)
-            dict_words, cov = dict_reference(db, phrase_sounds, ref_words)
-            checked_words, replaced = dict_reference(db, phrase_sounds, ref_words, check=True)
+            dict_words, cov = dict_reference(db, phrase_sounds, ref_words, lang)
+            checked_words, replaced = dict_reference(db, phrase_sounds, ref_words, lang, check=True)
             coverage.setdefault(lang, []).append(cov)
             replacements.setdefault(lang, []).append(replaced)
             print(f"{lang} {phrase}")
