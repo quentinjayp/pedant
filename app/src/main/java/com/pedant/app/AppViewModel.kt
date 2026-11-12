@@ -806,7 +806,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         editableIndex = null
     }
 
-    /** Learning mode: moves on without getting the phrase right (offered after a few tries). */
+    /** Learning mode: moves on without getting the phrase right (offered after [SKIP_AFTER_FAILS] failed tries). */
     fun skip() {
         val d = drill ?: return
         if (busy != Busy.Idle) return
@@ -982,6 +982,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     companion object {
+        /** Failed tries at a phrase before Skip is offered. */
+        const val SKIP_AFTER_FAILS = 2
+
         /** Speaking rate for "Slow": 40% of normal speed. */
         private const val SLOW_SPEED = 0.4f
 

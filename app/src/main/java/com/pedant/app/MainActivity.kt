@@ -1416,15 +1416,17 @@ private fun LearningControls(vm: AppViewModel) {
             PillButton("Send", { vm.submitEnglish(text); text = "" }, enabled = text.isNotBlank())
         }
     } else {
-        HearButtons("Hear it again:", vm::hearAgain) {
-            if (vm.drillAttempts >= 3) LinkButton("Skip", vm::skip)
+        // Skip sits outside the scrolling row so it's always on screen.
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { HearButtons("Hear it again:", vm::hearAgain) }
+            if (vm.drillAttempts >= AppViewModel.SKIP_AFTER_FAILS) LinkButton("Skip", vm::skip)
         }
     }
 }
 
-/** A label with Normal and Slow playback buttons, then any [extra] buttons. */
+/** A label with Normal and Slow playback buttons. */
 @Composable
-private fun HearButtons(label: String, onHear: (slow: Boolean) -> Unit, extra: @Composable () -> Unit = {}) {
+private fun HearButtons(label: String, onHear: (slow: Boolean) -> Unit) {
     Row(
         Modifier.horizontalScroll(rememberScrollState()),
         verticalAlignment = Alignment.CenterVertically,
@@ -1434,6 +1436,5 @@ private fun HearButtons(label: String, onHear: (slow: Boolean) -> Unit, extra: @
         Spacer(Modifier.width(2.dp))
         PillButton("▶ Normal", { onHear(false) })
         PillButton("Slow", { onHear(true) }, PillStyle.Secondary)
-        extra()
     }
 }
