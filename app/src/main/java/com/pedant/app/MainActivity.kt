@@ -503,7 +503,7 @@ private fun HomeScreen(vm: AppViewModel) {
             HomeButton(
                 mark = "⚙\uFE0E",
                 title = "Settings",
-                subtitle = "Tutor model: ${vm.gemma.title}",
+                subtitle = null,
                 color = Pastel.White,
                 ink = Pastel.Ink,
                 enabled = true,
@@ -603,12 +603,12 @@ private fun GemmaRow(vm: AppViewModel, model: Gemma) {
     }
 }
 
-/** A large home-page button with a mark, a title and a line of explanation. */
+/** A large home-page button with a mark, a title and, optionally, a line of explanation. */
 @Composable
 private fun HomeButton(
     mark: String,
     title: String,
-    subtitle: String,
+    subtitle: String?,
     color: Color,
     ink: Color,
     enabled: Boolean,
@@ -633,7 +633,7 @@ private fun HomeButton(
         }
         Column(Modifier.weight(1f)) {
             Text(title, color = content, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = content.copy(alpha = 0.9f), fontSize = 12.sp)
+            subtitle?.let { Text(it, color = content.copy(alpha = 0.9f), fontSize = 12.sp) }
         }
         Text("›", color = content, fontSize = 24.sp, fontWeight = FontWeight.Bold)
     }
