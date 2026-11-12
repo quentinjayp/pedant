@@ -62,6 +62,8 @@ data class WordLookup(
     val loading: Boolean = true,
     /** The meaning comes from the downloaded dictionary, not Gemma. */
     val fromDictionary: Boolean = false,
+    /** The dictionary's meanings, a group per part of speech, to lay out; [meaning] is the same as text. */
+    val groups: List<Dictionary.Group>? = null,
 )
 
 sealed interface ChatItem {
@@ -710,7 +712,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val sounds = d.ipa ?: zipaSounds
         return WordLookup(
             word, sentence,
-            meaning = d.meaning,
+            meaning = d.text,
+            groups = d.groups,
             soundsLike = sounds?.let(Respell::fromIpa)?.ifEmpty { null },
             sounds = sounds,
             loading = false,

@@ -18,40 +18,26 @@ class Dictionary(file: File) : Closeable {
         file.path, null, SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS,
     )
 
-    /** [formMeanings]: a verb form's base meanings put in its form ("eu": had, not to have), if any. */
-    data class Entry(
-        val word: String,
-        val pos: String?,
-        val ipa: String?,
-        val meanings: List<String>,
-        val formOf: String?,
-        val formMeanings: List<String>? = null,
-    )
+    data class Entry(val word: String, val pos: String?, val ipa: String?, val meanings: List<String>, val formOf: String?)
+
+    /**
+     * One part of speech of a word: [label] is the part of speech and, for a form, what form it is
+     * ("verb · past participle of avoir"); [meanings] are its meanings (for a form, its base word's).
+     */
+    data class Group(val label: String?, val meanings: List<String>)
 
     /** What the word bubble shows for a word. [ipa] is null when the dictionary has none. */
-    data class Description(val meaning: String, val ipa: String?)
-
-    /** Dictionaries built before these columns were added do without them until updated. */
-    private val columns = db.rawQuery("PRAGMA table_info(entries)", null).use { c ->
-        buildSet { while (c.moveToNext()) add(c.getString(1)) }
+    data class Description(val groups: List<Group>, val ipa: String?) {
+        /** The same as plain text, a line per label and per meaning. */
+        val text: String get() = groups.joinToString("\n") { g -> (listOfNotNull(g.label) + g.meanings).joinToString("\n") }
     }
-    private val query = "SELECT word, pos, ipa, meanings, form_of, " +
-        (if ("form_meanings" in columns) "form_meanings" else "NULL") +
-        " FROM entries WHERE key = ? ORDER BY " + (if ("freq" in columns) "freq DESC, rowid" else "rowid")
 
-    fun entries(word: String): List<Entry> =
-        db.rawQuery(query, arrayOf(key(word))).use { c ->
-            buildList {
-                while (c.moveToNext()) {
-                    add(
-                        Entry(
-                            c.getString(0), c.getString(1), c.getString(2), c.getString(3).split('\n'), c.getString(4),
-                            c.getString(5)?.split('\n'),
-                        ),
-                    )
-                }
-            }
-        }
+    /** Dictionaries built before the counts were added keep Wiktionary's order until updated. */
+    private val order = db.rawQuery("PRAGMA table_info(entries)", null).use { c ->
+        var hasFreq = false
+        while (c.moveToNext()) if (c.getString(1) == "freq") hasFreq = true
+        if (hasFreq) "freq DESC, rowid" else "rowid"
+    }
 
     /**
      * [word]'s entries, spelled as it is ("eu", not the initialism "EU"); failing that, in lower case
@@ -67,18 +53,28 @@ class Dictionary(file: File) : Closeable {
 
     private fun spelling(word: String) = Normalizer.normalize(word, Normalizer.Form.NFC).replace('’', '\'')
 
+    fun entries(word: String): List<Entry> =
+        db.rawQuery(
+            "SELECT word, pos, ipa, meanings, form_of FROM entries WHERE key = ? ORDER BY $order", arrayOf(key(word)),
+        ).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    add(Entry(c.getString(0), c.getString(1), c.getString(2), c.getString(3).split('\n'), c.getString(4)))
+                }
+            }
+        }
+
     /**
-     * The meanings of [word], meanings first. A form ("dessins") shows its base word's meanings,
-     * with what form it is noted after:
+     * The meanings of [word], a group per part of speech, the most common first. A form ("dessins",
+     * "eu") shows its base word's meanings under what form it is:
      *
-     *     drawing (act of drawing); design (pattern)
-     *     noun · plural of dessin
-     *
-     * When the word is more than one part of speech, each gets its own line, labelled at the end.
+     *     verb · past participle of avoir
+     *     to have
+     *     to own
      *
      * An elided word the dictionary doesn't have whole, like "d'encouragement", shows the main word
-     * with the elided part added after ("d': apocopic form of de: of"), and their IPA joined.
-     * Null if the dictionary doesn't have the word.
+     * with the elided part added after, and their IPA joined. Null if the dictionary doesn't have
+     * the word.
      */
     fun describe(word: String): Description? {
         describeWhole(word)?.let { return it }
@@ -88,7 +84,7 @@ class Dictionary(file: File) : Closeable {
         val main = describeWhole(word.substring(cut + 1)) ?: return null
         val part = entries(elided).firstOrNull() ?: return null
         val ipa = if (main.ipa != null && part.ipa != null) part.ipa.trimEnd('‿') + main.ipa else null
-        return Description(main.meaning + "\n" + "${part.word}: ${part.meanings.first()}", ipa)
+        return Description(main.groups + Group(part.word, part.meanings.take(MAX_MEANINGS)), ipa)
     }
 
     private fun describeWhole(word: String): Description? {
@@ -96,29 +92,16 @@ class Dictionary(file: File) : Closeable {
         if (found.isEmpty()) return null
         val senses = found.map { e ->
             val base = e.formOf?.let { baseEntries(it, e.pos) }.orEmpty()
-            when {
-                // A verb form: its base word's meanings in its form ("had"), then what form it is.
-                e.formOf != null && e.formMeanings != null -> Sense(e.pos, e.formMeanings, note = e.meanings.first())
-                base.isEmpty() -> Sense(e.pos, e.meanings, note = null)
-                else -> Sense(e.pos, base.flatMap { it.meanings }, note = e.meanings.first())
-            }
+            if (base.isEmpty()) Sense(e.pos, e.meanings, note = null)
+            else Sense(e.pos, base.flatMap { it.meanings }, note = e.meanings.first())
         }
-        // One line per part of speech.
         val groups = senses.groupBy { it.pos }.map { (pos, group) ->
-            Sense(pos, group.flatMap { it.meanings }.distinct().take(MAX_MEANINGS), group.firstNotNullOfOrNull { it.note })
+            Group(
+                listOfNotNull(posName(pos), group.firstNotNullOfOrNull { it.note }).joinToString(" · ").ifEmpty { null },
+                group.flatMap { it.meanings }.distinct().take(MAX_MEANINGS),
+            )
         }
-        val text = if (groups.size == 1) {
-            val g = groups[0]
-            listOf(g.meanings.joinToString("; "), listOfNotNull(posName(g.pos), g.note).joinToString(" · "))
-                .filter { it.isNotEmpty() }
-                .joinToString("\n")
-        } else {
-            groups.joinToString("\n") { g ->
-                val label = listOfNotNull(posName(g.pos), g.note).joinToString("; ")
-                if (label.isEmpty()) g.meanings.joinToString("; ") else "${g.meanings.joinToString("; ")} ($label)"
-            }
-        }
-        return Description(text, found.firstNotNullOfOrNull { it.ipa })
+        return Description(groups, found.firstNotNullOfOrNull { it.ipa })
     }
 
     private data class Sense(val pos: String?, val meanings: List<String>, val note: String?)

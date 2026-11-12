@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
@@ -109,6 +110,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
@@ -1554,7 +1556,24 @@ private fun WordBubble(
         },
     ) {
         when {
-            lookup.meaning != null -> Text(lookup.meaning, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Pastel.Ink)
+            lookup.groups != null || lookup.meaning != null -> Column(
+                // Scrolls on its own, so a long entry never pushes the rest of the bubble away.
+                Modifier.fillMaxWidth().heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                val groups = lookup.groups
+                if (groups == null) {
+                    Text(lookup.meaning.orEmpty(), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Pastel.Ink)
+                } else {
+                    // Each part of speech: what it is in italics, then each meaning on its own line.
+                    groups.forEach { g ->
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            g.label?.let { Text(it, fontSize = 13.sp, fontStyle = FontStyle.Italic, color = Pastel.InkSoft) }
+                            g.meanings.forEach { Text(it, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Pastel.Ink) }
+                        }
+                    }
+                }
+            }
             lookup.loading -> Text(
                 if (appBusy) "Will look this up once the app is free…" else "Looking up the meaning…",
                 fontSize = 14.sp,

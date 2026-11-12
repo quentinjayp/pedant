@@ -7,10 +7,6 @@ shown, and every pronunciation listed, tab-separated), a few short English meani
 it is a form of. Writes one gzipped SQLite file per
 language, plus a manifest describing them.
 
-A verb form ("eu", past participle of avoir) also gets its base word's meanings in that form
-(form_meanings: "had; owned", not "to have; to own"), using English Wiktionary's English verb forms
-from the same data.
-
 Each entry also gets how common its part of speech is for that spelling (freq), counted in
 Universal Dependencies treebanks, so the app can show "est" (is) before "est" (east). Only
 treebanks whose license allows it (no NonCommercial, NoDerivatives or GPL) are counted; a language
@@ -136,9 +132,8 @@ def split_ipa(ipa):
 
 
 def pick_senses(senses):
-    """A few short meanings, common senses first, the word this is a form of, if any, and that
-    sense's tags (which form it is)."""
-    kept, form_of, form_tags = [], None, []
+    """A few short meanings, common senses first, and the word this is a form of, if any."""
+    kept, form_of = [], None
     usable = [s for s in senses or [] if s.get("glosses")]
     preferred = [s for s in usable if not SKIP_SENSE_TAGS & set(s.get("tags") or [])] or usable
     for s in preferred:
@@ -146,7 +141,6 @@ def pick_senses(senses):
             for link in (s.get("form_of") or []) + (s.get("alt_of") or []):
                 if link.get("word"):
                     form_of = link["word"]
-                    form_tags = s.get("tags") or []
                     break
         gloss = s["glosses"][-1].strip()
         if len(gloss) > MAX_GLOSS:
@@ -155,111 +149,7 @@ def pick_senses(senses):
             kept.append(gloss)
         if len(kept) >= MAX_SENSES:
             break
-    return kept, form_of, form_tags
-
-
-# ---- A verb form's meanings in that form ("eu": had, not to have) ------------------------------
-
-# English verb forms worth reading off Wiktionary's English entries, by kind.
-ENGLISH_FORM_KINDS = {
-    "past": lambda t: "past" in t and "participle" not in t,
-    "past_participle": lambda t: "past" in t and "participle" in t,
-    "present_participle": lambda t: "present" in t and "participle" in t,
-}
-SKIP_FORM_TAGS = {"archaic", "obsolete", "dialectal", "nonstandard", "rare", "table-tags", "inflection-template",
-                  "colloquial", "informal", "error-unknown-tag", "misspelling"}
-# How many base meanings a form gets, as the app shows at most.
-MAX_FORM_MEANINGS = 4
-
-
-def english_verb_forms(entry, table):
-    """Adds an English verb's past, past participle and present participle to [table]."""
-    lemma = entry.get("word", "").lower()
-    if not lemma or lemma in table:
-        return
-    found = {}
-    for f in entry.get("forms") or []:
-        form, tags = f.get("form"), set(f.get("tags") or [])
-        if not form or " " in form or tags & SKIP_FORM_TAGS:
-            continue
-        for kind, matches in ENGLISH_FORM_KINDS.items():
-            if kind not in found and matches(tags):
-                found[kind] = form
-    if found:
-        table[lemma] = found
-
-
-def form_tense(tags):
-    """Which English form a verb form's meaning takes, from its Wiktionary tags; None to leave it."""
-    t = set(tags)
-    if "participle" in t and "past" in t:
-        return "past_participle"
-    if ("participle" in t and "present" in t) or "gerund" in t:
-        return "present_participle"
-    if "conditional" in t:
-        return "conditional"
-    if "future" in t:
-        return "future"
-    if t & {"past", "preterite", "imperfect", "historic", "pluperfect"}:
-        return "past"
-    return None
-
-
-def english_form(verb, kind, table):
-    """[verb] in the English form [kind], from Wiktionary's English entries or the regular rules."""
-    known = table.get(verb.lower(), {}).get(kind)
-    if known:
-        return known
-    if kind == "present_participle":
-        if verb.endswith("ie"):
-            return verb[:-2] + "ying"
-        if verb.endswith("e") and not verb.endswith("ee"):
-            return verb[:-1] + "ing"
-        return verb + "ing"
-    if verb.endswith("e"):
-        return verb + "d"
-    if re.search(r"[^aeiou]y$", verb):
-        return verb[:-1] + "ied"
-    return verb + "ed"
-
-
-def inflect_meaning(gloss, tense, table):
-    """An English meaning ("to have (an age)") in [tense] ("had (an age)"), or None if it isn't a
-    "to ..." verb meaning. A second verb joined by "or"/"and" changes too ("to experience or suffer
-    from" → "experienced or suffered from")."""
-    m = re.match(r"to ([A-Za-z]+)(.*)", gloss, re.S)
-    if not m:
-        return None
-    verb, tail = m.groups()
-    if tense in ("future", "conditional"):
-        return ("will " if tense == "future" else "would ") + verb + tail
-    second = re.match(r"(,? (?:or|and) |, )([A-Za-z]+)(.*)", tail, re.S)
-    if second and second.group(2).lower() in table:
-        tail = second.group(1) + english_form(second.group(2), tense, table) + second.group(3)
-    return english_form(verb, tense, table) + tail
-
-
-def add_form_meanings(db, table):
-    """Gives each verb form noted while reading its base word's meanings in that form."""
-    pending = db.execute(
-        "SELECT entries.rowid, entries.form_of, entries.pos, forms.tense FROM forms JOIN entries ON entries.rowid = forms.row"
-    ).fetchall()
-    updates = []
-    for row, base, pos, tense in pending:
-        bases = db.execute("SELECT pos, meanings FROM entries WHERE key = ? AND form_of IS NULL", (key_of(base),)).fetchall()
-        same = [m for p, m in bases if p == pos] or [m for _, m in bases]
-        meanings = []
-        for block in same:
-            for gloss in block.split("\n"):
-                if gloss not in meanings:
-                    meanings.append(gloss)
-        meanings = meanings[:MAX_FORM_MEANINGS]
-        inflected = [inflect_meaning(g, tense, table) for g in meanings]
-        if any(inflected):
-            updates.append(("\n".join(i or g for i, g in zip(inflected, meanings)), row))
-    db.executemany("UPDATE entries SET form_meanings = ? WHERE rowid = ?", updates)
-    db.execute("DROP TABLE forms")
-    return len(updates)
+    return kept, form_of
 
 
 def ud_license_ok(treebank_dir):
@@ -307,10 +197,8 @@ def open_db(path):
     db = sqlite3.connect(path)
     db.execute(
         "CREATE TABLE entries (key TEXT NOT NULL, word TEXT NOT NULL, pos TEXT, ipa TEXT, ipas TEXT,"
-        " meanings TEXT NOT NULL, form_of TEXT, freq INTEGER NOT NULL, form_meanings TEXT)"
+        " meanings TEXT NOT NULL, form_of TEXT, freq INTEGER NOT NULL)"
     )
-    # Verb forms whose meanings are put in their form once every entry is in; see add_form_meanings.
-    db.execute("CREATE TABLE forms (row INTEGER NOT NULL, tense TEXT NOT NULL)")
     db.execute("CREATE TABLE meta (name TEXT PRIMARY KEY, value TEXT)")
     return db
 
@@ -347,7 +235,6 @@ def main():
     rows = {code: {} for code in codes}  # key -> number of rows written
     stats = {code: {"entries": 0, "with_ipa": 0} for code in codes}
 
-    english_forms = {}  # English verb -> its past, past participle and present participle
     lines = 0
     for line in sys.stdin.buffer:
         lines += 1
@@ -357,13 +244,11 @@ def main():
             entry = loads(line)
         except ValueError:
             continue
-        if entry.get("lang") == "English" and entry.get("pos") == "verb":
-            english_verb_forms(entry, english_forms)
         code = by_name.get(entry.get("lang"))
         word = entry.get("word")
         if code is None or not word:
             continue
-        meanings, form_of, form_tags = pick_senses(entry.get("senses"))
+        meanings, form_of = pick_senses(entry.get("senses"))
         if not meanings:
             continue
         key = key_of(word)
@@ -371,24 +256,18 @@ def main():
             continue
         rows[code][key] = rows[code].get(key, 0) + 1
         ipa, variants = pick_ipa(entry.get("sounds"), code)
-        cur = dbs[code].execute(
-            "INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
+        dbs[code].execute(
+            "INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (key, word, entry.get("pos"), ipa, "\t".join(variants) or None, "\n".join(meanings), form_of,
              freq[code].get((key, entry.get("pos")), 0)),
         )
-        tense = form_tense(form_tags) if form_of and entry.get("pos") == "verb" else None
-        if tense:
-            dbs[code].execute("INSERT INTO forms VALUES (?, ?)", (cur.lastrowid, tense))
         stats[code]["entries"] += 1
         stats[code]["with_ipa"] += ipa is not None
 
-    print(f"{lines:,} lines read in total; {len(english_forms):,} English verbs' forms", file=sys.stderr)
-    for verb in ("have", "be", "go", "suffer"):
-        print(f"  {verb}: {english_forms.get(verb)}", file=sys.stderr)
+    print(f"{lines:,} lines read in total", file=sys.stderr)
     languages = {}
     for code, db in dbs.items():
         db.execute("CREATE INDEX entries_key ON entries (key)")
-        print(f"{code}: {add_form_meanings(db, english_forms):,} verb forms given meanings in their form", file=sys.stderr)
         db.executemany(
             "INSERT INTO meta VALUES (?, ?)",
             [
