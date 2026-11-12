@@ -29,7 +29,8 @@ if changed:
         release=f"dictionaries-{args.version}",
         languages=built,
         source="English Wiktionary, via kaikki.org (Wiktextract)",
-        license="CC BY-SA 4.0. Text from Wiktionary contributors; extracted with Wiktextract (Ylonen, LREC 2022).",
+        license="CC BY-SA 4.0. Text from Wiktionary contributors; extracted with Wiktextract (Ylonen, LREC 2022)."
+        " Part-of-speech counts from Universal Dependencies treebanks (CC BY-SA or CC BY).",
     )
 manifest["checked"] = args.checked
 os.makedirs(os.path.dirname(args.manifest), exist_ok=True)

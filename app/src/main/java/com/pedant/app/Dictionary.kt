@@ -9,7 +9,8 @@ import java.util.Locale
 /**
  * A language's word dictionary, built from English Wiktionary (CC BY-SA 4.0) by
  * tools/build_dictionaries.py: spelling, part of speech, IPA, short English meanings, and the word
- * each form belongs to.
+ * each form belongs to. A word's entries come most common part of speech first ("est", is, before
+ * "est", east), from counts in Universal Dependencies treebanks.
  */
 class Dictionary(file: File) : Closeable {
 
@@ -22,8 +23,17 @@ class Dictionary(file: File) : Closeable {
     /** What the word bubble shows for a word. [ipa] is null when the dictionary has none. */
     data class Description(val meaning: String, val ipa: String?)
 
+    /** Dictionaries built before the counts were added keep Wiktionary's order until updated. */
+    private val order = db.rawQuery("PRAGMA table_info(entries)", null).use { c ->
+        var hasFreq = false
+        while (c.moveToNext()) if (c.getString(1) == "freq") hasFreq = true
+        if (hasFreq) "freq DESC, rowid" else "rowid"
+    }
+
     fun entries(word: String): List<Entry> =
-        db.rawQuery("SELECT word, pos, ipa, meanings, form_of FROM entries WHERE key = ?", arrayOf(key(word))).use { c ->
+        db.rawQuery(
+            "SELECT word, pos, ipa, meanings, form_of FROM entries WHERE key = ? ORDER BY $order", arrayOf(key(word)),
+        ).use { c ->
             buildList {
                 while (c.moveToNext()) {
                     add(Entry(c.getString(0), c.getString(1), c.getString(2), c.getString(3).split('\n'), c.getString(4)))

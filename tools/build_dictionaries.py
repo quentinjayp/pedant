@@ -7,15 +7,23 @@ shown, and every pronunciation listed, tab-separated), a few short English meani
 it is a form of. Writes one gzipped SQLite file per
 language, plus a manifest describing them.
 
+Each entry also gets how common its part of speech is for that spelling (freq), counted in
+Universal Dependencies treebanks, so the app can show "est" (is) before "est" (east). Only
+treebanks whose license allows it (no NonCommercial, NoDerivatives or GPL) are counted; a language
+with none keeps Wiktionary's order.
+
+    python3 tools/build_dictionaries.py --list-treebanks   # the UD_* repositories to clone into ud/
     curl -sSL https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz | gzip -dc \
-        | python3 tools/build_dictionaries.py --out out --languages app/src/main/java/com/pedant/app/Languages.kt
+        | python3 tools/build_dictionaries.py --out out --ud ud --languages app/src/main/java/com/pedant/app/Languages.kt
 
 Each file holds no build date, so an unchanged dictionary gives a byte-identical file.
 
 The data is from Wiktionary (CC BY-SA 4.0), extracted with Wiktextract (Tatu Ylonen, LREC 2022).
+The counts are from Universal Dependencies treebanks (https://universaldependencies.org).
 """
 
 import argparse
+import glob
 import gzip
 import hashlib
 import json
@@ -48,6 +56,31 @@ PREFERRED_ACCENT = {
     "en": ["US", "General-American"],
     "pt": ["Brazil", "Brazilian-Portuguese"],
     "zh": ["Mandarin"],
+}
+
+# Universal Dependencies treebanks to count parts of speech in, per app language. Each one's
+# license is checked when it's read (see ud_license_ok); Hungarian's only treebank is
+# NonCommercial, so Hungarian has none.
+UD_TREEBANKS = {
+    "ar": ["Arabic-PUD"], "cs": ["Czech-CAC", "Czech-CLTT"], "da": ["Danish-DDT"],
+    "de": ["German-GSD", "German-HDT"], "el": ["Greek-GUD"], "en": ["English-EWT"],
+    "es": ["Spanish-AnCora", "Spanish-GSD"], "fi": ["Finnish-TDT", "Finnish-FTB"], "fr": ["French-GSD"],
+    "hi": ["Hindi-PUD"], "hu": [], "id": ["Indonesian-GSD", "Indonesian-CSUI", "Indonesian-PUD"],
+    "it": ["Italian-ParlaMint", "Italian-MarkIT", "Italian-PUD"], "nl": ["Dutch-Alpino", "Dutch-LassySmall"],
+    "no": ["Norwegian-Bokmaal"], "pl": ["Polish-MPDT", "Polish-PUD"], "pt": ["Portuguese-GSD", "Portuguese-Bosque"],
+    "ro": ["Romanian-RRT"], "ru": ["Russian-GSD", "Russian-Taiga"], "sk": ["Slovak-SNK"],
+    "sl": ["Slovenian-SSJ"], "sr": ["Serbian-SET"], "sv": ["Swedish-Talbanken"], "sw": ["Swahili-OPUSGV"],
+    "tr": ["Turkish-BOUN", "Turkish-Kenet", "Turkish-Penn"], "uk": ["Ukrainian-ParlaMint"],
+    "vi": ["Vietnamese-VTB"], "zh": ["Chinese-GSDSimp"],
+}
+
+# Wiktionary's parts of speech for each UD one. A word that's a contraction of two (French "des",
+# de + les) is a multiword token in UD, counted as CONTRACTION.
+UD_TO_POS = {
+    "NOUN": {"noun"}, "PROPN": {"name"}, "VERB": {"verb"}, "AUX": {"verb"}, "ADJ": {"adj"},
+    "ADV": {"adv"}, "ADP": {"prep", "postp"}, "PRON": {"pron"}, "DET": {"det", "article"},
+    "NUM": {"num"}, "CCONJ": {"conj"}, "SCONJ": {"conj"}, "INTJ": {"intj"}, "PART": {"particle"},
+    "CONTRACTION": {"contraction"},
 }
 
 MAX_SENSES = 3
@@ -119,13 +152,52 @@ def pick_senses(senses):
     return kept, form_of
 
 
+def ud_license_ok(treebank_dir):
+    """Whether the treebank's license lets its counts go into the CC BY-SA dictionaries."""
+    for name in ("README.md", "README.txt"):
+        path = os.path.join(treebank_dir, name)
+        if os.path.exists(path):
+            for line in open(path, encoding="utf-8", errors="replace"):
+                if line.lower().startswith("license:"):
+                    lic = line.split(":", 1)[1].upper()
+                    return "CC" in lic and not any(x in lic for x in ("NC", "ND", "GPL"))
+    return False
+
+
+def ud_counts(code, ud_dir):
+    """How often each spelling is each Wiktionary part of speech in [code]'s treebanks, and the
+    treebanks counted."""
+    counts, used = {}, []
+    for treebank in UD_TREEBANKS.get(code, []):
+        d = os.path.join(ud_dir, f"UD_{treebank}")
+        if not os.path.isdir(d):
+            print(f"{code}: {treebank} not found, skipped", file=sys.stderr)
+            continue
+        if not ud_license_ok(d):
+            print(f"{code}: {treebank} license doesn't allow it, skipped", file=sys.stderr)
+            continue
+        used.append(treebank)
+        for path in sorted(glob.glob(os.path.join(d, "*.conllu"))):
+            for line in open(path, encoding="utf-8"):
+                if not line or line[0] in "#\n":
+                    continue
+                cols = line.rstrip("\n").split("\t")
+                if len(cols) < 4 or cols[1] == "_" or "." in cols[0]:
+                    continue
+                upos = "CONTRACTION" if "-" in cols[0] else cols[3]
+                for pos in UD_TO_POS.get(upos, ()):
+                    k = (key_of(cols[1]), pos)
+                    counts[k] = counts.get(k, 0) + 1
+    return counts, used
+
+
 def open_db(path):
     if os.path.exists(path):
         os.remove(path)
     db = sqlite3.connect(path)
     db.execute(
         "CREATE TABLE entries (key TEXT NOT NULL, word TEXT NOT NULL, pos TEXT, ipa TEXT, ipas TEXT,"
-        " meanings TEXT NOT NULL, form_of TEXT)"
+        " meanings TEXT NOT NULL, form_of TEXT, freq INTEGER NOT NULL)"
     )
     db.execute("CREATE TABLE meta (name TEXT PRIMARY KEY, value TEXT)")
     return db
@@ -133,15 +205,30 @@ def open_db(path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", required=True)
-    ap.add_argument("--languages", required=True, help="Languages.kt, to check every app language is covered")
+    ap.add_argument("--out")
+    ap.add_argument("--languages", help="Languages.kt, to check every app language is covered")
+    ap.add_argument("--ud", help="the folder the UD_* treebanks are cloned into")
+    ap.add_argument("--list-treebanks", action="store_true", help="print the UD_* repositories to clone")
     args = ap.parse_args()
+    if args.list_treebanks:
+        print("\n".join(f"UD_{t}" for ts in UD_TREEBANKS.values() for t in ts))
+        return
+    if not args.out or not args.languages:
+        ap.error("--out and --languages are required")
 
     codes = app_codes(args.languages)
     missing = [c for c in codes if c not in WIKTIONARY_NAMES]
     if missing:
         sys.exit(f"No Wiktionary name for app languages: {missing}")
     by_name = {name: code for code in codes for name in WIKTIONARY_NAMES[code]}
+    missing = [c for c in codes if c not in UD_TREEBANKS]
+    if missing:
+        sys.exit(f"No treebank list for app languages: {missing}")
+    freq, treebanks = {}, {}
+    for code in codes:
+        freq[code], treebanks[code] = ud_counts(code, args.ud) if args.ud else ({}, [])
+        print(f"{code}: {len(freq[code]):,} spellings counted in {', '.join(treebanks[code]) or 'no treebanks'}",
+              file=sys.stderr, flush=True)
 
     os.makedirs(args.out, exist_ok=True)
     dbs = {code: open_db(os.path.join(args.out, f"{code}.db")) for code in codes}
@@ -170,8 +257,9 @@ def main():
         rows[code][key] = rows[code].get(key, 0) + 1
         ipa, variants = pick_ipa(entry.get("sounds"), code)
         dbs[code].execute(
-            "INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (key, word, entry.get("pos"), ipa, "\t".join(variants) or None, "\n".join(meanings), form_of),
+            "INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (key, word, entry.get("pos"), ipa, "\t".join(variants) or None, "\n".join(meanings), form_of,
+             freq[code].get((key, entry.get("pos")), 0)),
         )
         stats[code]["entries"] += 1
         stats[code]["with_ipa"] += ipa is not None
@@ -186,6 +274,7 @@ def main():
                 ("language", code),
                 ("source", "English Wiktionary via kaikki.org (Wiktextract)"),
                 ("license", "CC BY-SA 4.0; text from Wiktionary contributors"),
+                ("frequency", "Universal Dependencies: " + (", ".join(f"UD_{t}" for t in treebanks[code]) or "none")),
             ],
         )
         db.commit()

@@ -31,13 +31,26 @@ jobs:
         with:
           python-version: "3.12"
 
+      # For how common each part of speech is, so "est" (is) shows before "est" (east).
+      - name: Get the Universal Dependencies treebanks
+        run: |
+          set -euo pipefail
+          mkdir -p ud
+          for repo in $(python3 tools/build_dictionaries.py --list-treebanks); do
+            # A treebank that can't be had (renamed, say) is left out rather than failing the run,
+            # which would stop the monthly manifest commit.
+            git clone --quiet --depth 1 "https://github.com/UniversalDependencies/$repo" "ud/$repo" \
+              || echo "::warning::Couldn't get $repo; its language is counted without it"
+          done
+          du -sh ud
+
       - name: Build the dictionaries (streams the data; nothing large is saved)
         run: |
           set -euo pipefail
           pip install --quiet orjson
           curl -fsSL --retry 3 https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz \
             | gzip -dc \
-            | python3 tools/build_dictionaries.py --out out \
+            | python3 tools/build_dictionaries.py --out out --ud ud \
                 --languages app/src/main/java/com/pedant/app/Languages.kt
           ls -l out
 
@@ -69,6 +82,10 @@ jobs:
             Extracted with Wiktextract via kaikki.org: Tatu Ylonen, "Wiktextract: Wiktionary as
             Machine-Readable Structured Data", LREC 2022. Changes: kept only each entry's spelling,
             part of speech, IPA, up to three short English meanings, and the word it is a form of.
+
+            Each entry also holds how often its spelling is that part of speech, counted in
+            Universal Dependencies treebanks (https://universaldependencies.org) licensed CC BY-SA
+            or CC BY; each file's meta table names the treebanks used.
 
       - name: Commit the manifest
         run: |
