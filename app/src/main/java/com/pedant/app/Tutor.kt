@@ -61,7 +61,8 @@ class Tutor(context: Context, modelFile: File) {
             turns.clear()
             turns += kept
         }
-        val key = openingKey(language, scenario) + "|" + kept.hashCode()
+        // The instructions don't depend on formal or casual (each message carries it), so neither does this.
+        val key = "${language.code}|${scenario.name}|${kept.hashCode()}"
         val base = ready?.takeIf { it.first == key }?.second ?: run {
             ready?.second?.close()
             ready = null
@@ -193,7 +194,7 @@ class Tutor(context: Context, modelFile: File) {
         private const val HISTORY_CHARS = 2500
 
         /** The message that asks Gemma to open the conversation. */
-        fun startMessage() = Instructions.start
+        fun startMessage(register: Register) = Instructions.start(register)
 
         private fun systemPrompt(language: Language, scenario: Scenario) = Instructions.system(language, scenario)
 
@@ -201,11 +202,11 @@ class Tutor(context: Context, modelFile: File) {
          * Names the opening for these choices; it changes whenever the instructions change.
          * tools/build_openings.py names the openings that ship with the app the same way.
          */
-        fun openingKey(language: Language, scenario: Scenario): String {
-            val hash = (systemPrompt(language, scenario) + startMessage()).hashCode()
+        fun openingKey(language: Language, scenario: Scenario, register: Register): String {
+            val hash = (systemPrompt(language, scenario) + startMessage(register)).hashCode()
             // "Learning" stays in the name, as before Conversation mode was removed, so shipped and
             // saved openings still match.
-            return "${language.code}-Learning-${scenario.name}-${Integer.toHexString(hash)}"
+            return "${language.code}-Learning-${scenario.name}-${register.name}-${Integer.toHexString(hash)}"
         }
 
         fun learningSaid(phrase: String, register: Register) = Instructions.said(phrase, register)

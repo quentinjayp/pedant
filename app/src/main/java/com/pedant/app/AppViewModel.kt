@@ -371,7 +371,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     error = "Could not start: ${e.message}"
                     return@launch
                 }
-                val openingKey = Tutor.openingKey(lang, scenario)
+                val openingKey = Tutor.openingKey(lang, scenario, register)
                 val opening = if (resume != null) null else {
                     withContext(Dispatchers.IO) { openings.text(openingKey) }?.let { it to Tutor.parse(it) }
                 }
@@ -398,7 +398,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         // Gemma reads its instructions while the voice loads and the opening plays.
                         val started = async(Dispatchers.Default) {
                             val earlier = resume?.history
-                                ?: opening?.let { listOf(Tutor.Turn(true, Tutor.startMessage()), Tutor.Turn(false, it.first)) }
+                                ?: opening?.let { listOf(Tutor.Turn(true, Tutor.startMessage(register)), Tutor.Turn(false, it.first)) }
                                 ?: emptyList()
                             checkNotNull(tutor).startConversation(lang, scenario, earlier)
                             diagnostics.log("Gemma ready for the ${lang.englishName} session")
@@ -429,7 +429,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         } else {
                             started.await()
                             diagnostics.step = null
-                            runTurn(Tutor.startMessage(), saveOpening = openingKey to voice)
+                            runTurn(Tutor.startMessage(register), saveOpening = openingKey to voice)
                         }
                     }
                 } catch (e: CancellationException) {

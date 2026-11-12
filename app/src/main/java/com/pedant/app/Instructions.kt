@@ -18,7 +18,7 @@ object Instructions {
 
     private fun text(name: String, language: Language) = json.getString(name).replace("{language}", language.englishName)
 
-    val start: String get() = json.getString("start")
+    fun start(register: Register) = json.getString("start").replace("{register}", register.name.lowercase())
 
     fun said(phrase: String, register: Register) =
         json.getString("said").replace("{register}", register.name.lowercase()).replace("{phrase}", phrase)
