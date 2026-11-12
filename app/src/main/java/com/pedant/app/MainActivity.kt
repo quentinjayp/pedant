@@ -1,29 +1,33 @@
 package com.pedant.app
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -112,10 +116,10 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -123,9 +127,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
-
-import kotlinx.coroutines.delay
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
@@ -508,6 +513,7 @@ private fun ModelLoadingScreen(vm: AppViewModel) {
 private fun HomeScreen(vm: AppViewModel) {
     AppScreen(header = { HeaderTitle("Pedant", "Ready to speak?") }) {
         Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            BatteryNotice()
             HomeButton(
                 mark = "▶",
                 title = "Continue conversation",
@@ -623,6 +629,32 @@ private fun GemmaRow(vm: AppViewModel, model: Gemma) {
             dismissButton = { LinkButton("Cancel", { confirmDelete = false }) },
         )
     }
+}
+
+/**
+ * A notice, shown until it's done, that Pedant's battery use isn't unrestricted, so Android may stop
+ * it while it finishes a reply in the background. Tapping it asks for unrestricted use (or, where
+ * that can't be asked, opens Pedant's settings). Checked again whenever the app comes back.
+ */
+@Composable
+private fun BatteryNotice() {
+    val context = LocalContext.current
+    fun unrestricted() =
+        context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
+    var ok by remember { mutableStateOf(unrestricted()) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { ok = unrestricted() }
+    if (ok) return
+    PeachNotice(
+        "Battery use is restricted, so Android may stop Pedant in the background. Tap to make it unrestricted.",
+        Modifier.clip(RoundedCornerShape(16.dp)).clickable {
+            val app = Uri.fromParts("package", context.packageName, null)
+            runCatching {
+                context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, app))
+            }.recoverCatching {
+                context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, app))
+            }
+        },
+    )
 }
 
 /** A large home-page button with a mark, a title and, optionally, a line of explanation. */
