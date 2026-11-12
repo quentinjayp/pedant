@@ -316,6 +316,36 @@ def dict_reference(db, phrase_sounds, current, lang, check=False):
     return out, coverage
 
 
+def mark_carried(ref_words, isolated, lang):
+    """Option A2: Piper's sounds (option A), with each liaison consonant marked as carried.
+
+    A liaison consonant is one Piper says at the end of a word (or the start of the next) in the
+    sentence but not when it says the word on its own, before a word that starts with a vowel: the z
+    of "les enfants". It's moved to the end of the word it belongs to and written "‿z". A consonant
+    the word always has, moved onto the next word ("avec elle"), isn't one."""
+    if lang not in LIAISON:
+        return ref_words
+    seg = [[x for x in ss if x != "▁"] for _, ss in ref_words]
+    iso = [[x for x in ss if x != "▁"] for _, ss in isolated]
+    for k in range(len(seg) - 1):
+        nxt_iso = [x for x in iso[k + 1] if not is_mark(x)]
+        if not nxt_iso or base(nxt_iso[0]) not in VOWELS or not seg[k]:
+            continue
+        steps = align(seg[k], iso[k], sound_cost, sound_indel)
+        if steps and steps[-1][1] is None and is_consonant(seg[k][-1]):
+            seg[k][-1] = CARRIED + seg[k][-1]
+            continue
+        if not seg[k + 1]:
+            continue
+        first = seg[k + 1][0]
+        steps = align(seg[k + 1], iso[k + 1], sound_cost, sound_indel)
+        own_end = iso[k][-1] if iso[k] else None
+        if (steps and steps[0] == (0, None, sound_indel(first)) and is_consonant(first)
+                and first != "ʔ" and own_end != first):
+            seg[k].append(CARRIED + seg[k + 1].pop(0))
+    return [(w, ss or orig) for (w, orig), ss in zip(ref_words, seg)]
+
+
 # ---- Models -----------------------------------------------------------------------------------
 
 def tts(voice):
@@ -413,6 +443,7 @@ def fleurs_sentences(code):
 
 
 rows = []
+linked_found = {}
 coverage = {}
 replacements = {}
 for lang, cfg in LANGS.items():
@@ -436,7 +467,13 @@ for lang, cfg in LANGS.items():
             print("   current:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in ref_words))
             print("   dictionary: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in dict_words))
             print("   checked:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in checked_words), flush=True)
-            references_cache[phrase] = [("current", ref_words), ("dictionary", dict_words), ("checked", checked_words)]
+            linked_words = mark_carried(ref_words, isolated, lang)
+            for w, ss in linked_words:
+                if any(x.startswith(CARRIED) for x in ss):
+                    linked_found.setdefault(lang, []).append(f"{w} /{''.join(ss)}/")
+            print("   linked:     " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in linked_words), flush=True)
+            references_cache[phrase] = [("current", ref_words), ("dictionary", dict_words), ("checked", checked_words),
+                                        ("linked", linked_words)]
         return references_cache[phrase]
 
     sentences = fleurs_sentences(cfg["fleurs"])
@@ -462,6 +499,9 @@ for lang, cfg in LANGS.items():
 print("\n== Words with dictionary IPA, by language ==")
 for lang, covs in coverage.items():
     print(f"{lang} {sum(covs) / len(covs):.0%}")
+print("\n== Liaison consonants marked as carried (linked) ==")
+for lang, found in linked_found.items():
+    print(f"{lang} {len(found)}: " + ", ".join(found))
 print("\n== Words where Piper disagreed with the dictionary and were replaced (checked) ==")
 for lang, reps in replacements.items():
     print(f"{lang} {sum(reps) / len(reps):.0%}")
@@ -484,7 +524,7 @@ def bad_words(r, rule=RULES["All three (the app)"]):
     return [i for i, w in enumerate(r[6]) if not rule(*w)]
 
 
-for method in ["current", "dictionary", "checked"]:
+for method in ["current", "dictionary", "checked", "linked"]:
     group_rows = [r for r in rows if r[7] == method]
     print(f"\n== Expected sounds: {method} ==")
     for kind in KINDS:
