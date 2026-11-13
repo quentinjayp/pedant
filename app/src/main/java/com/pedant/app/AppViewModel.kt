@@ -252,11 +252,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         File("/proc/self/statm").readText().trim().split(' ')[1].toLong() * Os.sysconf(OsConstants._SC_PAGESIZE)
     }.getOrDefault(0L)
 
-    /** Loads one model, recording how long it took and the free memory before and after. */
-    private fun <T> timedLoad(name: String, load: () -> T): T {
+    /**
+     * Loads one model, recording how long it took and the free memory before and after. [shown] is
+     * what the loading screen says meanwhile: more than this model when others load alongside it.
+     */
+    private fun <T> timedLoad(name: String, shown: String = name, load: () -> T): T {
         val before = diagnostics.memorySummary()
-        loadingStep = name
-        diagnostics.step = "Loading $name ($before)"
+        loadingStep = shown
+        diagnostics.step = "Loading $shown ($before)"
         diagnostics.log("Loading $name: start, $before")
         val start = System.currentTimeMillis()
         val result = load()
@@ -297,8 +300,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             Tutor(getApplication(), checkNotNull(store.gemmaFile()) { "Gemma model file is missing" })
                         }
                     }
-                    if (stt == null) stt = timedLoad("Omnilingual ASR") { SpeechToText(store) }
-                    if (zipa == null) zipa = timedLoad("ZIPA") { SoundRecognizer(store) }
+                    // The speech recognizer and ZIPA load together: neither needs the other.
+                    val both = listOfNotNull("Omnilingual ASR".takeIf { stt == null }, "ZIPA".takeIf { zipa == null })
+                        .joinToString(" and ")
+                    coroutineScope {
+                        val loadingStt = if (stt != null) null else async { timedLoad("Omnilingual ASR", both) { SpeechToText(store) } }
+                        val loadingZipa = if (zipa != null) null else async { timedLoad("ZIPA", both) { SoundRecognizer(store) } }
+                        loadingStt?.let { stt = it.await() }
+                        loadingZipa?.let { zipa = it.await() }
+                    }
                     diagnostics.step = null
                     loadingStep = null
                 }
