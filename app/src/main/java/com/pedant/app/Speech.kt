@@ -148,15 +148,39 @@ class SpeechToText(private val store: ModelStore, private val onEvent: (String) 
 /**
  * ZIPA: hears the sounds (IPA phonemes) that were actually spoken, without knowing any words.
  * Returns ZIPA's tokens, with "▁" between words.
+ *
+ * Its working memory grows with the longest audio it has heard and is never given back, so after
+ * long audio the model is released ([releaseIfGrown]) and loads again the next time it's needed,
+ * or ahead of that with [warm]. [onEvent] is told when either happens.
  */
-class SoundRecognizer(store: ModelStore) {
-    private val recognizer = recognizer(
+class SoundRecognizer(private val store: ModelStore, private val onEvent: (String) -> Unit = {}) {
+    private var recognizer: OfflineRecognizer? = null
+
+    /** The longest audio heard since the model was loaded, in seconds. */
+    private var longest = 0.0
+
+    init {
+        // Loaded from the start, so a model that can't be loaded shows on the loading screen.
+        loaded()
+    }
+
+    private fun loaded(): OfflineRecognizer = recognizer ?: recognizer(
         OfflineModelConfig(
             zipformerCtc = OfflineZipformerCtcModelConfig(model = store.zipaModel.path),
             tokens = store.zipaTokens.path,
         ),
-    )
+    ).also { recognizer = it }
 
+    /** Loads the model if it isn't in memory, ahead of [sounds]. */
+    @Synchronized
+    fun warm() {
+        if (recognizer != null) return
+        val start = System.currentTimeMillis()
+        loaded()
+        onEvent("ZIPA loaded again in ${(System.currentTimeMillis() - start) / 1000.0} s")
+    }
+
+    @Synchronized
     fun sounds(audio: Audio): List<String> {
         if (audio.samples.isEmpty()) return emptyList()
         // ZIPA misses sounds right at the start of a clip with no lead-in (as in Piper's audio) and
@@ -164,10 +188,25 @@ class SoundRecognizer(store: ModelStore) {
         val margin = audio.sampleRate / 4
         val length = maxOf(audio.samples.size + 2 * margin, audio.sampleRate)
         val samples = FloatArray(length).also { audio.samples.copyInto(it, destinationOffset = margin) }
-        return recognizer.recognize(samples, audio.sampleRate).tokens.map { it.trim() }.filter { it.isNotEmpty() }
+        warm()
+        longest = maxOf(longest, length.toDouble() / audio.sampleRate)
+        return loaded().recognize(samples, audio.sampleRate).tokens.map { it.trim() }.filter { it.isNotEmpty() }
     }
 
-    fun release() = recognizer.release()
+    /** Releases the model if it has heard audio longer than [LONG_SECONDS], to give back the memory that took. */
+    @Synchronized
+    fun releaseIfGrown() {
+        if (recognizer == null || longest <= LONG_SECONDS) return
+        onEvent("ZIPA released after hearing %.1f s of audio".format(longest))
+        release()
+    }
+
+    @Synchronized
+    fun release() {
+        recognizer?.release()
+        recognizer = null
+        longest = 0.0
+    }
 
     companion object {
         /**
@@ -182,6 +221,12 @@ class SoundRecognizer(store: ModelStore) {
             tokens.joinToString("") { if (it == "▁") " " else it }.trim().replace(SPACES, " ")
 
         private val SPACES = Regex("\\s+")
+
+        /**
+         * Audio longer than this makes the model worth releasing afterwards: in a test, hearing 5 s
+         * added about 40 MB to its memory, 10 s about 80 MB and 20 s about 160 MB.
+         */
+        private const val LONG_SECONDS = 10.0
     }
 }
 

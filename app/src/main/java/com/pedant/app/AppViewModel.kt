@@ -301,7 +301,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         }
                     }
                     if (stt == null) stt = SpeechToText(store, diagnostics::log)
-                    if (zipa == null) zipa = timedLoad("ZIPA") { SoundRecognizer(store) }
+                    if (zipa == null) zipa = timedLoad("ZIPA") { SoundRecognizer(store, diagnostics::log) }
                     diagnostics.step = null
                     loadingStep = null
                 }
@@ -636,7 +636,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         recorder.start()
         // The speech recognizer loads while the learner talks, ready for when they've finished.
         stt?.expectSpeech()
-        viewModelScope.launch(Dispatchers.Default) { runCatching { stt?.warm() } }
+        // So does ZIPA, if it was released after long audio.
+        viewModelScope.launch(Dispatchers.Default) {
+            runCatching { stt?.warm() }
+            runCatching { zipa?.warm() }
+        }
         viewModelScope.launch { pauseBackground() }
     }
 
@@ -1032,6 +1036,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // The heard sounds, split into words by how they lined up with the phrase's words.
         val heardText = result.words.map { it.heard }.filter { it.isNotEmpty() }.joinToString(" ")
             .ifEmpty { SoundRecognizer.display(sounds) }
+        // ZIPA has heard all it will of this try; after a long one it gives its memory back before
+        // Gemma answers.
+        withContext(Dispatchers.Default) { zipa?.releaseIfGrown() }
         return Graded(transcript, heardText, result, Recording(audio))
     }
 
@@ -1079,7 +1086,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun expectedSounds(phrase: String, audio: Audio): List<RefWord> {
         val isolated = wordsOf(phrase).map { w -> RefWord(w, wordSounds(w)) }
-        return withShownSounds(phrase, Matching.segmentReference(checkNotNull(zipa).sounds(audio), isolated))
+        val heard = checkNotNull(zipa).sounds(audio)
+        // A long phrase grows ZIPA's memory as a long recording does.
+        zipa?.releaseIfGrown()
+        return withShownSounds(phrase, Matching.segmentReference(heard, isolated))
     }
 
     /**
