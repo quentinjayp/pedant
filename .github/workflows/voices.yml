@@ -1,0 +1,59 @@
+name: Voices
+
+# Packages Piper voices that sherpa-onnx doesn't host itself, with tools/package_piper_voice.py,
+# and publishes them on the "voices" release, where the app downloads them from. Runs when the list
+# below or the packaging script changes, or on demand.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/offline-ai-language-app-v3widq, main]
+    paths:
+      - .github/workflows/voices.yml
+      - tools/package_piper_voice.py
+
+permissions:
+  contents: write
+
+env:
+  # Each voice's folder in rhasspy/piper-voices on Hugging Face.
+  VOICES: uk/uk_UA/tetiana/high
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Package the voices
+        run: |
+          set -eu
+          pip install --quiet onnx
+          mkdir -p out
+          for path in $VOICES; do
+            voice="$(echo "$path" | cut -d/ -f2)-$(echo "$path" | cut -d/ -f3)-$(echo "$path" | cut -d/ -f4)"
+            base="https://huggingface.co/rhasspy/piper-voices/resolve/main/$path"
+            mkdir -p "src/$voice"
+            for f in "$voice.onnx" "$voice.onnx.json" MODEL_CARD; do
+              curl -fsSL --retry 3 -o "src/$voice/$f" "$base/$f"
+            done
+            python3 tools/package_piper_voice.py "src/$voice/$voice.onnx" "src/$voice/$voice.onnx.json" "pkg/$voice"
+            cp "pkg/$voice/$voice.onnx" "out/$voice.onnx"
+            cp "pkg/$voice/tokens.txt" "out/$voice.tokens.txt"
+            cp "src/$voice/MODEL_CARD" "out/$voice.MODEL_CARD.txt"
+          done
+          ls -l out
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: voices
+          name: Voices
+          target_commitish: ${{ github.sha }}
+          make_latest: false
+          files: out/*
+          body: |
+            Piper voices (https://github.com/rhasspy/piper) packaged for sherpa-onnx by
+            tools/package_piper_voice.py, for voices sherpa-onnx doesn't host itself. The app
+            downloads <voice>.onnx and <voice>.tokens.txt. Each voice's licence is in its
+            MODEL_CARD file here.

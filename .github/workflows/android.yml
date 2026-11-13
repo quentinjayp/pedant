@@ -78,6 +78,11 @@ jobs:
               if echo "$files" | grep -qx "$v.onnx" && echo "$files" | grep -qx tokens.txt && echo "$files" | grep -q '^espeak-ng-data/'; then
                 ok=$v; break
               fi
+              # Or packaged by this app, on its "voices" release (voices.yml).
+              own="https://github.com/$GITHUB_REPOSITORY/releases/download/voices/$v"
+              if curl -fsIL -o /dev/null "$own.onnx" && curl -fsIL -o /dev/null "$own.tokens.txt"; then
+                ok="$v (this app's release)"; break
+              fi
               echo "  missing $v"
             done
             if [ -n "$ok" ]; then echo "OK $lang: $ok"; else echo "NO VOICE $lang"; fail=1; fi
@@ -137,7 +142,18 @@ jobs:
           mkdir -p voices && cd voices
           # Each language's voices, in the app's order; a missing one is skipped like the app does.
           for v in $(grep -oE '"[a-z]{2}_[A-Z]{2}-[A-Za-z0-9_]+-(x_low|low|medium|high)"' ../app/src/main/java/com/pedant/app/Languages.kt | tr -d '"'); do
-            curl -fsSL "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-$v.tar.bz2" | tar xj || echo "missing $v"
+            curl -fsSL "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-$v.tar.bz2" | tar xj && continue
+            # Or packaged by this app, on its "voices" release, with espeak-ng's data from another voice.
+            own="https://github.com/$GITHUB_REPOSITORY/releases/download/voices/$v"
+            mkdir -p "vits-piper-$v"
+            if curl -fsSL -o "vits-piper-$v/$v.onnx" "$own.onnx" && curl -fsSL -o "vits-piper-$v/tokens.txt" "$own.tokens.txt"; then
+              echo "$v from this app's release"
+            else
+              rm -rf "vits-piper-$v"; echo "missing $v"
+            fi
+          done
+          for d in vits-piper-*; do
+            [ -d "$d/espeak-ng-data" ] || cp -r vits-piper-en_US-lessac-medium/espeak-ng-data "$d/"
           done
       - name: List the Piper voices for each language
         run: python tools/list_piper_voices.py

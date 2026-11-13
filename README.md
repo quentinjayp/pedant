@@ -22,6 +22,11 @@ GPL-3.0-or-later. See [LICENSE](LICENSE).
 The logo is the capital P from [Potta One](https://fonts.google.com/specimen/Potta+One) by the Potta Project Authors, used
 under the SIL Open Font License 1.1 (see [licenses/PottaOne-OFL.txt](licenses/PottaOne-OFL.txt)).
 
+Voices are [Piper](https://github.com/rhasspy/piper) voices, downloaded on first use: most as
+packaged by sherpa-onnx, and a few that sherpa-onnx doesn't host (the Ukrainian voice, tetiana,
+Apache 2.0, from [ukrainian-tts-datasets](https://github.com/egorsmkv/ukrainian-tts-datasets))
+packaged by `tools/package_piper_voice.py` and published on this repository's `voices` release.
+
 The word dictionaries are a separate download, not part of the app. They are built from
 [English Wiktionary](https://en.wiktionary.org), text by Wiktionary contributors, and are licensed
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). They were extracted with

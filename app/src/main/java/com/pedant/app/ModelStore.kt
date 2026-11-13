@@ -16,9 +16,9 @@ import java.security.MessageDigest
 import java.util.zip.GZIPInputStream
 import kotlin.coroutines.coroutineContext
 
-/** A file in a Hugging Face model repository. */
-data class HfFile(val repo: String, val path: String, val size: Long) {
-    val url get() = "https://huggingface.co/$repo/resolve/main/$path"
+/** A file to download: in a Hugging Face model repository, or at [directUrl]. */
+data class HfFile(val repo: String, val path: String, val size: Long, val directUrl: String? = null) {
+    val url get() = directUrl ?: "https://huggingface.co/$repo/resolve/main/$path"
 }
 
 /**
@@ -126,19 +126,24 @@ class ModelStore(context: Context) {
 
     /**
      * Downloads the first available Piper voice for [language], plus espeak-ng's data the first
-     * time, and returns the voice's name.
+     * time, and returns the voice's name. Voices come from sherpa-onnx's packaging on Hugging Face,
+     * or, for the ones it doesn't host, from this app's own "voices" release (see voices.yml).
      */
     suspend fun downloadVoice(language: Language, onProgress: (Long, Long, String) -> Unit): String =
         withContext(Dispatchers.IO) {
             val (voice, files) = language.piperVoices.firstNotNullOfOrNull { v ->
                 runCatching { v to listRepo("csukuangfj/vits-piper-$v") }.getOrNull()
+                    ?: runCatching { v to ownVoice(v) }.getOrNull()
             } ?: throw IOException("No voice found for ${language.englishName}")
             val jobs = mutableListOf<Pair<HfFile, File>>()
             files.filter { it.path == "$voice.onnx" || it.path == "tokens.txt" }
                 .forEach { jobs += it to File(voiceDir(voice), it.path) }
             val needEspeak = !isReady(espeakData)
             if (needEspeak) {
-                files.filter { it.path.startsWith("espeak-ng-data/") }
+                // espeak-ng's data is the same in every packaged voice; take it from one of sherpa-onnx's.
+                val source = files.takeIf { list -> list.any { it.path.startsWith("espeak-ng-data/") } }
+                    ?: listRepo(ESPEAK_SOURCE)
+                source.filter { it.path.startsWith("espeak-ng-data/") }
                     .forEach { jobs += it to File(root, it.path) }
             }
             downloadAll(jobs, onProgress)
@@ -279,6 +284,25 @@ class ModelStore(context: Context) {
         throw IOException("Too many redirects for $url")
     }
 
+    /** [voice]'s model and symbols from this app's "voices" release, as files named like sherpa-onnx's. */
+    private fun ownVoice(voice: String): List<HfFile> = listOf(
+        "$voice.onnx" to "$voice.onnx",
+        "tokens.txt" to "$voice.tokens.txt",
+    ).map { (path, published) ->
+        val url = "$VOICE_RELEASE/$published"
+        HfFile("", path, remoteSize(url), directUrl = url)
+    }
+
+    /** The size of the file at [url], which must exist. */
+    private fun remoteSize(url: String): Long {
+        val conn = open(url, 0)
+        try {
+            return conn.contentLengthLong.coerceAtLeast(0L)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     private fun listRepo(repo: String): List<HfFile> {
         val conn = open("https://huggingface.co/api/models/$repo/tree/main?recursive=true", 0)
         val body = conn.inputStream.use { it.readBytes().toString(Charsets.UTF_8) }
@@ -307,6 +331,10 @@ class ModelStore(context: Context) {
         private const val DICTIONARY_MANIFEST =
             "https://raw.githubusercontent.com/quentinjayp/pedant/HEAD/dictionaries/manifest.json"
         private const val DICTIONARY_RELEASES = "https://github.com/quentinjayp/pedant/releases/download"
+        /** Voices packaged by this app (.github/workflows/voices.yml). */
+        private const val VOICE_RELEASE = "https://github.com/quentinjayp/pedant/releases/download/voices"
+        /** A sherpa-onnx voice to take espeak-ng's data from, for a voice packaged without it. */
+        private const val ESPEAK_SOURCE = "csukuangfj/vits-piper-en_US-lessac-medium"
         const val ZIPA_REPO = "anyspeech/zipa-large-crctc-500k"
         val ASR_REPOS = listOf(
             "csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12",
