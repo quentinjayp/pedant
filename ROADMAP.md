@@ -30,6 +30,13 @@ Ideas for later. Nothing here is being built yet.
   scoring the model's translations by their similarity to the references, and produces a report of
   whether it's better or worse. The job reports only; it never blocks a build.
 
+## Testing
+
+- **Calibration with the app's own scoring code.** The calibration tool holds a hand-kept Python
+  copy of the app's scoring rules, which can drift from the app. Instead, Python only records what
+  the recognizers heard, and a Kotlin test scores it with the app's real code, the way the
+  dictionary report works.
+
 ## Settings
 
 - **Your own language.** Choose the language you speak (English today) for translations, meanings
