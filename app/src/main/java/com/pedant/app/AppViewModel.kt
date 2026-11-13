@@ -386,6 +386,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** How a conversation starts. */
+    private sealed interface Start {
+        /** The saved conversation, continued where it was left. */
+        class Continue(val saved: SavedConversation) : Start
+
+        /** A new one that opens with a line written earlier: shipped with the app, or saved on the phone. */
+        class Opened(val key: String, val opening: Opening) : Start
+
+        /** A new one that Gemma opens now; its line is saved under [key] for next time. */
+        class Fresh(val key: String) : Start
+    }
+
     /**
      * Opens a conversation in [lang]: a new one, or [resume] (the saved one). The page opens straight
      * away; Gemma and the voice get ready behind it, and talking waits until they are.
@@ -396,72 +408,51 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             // Stop anything left from the last conversation before its voice is released.
             stopConversationWork()
             conversationScope.launch {
-                val voice = try {
-                    store.installedVoice(lang)
-                        ?: withProgress("Downloading the ${lang.englishName} voice") { report -> store.downloadVoice(lang, report) }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Throwable) {
-                    error = "Could not start: ${e.message}"
-                    return@launch
+                val voice = voiceFor(lang) ?: return@launch
+                val start = when {
+                    resume != null -> Start.Continue(resume)
+                    else -> {
+                        val key = Tutor.openingKey(lang, scenario, register)
+                        withContext(Dispatchers.IO) { openings.get(key) }?.let { Start.Opened(key, it) } ?: Start.Fresh(key)
+                    }
                 }
-                val openingKey = Tutor.openingKey(lang, scenario, register)
-                val opening = if (resume != null) null else withContext(Dispatchers.IO) { openings.get(openingKey) }
-
-                // Open the conversation straight away (with the saved opening, or the conversation
-                // being continued).
-                openDictionary(lang)
-                language = lang
-                chat.clear()
-                resume?.let { chat.addAll(it.chat) }
-                practice = null
-                lastRecording = if (resume != null) withContext(Dispatchers.IO) { loadRecording() } else null
-                if (resume == null) withContext(Dispatchers.IO) { recordingFile.delete() }
-                startDrill(null)
-                editableIndex = resume?.editableIndex
-                busy = Busy.Starting
-                screen = Screen.Conversation
-                opening?.let { chat += ChatItem.Tutor(it.reply, it.english) }
-                conversationScope.launch { checkDictionary(lang) }
-
+                showConversation(lang, start)
                 try {
                     diagnostics.step = "Starting a ${lang.englishName} session and loading the $voice voice"
                     coroutineScope {
                         // Gemma reads its instructions while the voice loads and the opening plays.
-                        val started = async(Dispatchers.Default) {
-                            val earlier = resume?.history
-                                ?: opening?.let { listOf(Tutor.Turn(true, Instructions.start(register)), Tutor.Turn(false, "REPLY: ${it.reply}")) }
-                                ?: emptyList()
+                        val gemmaReady = async(Dispatchers.Default) {
+                            val earlier = when (start) {
+                                is Start.Continue -> start.saved.history
+                                is Start.Opened -> listOf(
+                                    Tutor.Turn(true, Instructions.start(register)),
+                                    Tutor.Turn(false, "REPLY: ${start.opening.reply}"),
+                                )
+                                is Start.Fresh -> emptyList()
+                            }
                             checkNotNull(tutor).startConversation(lang, scenario, earlier)
                             diagnostics.log("Gemma ready for the ${lang.englishName} session")
                         }
-                        withContext(Dispatchers.Default) {
-                            if (ttsVoice != voice) {
-                                tts?.release()
-                                tts = TextToSpeech(store, voice, lang::espeakText, getApplication<Application>().cacheDir)
-                                ttsVoice = voice
-                                wordSoundsCache.clear()
-                                diagnostics.log("Loaded the $voice voice")
+                        loadVoice(lang, voice)
+                        when (start) {
+                            is Start.Continue -> {
+                                // Back to the phrase being practised, with the tries made so far.
+                                start.saved.drillPhrase?.let { phrase ->
+                                    val audio = withContext(Dispatchers.Default) { checkNotNull(tts).synthesize(phrase) }
+                                    drill = Drill(phrase, audio, start.saved.drillWords)
+                                    drillAttempts = start.saved.drillAttempts
+                                }
+                                gemmaReady.await()
                             }
-                        }
-                        if (resume != null) {
-                            // Back to the phrase being practised, with the tries made so far.
-                            resume.drillPhrase?.let { phrase ->
-                                val audio = withContext(Dispatchers.Default) { checkNotNull(tts).synthesize(phrase) }
-                                drill = Drill(phrase, audio, resume.drillWords)
-                                drillAttempts = resume.drillAttempts
+                            is Start.Opened -> {
+                                playOpening(start.key, voice, start.opening.reply)
+                                busy = Busy.Starting
+                                gemmaReady.await()
                             }
-                            started.await()
-                            diagnostics.step = null
-                        } else if (opening != null) {
-                            playOpening(openingKey, voice, opening.reply)
-                            busy = Busy.Starting
-                            started.await()
-                            diagnostics.step = null
-                        } else {
-                            started.await()
-                            diagnostics.step = null
-                            runTurn(Instructions.start(register), saveOpening = openingKey to voice)
+                            is Start.Fresh -> {
+                                gemmaReady.await()
+                                runTurn(Instructions.start(register), saveOpening = start.key to voice)
+                            }
                         }
                     }
                 } catch (e: CancellationException) {
@@ -473,6 +464,52 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     busy = Busy.Idle
                 }
             }
+        }
+    }
+
+    /** [lang]'s voice, downloaded first if it isn't here; null (with [error] set) if that fails. */
+    private suspend fun voiceFor(lang: Language): String? = try {
+        store.installedVoice(lang)
+            ?: withProgress("Downloading the ${lang.englishName} voice") { report -> store.downloadVoice(lang, report) }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        error = "Could not start: ${e.message}"
+        null
+    }
+
+    /** Shows the conversation page straight away, with what there is to show before Gemma is ready. */
+    private suspend fun showConversation(lang: Language, start: Start) {
+        val saved = (start as? Start.Continue)?.saved
+        openDictionary(lang)
+        language = lang
+        chat.clear()
+        saved?.let { chat.addAll(it.chat) }
+        practice = null
+        lastRecording = withContext(Dispatchers.IO) {
+            if (saved != null) {
+                loadRecording()
+            } else {
+                recordingFile.delete()
+                null
+            }
+        }
+        startDrill(null)
+        editableIndex = saved?.editableIndex
+        busy = Busy.Starting
+        screen = Screen.Conversation
+        if (start is Start.Opened) chat += ChatItem.Tutor(start.opening.reply, start.opening.english)
+        conversationScope.launch { checkDictionary(lang) }
+    }
+
+    /** Loads [voice] for speaking [lang], unless it's the one already loaded. */
+    private suspend fun loadVoice(lang: Language, voice: String) = withContext(Dispatchers.Default) {
+        if (ttsVoice != voice) {
+            tts?.release()
+            tts = TextToSpeech(store, voice, lang::espeakText, getApplication<Application>().cacheDir)
+            ttsVoice = voice
+            wordSoundsCache.clear()
+            diagnostics.log("Loaded the $voice voice")
         }
     }
 
