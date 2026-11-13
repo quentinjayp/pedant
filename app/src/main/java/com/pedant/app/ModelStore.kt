@@ -101,7 +101,7 @@ class ModelStore(context: Context) {
 
     /**
      * Deletes downloaded voices no longer needed: a fallback once its language's first choice is
-     * downloaded (lada, once tetiana is here), and any voice no language uses.
+     * downloaded, and any voice no language uses (such as Ukrainian's old voice, lada).
      */
     fun deleteUnusedVoices() {
         val keep = LANGUAGES.flatMap { lang ->
