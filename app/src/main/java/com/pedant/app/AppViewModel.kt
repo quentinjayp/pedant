@@ -94,6 +94,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         Instructions.load(app)
+        loadLanguages(app)
     }
 
     private val store = ModelStore(app)

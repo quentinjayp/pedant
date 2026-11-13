@@ -1,5 +1,6 @@
 """
-The app's languages, read from Languages.kt: the one place the tools and workflows read them.
+The app's languages, read from the app's own list (assets/languages.json): the one place the tools
+and workflows read them.
 
     python3 tools/app_languages.py
 
@@ -7,21 +8,20 @@ prints a line per language: its code, English name, Piper voice and espeak-ng vo
 """
 
 import collections
+import json
 import os
-import re
 import unicodedata
 
-LANGUAGES_KT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app/src/main/java/com/pedant/app/Languages.kt")
+LANGUAGES_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "app/src/main/assets/languages.json")
 
 Language = collections.namedtuple("Language", "code name native voice espeak")
 
-_PATTERN = re.compile(r'Language\("([a-z]{2})", "([^"]+)", "([^"]+)", "([^"]+)".*espeakVoice = "([^"]+)"')
 
-
-def languages(path=LANGUAGES_KT):
-    """Every language in Languages.kt, in its order."""
-    with open(path, encoding="utf-8") as f:
-        return [Language(*m.groups()) for m in map(_PATTERN.search, f) if m]
+def languages():
+    """Every language of the app, in its order."""
+    with open(LANGUAGES_JSON, encoding="utf-8") as f:
+        return [Language(l["code"], l["englishName"], l["nativeName"], l["piperVoice"], l["espeakVoice"])
+                for l in json.load(f)["languages"]]
 
 
 def dictionary_key(word):

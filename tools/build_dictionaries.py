@@ -14,7 +14,7 @@ with none keeps Wiktionary's order.
 
     python3 tools/build_dictionaries.py --list-treebanks   # the UD_* repositories to clone into ud/
     curl -sSL https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz | gzip -dc \
-        | python3 tools/build_dictionaries.py --out out --ud ud --languages app/src/main/java/com/pedant/app/Languages.kt
+        | python3 tools/build_dictionaries.py --out out --ud ud
 
 Each file holds no build date, so an unchanged dictionary gives a byte-identical file.
 
@@ -265,7 +265,6 @@ def open_db(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out")
-    ap.add_argument("--languages", help="Languages.kt, to check every app language is covered")
     ap.add_argument("--ud", help="the folder the UD_* treebanks are cloned into")
     ap.add_argument("--list-treebanks", action="store_true", help="print the UD_* repositories to clone")
     ap.add_argument("--forms", action="store_true", help="add inflected forms from Wiktionary's tables")
@@ -273,10 +272,10 @@ def main():
     if args.list_treebanks:
         print("\n".join(f"UD_{t}" for ts in UD_TREEBANKS.values() for t in ts))
         return
-    if not args.out or not args.languages:
-        ap.error("--out and --languages are required")
+    if not args.out:
+        ap.error("--out is required")
 
-    codes = [lang.code for lang in languages(args.languages)]
+    codes = [lang.code for lang in languages()]
     missing = [c for c in codes if c not in WIKTIONARY_NAMES]
     if missing:
         sys.exit(f"No Wiktionary name for app languages: {missing}")

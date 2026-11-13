@@ -12,7 +12,7 @@ on:
     branches: [claude/offline-ai-language-app-v3widq, main]
     paths:
       - app/src/main/assets/instructions.json
-      - app/src/main/java/com/pedant/app/Languages.kt
+      - app/src/main/assets/languages.json
       - tools/build_openings.py
       - .github/workflows/openings.yml
   workflow_dispatch:

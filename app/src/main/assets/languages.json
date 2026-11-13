@@ -1,0 +1,32 @@
+{
+  "_about": "The languages the app can hold a conversation in: those supported by Gemma 4, Omnilingual ASR, ZIPA and Piper together. Read by the app (Languages.kt) and by the tools (tools/app_languages.py). piperVoice is the voice that speaks the language; espeakVoice is the espeak-ng voice it reads text with (its .onnx.json's espeak.voice); ttsRewrites fix text espeak-ng misreads, applied before it reads any. Arabic was removed: it's written without most vowels, so its expected sounds (espeak-ng's) are often guesses, and the app teaches and judges by sounds.",
+  "languages": [
+    {"code": "cs", "englishName": "Czech", "nativeName": "Čeština", "piperVoice": "cs_CZ-jirka-medium", "espeakVoice": "cs"},
+    {"code": "da", "englishName": "Danish", "nativeName": "Dansk", "piperVoice": "da_DK-talesyntese-medium", "espeakVoice": "da"},
+    {"code": "de", "englishName": "German", "nativeName": "Deutsch", "piperVoice": "de_DE-thorsten-medium", "espeakVoice": "de"},
+    {"code": "el", "englishName": "Greek", "nativeName": "Ελληνικά", "piperVoice": "el_GR-rapunzelina-low", "espeakVoice": "el"},
+    {"code": "en", "englishName": "English", "nativeName": "English", "piperVoice": "en_US-lessac-medium", "espeakVoice": "en-us"},
+    {"code": "es", "englishName": "Spanish", "nativeName": "Español", "piperVoice": "es_ES-davefx-medium", "espeakVoice": "es"},
+    {"code": "fi", "englishName": "Finnish", "nativeName": "Suomi", "piperVoice": "fi_FI-harri-medium", "espeakVoice": "fi"},
+    {"code": "fr", "englishName": "French", "nativeName": "Français", "piperVoice": "fr_FR-siwis-medium", "espeakVoice": "fr", "ttsRewrites": [{"about": "espeak-ng reads a French hyphenated \"-y\" at the end of a word (\"Allons-y\", \"Vas-y\") as the letter's name, \"i grec\"; \"-i\" is read correctly.", "pattern": "(?<=\\p{L})-[yY](?![\\p{L}\\p{N}])", "replacement": "-i"}]},
+    {"code": "hi", "englishName": "Hindi", "nativeName": "हिन्दी", "piperVoice": "hi_IN-pratham-medium", "espeakVoice": "hi"},
+    {"code": "hu", "englishName": "Hungarian", "nativeName": "Magyar", "piperVoice": "hu_HU-anna-medium", "espeakVoice": "hu"},
+    {"code": "id", "englishName": "Indonesian", "nativeName": "Bahasa Indonesia", "piperVoice": "id_ID-news_tts-medium", "espeakVoice": "id"},
+    {"code": "it", "englishName": "Italian", "nativeName": "Italiano", "piperVoice": "it_IT-paola-medium", "espeakVoice": "it"},
+    {"code": "nl", "englishName": "Dutch", "nativeName": "Nederlands", "piperVoice": "nl_BE-nathalie-medium", "espeakVoice": "nl"},
+    {"code": "no", "englishName": "Norwegian", "nativeName": "Norsk", "piperVoice": "no_NO-talesyntese-medium", "espeakVoice": "nb"},
+    {"code": "pl", "englishName": "Polish", "nativeName": "Polski", "piperVoice": "pl_PL-gosia-medium", "espeakVoice": "pl"},
+    {"code": "pt", "englishName": "Portuguese", "nativeName": "Português", "piperVoice": "pt_BR-faber-medium", "espeakVoice": "pt-br"},
+    {"code": "ro", "englishName": "Romanian", "nativeName": "Română", "piperVoice": "ro_RO-mihai-medium", "espeakVoice": "ro"},
+    {"code": "ru", "englishName": "Russian", "nativeName": "Русский", "piperVoice": "ru_RU-irina-medium", "espeakVoice": "ru"},
+    {"code": "sk", "englishName": "Slovak", "nativeName": "Slovenčina", "piperVoice": "sk_SK-lili-medium", "espeakVoice": "sk"},
+    {"code": "sl", "englishName": "Slovenian", "nativeName": "Slovenščina", "piperVoice": "sl_SI-artur-medium", "espeakVoice": "sl"},
+    {"code": "sr", "englishName": "Serbian", "nativeName": "Српски", "piperVoice": "sr_RS-serbski_institut-medium", "espeakVoice": "sr"},
+    {"code": "sv", "englishName": "Swedish", "nativeName": "Svenska", "piperVoice": "sv_SE-nst-medium", "espeakVoice": "sv"},
+    {"code": "sw", "englishName": "Swahili", "nativeName": "Kiswahili", "piperVoice": "sw_CD-lanfrica-medium", "espeakVoice": "sw"},
+    {"code": "tr", "englishName": "Turkish", "nativeName": "Türkçe", "piperVoice": "tr_TR-dfki-medium", "espeakVoice": "tr"},
+    {"code": "uk", "englishName": "Ukrainian", "nativeName": "Українська", "piperVoice": "uk_UA-tetiana-high", "espeakVoice": "uk"},
+    {"code": "vi", "englishName": "Vietnamese", "nativeName": "Tiếng Việt", "piperVoice": "vi_VN-vais1000-medium", "espeakVoice": "vi"},
+    {"code": "zh", "englishName": "Mandarin", "nativeName": "中文", "piperVoice": "zh_CN-huayan-medium", "espeakVoice": "cmn"}
+  ]
+}
