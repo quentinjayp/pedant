@@ -1339,14 +1339,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 // Only the latest attempt keeps a recording, so retries of older ones aren't kept.
                 val latest = p.chatIndex == latestAttemptIndex()
                 if (latest) keepRecording(p.chatIndex, graded.recording, r)
-                // Getting the phrase being practised right here counts as getting it right: the
-                // window closes and the conversation moves on, as from the main button.
-                val d = drill
-                val current = d != null && d.phrase == p.phrase &&
-                    chat.drop(p.chatIndex + 1).none { it is ChatItem.Say }
-                if (current && r.passed && old?.result?.passed == false) {
+                // Getting a failed phrase right here closes the window, so its card shows as correct.
+                // If it's the phrase being practised, that counts as getting it right: the
+                // conversation moves on, as from the main button.
+                if (r.passed && old?.result?.passed == false) {
+                    val d = drill
+                    val current = d != null && d.phrase == p.phrase &&
+                        chat.drop(p.chatIndex + 1).none { it is ChatItem.Say }
                     practice = null
-                    phraseDone(p.phrase)
+                    if (current) phraseDone(p.phrase)
                     return
                 }
                 val scores = "Words ${(r.wordScore * 100).toInt()}% · Sounds ${(r.soundScore * 100).toInt()}%"
@@ -1354,7 +1355,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     result = r,
                     hasRecording = latest,
                     note = when {
-                        better && r.passed && old?.result?.passed == false -> "Correct! $scores. The conversation now shows it as correct."
                         better -> "New best: $scores. Saved to the conversation."
                         else -> "This try: $scores. Your best stays in the conversation."
                     },
