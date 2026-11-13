@@ -442,8 +442,24 @@ private fun SetupScreen(vm: AppViewModel) {
             }
             PeachNotice("Use Wi-Fi. The download keeps going if you leave the app.")
             Spacer(Modifier.height(6.dp))
+            // The download's progress shows in a notification too, which needs permission on Android 13
+            // and later; it's asked for as the download starts (and it goes ahead either way).
+            val context = LocalContext.current
+            val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
             val p = vm.progress
-            if (p != null) ProgressBlock(p) else CtaButton("Download models", vm::downloadCore)
+            if (p != null) {
+                ProgressBlock(p)
+            } else {
+                CtaButton("Download models", {
+                    if (Build.VERSION.SDK_INT >= 33 &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                        PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    vm.downloadCore()
+                })
+            }
             vm.error?.let { PeachNotice(it) }
         }
     }
