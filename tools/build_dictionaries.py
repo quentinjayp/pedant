@@ -131,6 +131,31 @@ def split_ipa(ipa):
     return [p.strip() for p in parts if p.strip()]
 
 
+WIKILINK = re.compile(r"\[\[(?:[^\]|]*\|)?([^\]|]*)\]\]")
+
+
+def clean_gloss(gloss):
+    """A meaning without wiki link markup that Wiktextract left in ("[[Appendix:…|mi class]]" → "mi class")."""
+    return WIKILINK.sub(r"\1", gloss).strip()
+
+
+def fix_form_links(db):
+    """Some "form of" links carry the rest of their sentence ("Abend which was deprecated in the
+    spelling reform"); each is cut back to its longest start that is a word in the dictionary."""
+    fixed = 0
+    for row, base in db.execute("SELECT rowid, form_of FROM entries WHERE form_of LIKE '% %'").fetchall():
+        if db.execute("SELECT 1 FROM entries WHERE key = ? LIMIT 1", (key_of(base),)).fetchone():
+            continue
+        words = base.split(" ")
+        for n in range(len(words) - 1, 0, -1):
+            prefix = " ".join(words[:n]).rstrip(",;:")
+            if db.execute("SELECT 1 FROM entries WHERE key = ? LIMIT 1", (key_of(prefix),)).fetchone():
+                db.execute("UPDATE entries SET form_of = ? WHERE rowid = ?", (prefix, row))
+                fixed += 1
+                break
+    return fixed
+
+
 def pick_senses(senses):
     """A few short meanings, common senses first, and the word this is a form of, if any."""
     kept, form_of = [], None
@@ -142,7 +167,7 @@ def pick_senses(senses):
                 if link.get("word"):
                     form_of = link["word"]
                     break
-        gloss = s["glosses"][-1].strip()
+        gloss = clean_gloss(s["glosses"][-1])
         if len(gloss) > MAX_GLOSS:
             gloss = gloss[: MAX_GLOSS - 1].rstrip() + "…"
         if gloss and gloss not in kept:
@@ -268,6 +293,7 @@ def main():
     languages = {}
     for code, db in dbs.items():
         db.execute("CREATE INDEX entries_key ON entries (key)")
+        print(f"{code}: {fix_form_links(db):,} form links cut back to their word", file=sys.stderr)
         db.executemany(
             "INSERT INTO meta VALUES (?, ?)",
             [
