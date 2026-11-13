@@ -34,6 +34,19 @@ object Phonemizer {
     }
 
     /**
+     * [word]'s IPA as espeak-ng says it on its own, with its stress marks, for showing; null if
+     * espeak-ng can't be used.
+     */
+    @Synchronized
+    fun ipa(dataDir: File, voice: String, word: String): String? {
+        if (!loaded) return null
+        if (!started) started = runCatching { nativeInit(dataDir.path) }.getOrDefault(false)
+        if (!started) return null
+        return nativePhonemize(voice, word)?.replace(LANGUAGE_SWITCH, "")
+            ?.filterNot { it.isWhitespace() || it.isDigit() }?.ifEmpty { null }
+    }
+
+    /**
      * IPA as separate sounds, without stress marks, syllable breaks or links, espeak-ng's language
      * switches ("(en)" where it reads a "/" in English) or its tone numbers (Vietnamese, Mandarin;
      * ZIPA doesn't hear tones).

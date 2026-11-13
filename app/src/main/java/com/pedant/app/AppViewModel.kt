@@ -810,10 +810,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Works out the meaning and sounds of every word in [sentence] and stores them. */
     private suspend fun lookUpSentence(lang: Language, sentence: String) {
         val words = tappableWords(sentence).distinctBy { it.lowercase() }
-        // The dictionary first; ZIPA only for words it has no IPA for, Gemma only for words it lacks.
+        // The dictionary first; espeak-ng only for words it has no IPA for, Gemma only for words it lacks.
         val known = words.associateWith { fromDictionary(it) }
         val sounds = withContext(Dispatchers.Default) {
-            words.filter { known[it]?.ipa == null }.associateWith { w -> SoundRecognizer.display(wordSounds(w)) }
+            words.filter { known[it]?.ipa == null }.associateWith { w -> wordIpa(lang, w) }
         }
         val meanings = if (words.all { known[it] != null }) emptyMap() else try {
             Tutor.parseSentenceLookup(checkNotNull(tutor).lookUpSentence(lang, sentence))
@@ -836,13 +836,22 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         refreshOpenLookup()
     }
 
+    /**
+     * [word]'s IPA for the word bubble when the dictionary has none: espeak-ng's, as the voice is given
+     * it (ZIPA's hearing of the voice mishears it: "mår" came out /voːl/); ZIPA's only if espeak-ng
+     * can't be used.
+     */
+    private fun wordIpa(lang: Language, word: String): String {
+        val fixed = lang.ttsRewrites.fold(word) { t, (pattern, replacement) -> pattern.replace(t, replacement) }
+        return runCatching { Phonemizer.ipa(store.espeakData, lang.espeakVoice, fixed) }.getOrNull()
+            ?: SoundRecognizer.display(wordSounds(word))
+    }
+
     /** Looks up one word on its own, for a tapped word the sentence lookup missed. */
     private suspend fun lookUpAlone(lang: Language, word: String, sentence: String) {
         val key = word.lowercase() to sentence
         triedAlone += key
-        val sounds = lookupCache[key]?.sounds ?: withContext(Dispatchers.Default) {
-            SoundRecognizer.display(wordSounds(word))
-        }
+        val sounds = lookupCache[key]?.sounds ?: withContext(Dispatchers.Default) { wordIpa(lang, word) }
         val result = try {
             val meaning = Tutor.parseLookup(checkNotNull(tutor).lookUp(lang, word, sentence))
             WordLookup(word, sentence, meaning, Respell.fromIpa(sounds).ifEmpty { null }, sounds, loading = false)
