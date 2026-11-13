@@ -1107,7 +1107,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun checkAttempt(d: Drill, audio: Audio) {
         val graded = grade(d.phrase, d.refWords, audio)
         val result = graded.result
-        chat += ChatItem.Attempt(graded.transcript, graded.heardText, result, d.phrase)
+        val attempt = ChatItem.Attempt(graded.transcript, graded.heardText, result, d.phrase)
+        // Only the latest try at a phrase is shown: it takes the place of the try before it, right
+        // or wrong, so failed tries don't pile up.
+        if ((chat.lastOrNull() as? ChatItem.Attempt)?.phrase == d.phrase) chat[chat.lastIndex] = attempt else chat += attempt
         keepRecording(chat.lastIndex, graded.recording)
         if (result.passed) {
             phraseDone(d.phrase)
