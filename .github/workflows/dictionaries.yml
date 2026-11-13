@@ -108,3 +108,44 @@ jobs:
           gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName -q '.[].tagName' \
             | grep "^dictionaries-" | sort -rV | tail -n +3 \
             | xargs -r -n1 gh release delete --repo "$GITHUB_REPOSITORY" --cleanup-tag -y
+
+  sizes:
+    # Builds the dictionaries with inflected forms from Wiktionary's tables (--forms) and reports
+    # their sizes against the published ones. Publishes nothing. On a push whose message contains
+    # [dictsizes].
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[dictsizes]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Get the Universal Dependencies treebanks
+        run: |
+          mkdir -p ud
+          for repo in $(python3 tools/build_dictionaries.py --list-treebanks); do
+            git clone --quiet --depth 1 "https://github.com/UniversalDependencies/$repo" "ud/$repo" || echo "couldn't get $repo"
+          done
+      - name: Build the dictionaries with inflected forms
+        run: |
+          set -euo pipefail
+          pip install --quiet orjson
+          curl -fsSL --retry 3 https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz \
+            | gzip -dc \
+            | python3 tools/build_dictionaries.py --forms --out out --ud ud \
+                --languages app/src/main/java/com/pedant/app/Languages.kt
+      - name: Compare with the published dictionaries
+        run: |
+          python3 - <<'PY'
+          import json
+          old = json.load(open("dictionaries/manifest.json"))["languages"]
+          new = json.load(open("out/languages.json"))
+          print(f"{'':4}{'published':>12}{'with forms':>12}{'x':>6}{'entries now':>14}{'with forms':>14}")
+          for code in sorted(new):
+              o, n = old.get(code, {}), new[code]
+              ratio = n["bytes"] / o["bytes"] if o.get("bytes") else 0
+              print(f"{code:4}{o.get('bytes', 0) / 1e6:>10.1f}MB{n['bytes'] / 1e6:>10.1f}MB{ratio:>6.1f}"
+                    f"{o.get('entries', 0):>14,}{n['entries']:>14,}")
+          print(f"all {sum(v['bytes'] for v in old.values()) / 1e6:>10.1f}MB{sum(v['bytes'] for v in new.values()) / 1e6:>10.1f}MB")
+          PY

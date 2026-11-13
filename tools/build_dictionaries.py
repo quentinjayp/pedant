@@ -156,6 +156,11 @@ def fix_form_links(db):
     return fixed
 
 
+# A form's own description when Wiktionary doesn't link it to its base word (Swahili "yako": "mi
+# class inflection of -ako"): the base word is read from the end of it.
+UNLINKED_FORM = re.compile(r"\b(?:inflection|form) of (\S+?)[.,;]?$")
+
+
 def pick_senses(senses):
     """A few short meanings, common senses first, and the word this is a form of, if any."""
     kept, form_of = [], None
@@ -168,6 +173,10 @@ def pick_senses(senses):
                     form_of = link["word"]
                     break
         gloss = clean_gloss(s["glosses"][-1])
+        if form_of is None:
+            unlinked = UNLINKED_FORM.search(gloss)
+            if unlinked:
+                form_of = unlinked.group(1)
         if len(gloss) > MAX_GLOSS:
             gloss = gloss[: MAX_GLOSS - 1].rstrip() + "…"
         if gloss and gloss not in kept:
@@ -216,6 +225,40 @@ def ud_counts(code, ud_dir):
     return counts, used
 
 
+# Inflected forms (--forms): the forms Wiktionary lists in a word's conjugation or declension table
+# ("bekliyorum" under "beklemek") become entries of their own, "form of <word>", where the dictionary
+# has no entry for them. What form each is (person, tense...) is left out: the tables' labels are
+# sometimes shifted (Turkish "bekliyorum", I'm waiting, is labelled third person singular).
+SKIP_TABLE_TAGS = {"table-tags", "inflection-template", "canonical", "romanization", "class", "error-unknown-tag",
+                   "obsolete", "archaic", "dialectal", "rare", "nonstandard", "misspelling", "colloquial"}
+
+
+def table_forms(entry):
+    """(form, description) for each form in [entry]'s inflection table."""
+    word = entry.get("word") or ""
+    out = []
+    for f in entry.get("forms") or []:
+        form, tags = f.get("form"), f.get("tags") or []
+        if not form or form == word or " " in form or form.startswith("-") or not tags or SKIP_TABLE_TAGS & set(tags):
+            continue
+        out.append((form, f"form of {word}"))
+    return out
+
+
+def add_table_forms(db, freq):
+    """Adds the noted table forms the dictionary has no entry for, one per spelling and part of speech."""
+    rows = db.execute(
+        "SELECT key, word, pos, description, base FROM table_forms "
+        "WHERE key NOT IN (SELECT key FROM entries) GROUP BY key, pos ORDER BY key"
+    ).fetchall()
+    db.executemany(
+        "INSERT INTO entries VALUES (?, ?, ?, NULL, NULL, ?, ?, ?)",
+        [(k, w, pos, d, base, freq.get((k, pos), 0)) for k, w, pos, d, base in rows],
+    )
+    db.execute("DROP TABLE table_forms")
+    return len(rows)
+
+
 def open_db(path):
     if os.path.exists(path):
         os.remove(path)
@@ -225,6 +268,7 @@ def open_db(path):
         " meanings TEXT NOT NULL, form_of TEXT, freq INTEGER NOT NULL)"
     )
     db.execute("CREATE TABLE meta (name TEXT PRIMARY KEY, value TEXT)")
+    db.execute("CREATE TABLE table_forms (key TEXT, word TEXT, pos TEXT, description TEXT, base TEXT)")
     return db
 
 
@@ -234,6 +278,7 @@ def main():
     ap.add_argument("--languages", help="Languages.kt, to check every app language is covered")
     ap.add_argument("--ud", help="the folder the UD_* treebanks are cloned into")
     ap.add_argument("--list-treebanks", action="store_true", help="print the UD_* repositories to clone")
+    ap.add_argument("--forms", action="store_true", help="add inflected forms from Wiktionary's tables")
     args = ap.parse_args()
     if args.list_treebanks:
         print("\n".join(f"UD_{t}" for ts in UD_TREEBANKS.values() for t in ts))
@@ -276,6 +321,11 @@ def main():
         meanings, form_of = pick_senses(entry.get("senses"))
         if not meanings:
             continue
+        if args.forms and form_of is None:
+            dbs[code].executemany(
+                "INSERT INTO table_forms VALUES (?, ?, ?, ?, ?)",
+                [(key_of(f), f, entry.get("pos"), d, word) for f, d in table_forms(entry)],
+            )
         key = key_of(word)
         if rows[code].get(key, 0) >= MAX_ROWS_PER_WORD:
             continue
@@ -294,6 +344,9 @@ def main():
     for code, db in dbs.items():
         db.execute("CREATE INDEX entries_key ON entries (key)")
         print(f"{code}: {fix_form_links(db):,} form links cut back to their word", file=sys.stderr)
+        added = add_table_forms(db, freq[code])
+        stats[code]["entries"] += added
+        print(f"{code}: {added:,} forms added from inflection tables", file=sys.stderr)
         db.executemany(
             "INSERT INTO meta VALUES (?, ?)",
             [
