@@ -40,14 +40,18 @@ class Dictionary(file: File) : Closeable {
     }
 
     /**
-     * [word]'s entries, spelled as it is ("eu", not the initialism "EU"); failing that, in lower case
-     * (a capital at the start of a sentence); failing that, however they're spelled.
+     * [word]'s entries, spelled as it is ("eu", not the initialism "EU"). A word capitalised only at
+     * the start ("Dobrý", maybe the start of a sentence) also takes its lower-case entries, the
+     * most common first ("dobrý", good, before the surname). Failing that, however they're spelled.
      */
     private fun matching(word: String): List<Entry> {
         val all = entries(word)
         val exact = spelling(word)
-        return all.filter { spelling(it.word) == exact }
-            .ifEmpty { all.filter { spelling(it.word) == exact.lowercase(Locale.ROOT) } }
+        val lower = exact.lowercase(Locale.ROOT)
+        val capitalised = exact != lower && exact.drop(1) == lower.drop(1)
+        val wanted = if (capitalised) setOf(exact, lower) else setOf(exact)
+        return all.filter { spelling(it.word) in wanted }
+            .ifEmpty { all.filter { spelling(it.word) == lower } }
             .ifEmpty { all }
     }
 
