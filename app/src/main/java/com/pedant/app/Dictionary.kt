@@ -95,9 +95,11 @@ class Dictionary(file: File) : Closeable {
             if (base.isEmpty()) Sense(e.pos, e.meanings, note = null)
             else Sense(e.pos, base.flatMap { it.meanings }, note = e.meanings.first())
         }
-        val groups = senses.groupBy { it.pos }.map { (pos, group) ->
+        // A group per part of speech and, within it, per form: "den" (day) and "den" (genitive
+        // plural of dno, bottom) are both nouns but stay apart, each under its own label.
+        val groups = senses.groupBy { it.pos to it.note }.map { (key, group) ->
             Group(
-                listOfNotNull(posName(pos), group.firstNotNullOfOrNull { it.note }).joinToString(" · ").ifEmpty { null },
+                listOfNotNull(posName(key.first), key.second).joinToString(" · ").ifEmpty { null },
                 group.flatMap { it.meanings }.distinct().take(MAX_MEANINGS),
             )
         }
