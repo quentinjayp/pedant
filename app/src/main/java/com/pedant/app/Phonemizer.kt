@@ -33,10 +33,17 @@ object Phonemizer {
         return each.map(::symbols)
     }
 
-    /** IPA as separate sounds, without stress marks, syllable breaks or links. */
+    /**
+     * IPA as separate sounds, without stress marks, syllable breaks or links, espeak-ng's language
+     * switches ("(en)" where it reads a "/" in English) or its tone numbers (Vietnamese, Mandarin;
+     * ZIPA doesn't hear tones).
+     */
     fun symbols(ipa: String): List<String> =
-        Normalizer.normalize(ipa, Normalizer.Form.NFD).filterNot { it in DROP || it.isWhitespace() }.map { it.toString() }
+        Normalizer.normalize(ipa.replace(LANGUAGE_SWITCH, ""), Normalizer.Form.NFD)
+            .filterNot { it in DROP || it.isWhitespace() || it.isDigit() }
+            .map { it.toString() }
 
     private val SPACES = Regex("\\s+")
+    private val LANGUAGE_SWITCH = Regex("\\([a-z-]+\\)")
     private const val DROP = "ˈˌ.‿͜͡-"
 }
