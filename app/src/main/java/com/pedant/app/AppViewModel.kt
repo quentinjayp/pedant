@@ -60,8 +60,10 @@ data class WordLookup(
     val sounds: String? = null,
     val error: String? = null,
     val loading: Boolean = true,
-    /** The meaning comes from the downloaded dictionary, not Gemma. */
+    /** The meaning comes from the downloaded dictionary, not Gemma (whose meanings are labelled generated). */
     val fromDictionary: Boolean = false,
+    /** The IPA isn't the dictionary's but generated (espeak-ng's), and is labelled so. */
+    val soundsGenerated: Boolean = true,
     /** The dictionary's meanings, a group per part of speech, to lay out; [meaning] is the same as text. */
     val groups: List<Dictionary.Group>? = null,
 )
@@ -740,8 +742,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun fromDictionary(word: String): Dictionary.Description? =
         runCatching { dictionary?.describe(word) }.getOrNull()
 
-    private fun dictionaryLookup(word: String, sentence: String, d: Dictionary.Description, zipaSounds: String? = null): WordLookup {
-        val sounds = d.ipa ?: zipaSounds
+    private fun dictionaryLookup(word: String, sentence: String, d: Dictionary.Description, generatedSounds: String? = null): WordLookup {
+        val sounds = d.ipa ?: generatedSounds
         return WordLookup(
             word, sentence,
             meaning = d.text,
@@ -750,6 +752,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             sounds = sounds,
             loading = false,
             fromDictionary = true,
+            soundsGenerated = d.ipa == null,
         )
     }
 
