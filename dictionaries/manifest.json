@@ -1,13 +1,6 @@
 {
-  "checked": "2026-11-13T15:30:10Z",
+  "checked": "2026-11-13T17:29:44Z",
   "languages": {
-    "ar": {
-      "bytes": 19574691,
-      "entries": 855232,
-      "file": "ar.db.gz",
-      "sha256": "2edad88b87d21a8db9d75010023557a1e4db8587e4e2b6b4df329a31410ddb4f",
-      "with_ipa": 21055
-    },
     "cs": {
       "bytes": 11375526,
       "entries": 448984,
@@ -199,7 +192,7 @@
     }
   },
   "license": "CC BY-SA 4.0. Text from Wiktionary contributors; extracted with Wiktextract (Ylonen, LREC 2022). Part-of-speech counts from Universal Dependencies treebanks (CC BY-SA or CC BY).",
-  "release": "dictionaries-2026-11-13-r80",
+  "release": "dictionaries-2026-11-13-r86",
   "source": "English Wiktionary, via kaikki.org (Wiktextract)",
-  "version": "2026-11-13-r80"
+  "version": "2026-11-13-r86"
 }
