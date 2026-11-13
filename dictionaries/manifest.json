@@ -1,198 +1,198 @@
 {
-  "checked": "2026-11-13T17:29:44Z",
+  "checked": "2026-11-13T19:46:08Z",
   "languages": {
     "cs": {
-      "bytes": 11375526,
+      "bytes": 11138885,
       "entries": 448984,
       "file": "cs.db.gz",
-      "sha256": "5a919da8f429affd871e6694242b694192b1051e466cae7e082d443f124688ab",
+      "sha256": "ff9979c6822911509699dc766d9446f49d5ad53dff0dd80af2051c310691ad76",
       "with_ipa": 71443
     },
     "da": {
-      "bytes": 3897625,
+      "bytes": 3814502,
       "entries": 134602,
       "file": "da.db.gz",
-      "sha256": "2a8a66e1cbfa89220934d2c675c17d442fe9735234659806ea14fcd5175317fd",
+      "sha256": "dc3c20b438246bf2a3778ac7a6f9bccc342ee7ca37bfea7a2f1d1b921c88bd36",
       "with_ipa": 10041
     },
     "de": {
-      "bytes": 16751141,
+      "bytes": 16297627,
       "entries": 497997,
       "file": "de.db.gz",
-      "sha256": "0e1c255ecd04c45f35e1e0e4ae2839c26e86ed31d698b5499db211d6c9157f82",
+      "sha256": "fe47698e0688f2e6b98048eee49e8740c8f8328f192d400290a93c22c7c73b06",
       "with_ipa": 84013
     },
     "el": {
-      "bytes": 7689254,
-      "entries": 251026,
+      "bytes": 7608871,
+      "entries": 251002,
       "file": "el.db.gz",
-      "sha256": "ca018b3930711a7bd434d078310adb0c8c1b961664e0ff2eee87292f4b2009f3",
+      "sha256": "dcb174a2ef12252a0b9974009c30a0f9f0ed483f7e11f245b1a6bc184fb74334",
       "with_ipa": 21685
     },
     "en": {
-      "bytes": 70304149,
-      "entries": 1529722,
+      "bytes": 69139908,
+      "entries": 1529676,
       "file": "en.db.gz",
-      "sha256": "764514c9be9f91ea09da906589ca2e3e7d7234ec5143601537e931e2486ba569",
+      "sha256": "6d2bb5ddd34ec7a0f8fc6912469159fa0eba378af6b8bb5da526f2b445a6494d",
       "with_ipa": 137679
     },
     "es": {
-      "bytes": 34346750,
+      "bytes": 32201165,
       "entries": 1230270,
       "file": "es.db.gz",
-      "sha256": "c8ac78280b11b8fb793a07b5d6e6a4ce77037669416c3b83ec7304c2c17338eb",
+      "sha256": "a1ee6fa4fba22c13ea2ceb57438a62c95705d9be93897f0832403bf2c4af0060",
       "with_ipa": 173793
     },
     "fi": {
-      "bytes": 14509056,
+      "bytes": 12107293,
       "entries": 267786,
       "file": "fi.db.gz",
-      "sha256": "81a6db700bf0b5c69068992424c48a08a73b745221cc99365ec50d639b185425",
+      "sha256": "4e91d11b058f8f49945a0b15f5adc323a571f063354de59586248e3ea29c199f",
       "with_ipa": 183752
     },
     "fr": {
-      "bytes": 15121486,
+      "bytes": 14677097,
       "entries": 457776,
       "file": "fr.db.gz",
-      "sha256": "cd802bff016607b36095021bb857386747f4debecc47373ace1a89da4973902d",
+      "sha256": "52e260dfb0bba9180eec3c46b5787010a6d0852b9a16d8de11554b7dd3d46805",
       "with_ipa": 130994
     },
     "hi": {
-      "bytes": 3861843,
+      "bytes": 3507547,
       "entries": 103120,
       "file": "hi.db.gz",
-      "sha256": "036d3a7893eca716a37837ae58babcc958a52120a913f2fb90afa7d5e5912c8f",
+      "sha256": "5cb735aefd29a4cb574864586d38f218ef95fb59adaf8d737341494e0ba3d0b2",
       "with_ipa": 37212
     },
     "hu": {
-      "bytes": 38842747,
+      "bytes": 38527165,
       "entries": 1784816,
       "file": "hu.db.gz",
-      "sha256": "b538ac8b41711fec8ff156ad5ed14bcef34ce644f95760fdc44da1402280b2c0",
+      "sha256": "f7679673dc5f52fffdca77fd267a3505bf896c221415fd92dbb0a1df646ec9b2",
       "with_ipa": 73884
     },
     "id": {
-      "bytes": 2834022,
+      "bytes": 2615620,
       "entries": 57769,
       "file": "id.db.gz",
-      "sha256": "ac1e5869193e9b51ed896b96458ca6d28e5916d46917636d2a5456392c428396",
+      "sha256": "4c60fb4e91ab159915c692c4ef7a3f0bf3439fa4004c55535631bb3fa5d0c7fc",
       "with_ipa": 30482
     },
     "it": {
-      "bytes": 27866124,
-      "entries": 1035588,
+      "bytes": 27481359,
+      "entries": 1035585,
       "file": "it.db.gz",
-      "sha256": "bdb0aaa9a1e9f4cf3ec7d135537c27df3b390a5165576d0045ba3fd0988d724b",
+      "sha256": "38b9dce910b2120086b102d58d065dccfe75afc8dfce77a6e446281ada8ca501",
       "with_ipa": 104837
     },
     "nl": {
-      "bytes": 7744624,
+      "bytes": 7526328,
       "entries": 216067,
       "file": "nl.db.gz",
-      "sha256": "70e3ed006ff19f9c9ca1483fad362bd7e0e98976e51989e04a896c3f794161fe",
+      "sha256": "97e1a5a101711d54dcfd987ecd9d47cc4e82152975b62ff4310808d34f2027c1",
       "with_ipa": 56439
     },
     "no": {
-      "bytes": 3218793,
+      "bytes": 3131478,
       "entries": 93071,
       "file": "no.db.gz",
-      "sha256": "952c73485bd75e00f211fa7854af105fb3245f5e75285268ac52532e4450bead",
+      "sha256": "6f7547dfcb8c81ca57351abac046039c3af114ca14f8df25805eabd0ba02ae46",
       "with_ipa": 12850
     },
     "pl": {
-      "bytes": 30099218,
-      "entries": 1162168,
+      "bytes": 29323251,
+      "entries": 1162167,
       "file": "pl.db.gz",
-      "sha256": "90c0a80fd2f4ad3cde880e8b691673ae6b23c97a8e94c9b673e29b213f1449e0",
+      "sha256": "b17f5a6894c63f9b4fa6c168cb48703c9c349d732a2c2f5d0deb62a2b97c1913",
       "with_ipa": 199607
     },
     "pt": {
-      "bytes": 16673057,
+      "bytes": 14961139,
       "entries": 471318,
       "file": "pt.db.gz",
-      "sha256": "3281be8709d90ab8ed9b03c99f1965aa07c6ed1e03aa6a7fa57684d93ef98f8e",
+      "sha256": "c1cd1b8271958f0c94af623aecbc38853384f40cdb2a66ead55ab119b290ae18",
       "with_ipa": 78486
     },
     "ro": {
-      "bytes": 16556728,
-      "entries": 674540,
+      "bytes": 16477589,
+      "entries": 674536,
       "file": "ro.db.gz",
-      "sha256": "b9d06fb99de6c51bd6da6334015add12733113fe8287ad5d882f2a85b79e620a",
+      "sha256": "6afddef81614b9b48ae570a0f32b306e6f6346562fb903fe77c03e3851f1c31e",
       "with_ipa": 17994
     },
     "ru": {
-      "bytes": 33226101,
-      "entries": 1037247,
+      "bytes": 31580423,
+      "entries": 1037246,
       "file": "ru.db.gz",
-      "sha256": "06928a3ce39a25966a4aea10236225d4c1f9f6cd1a074012ee75b5ce79d3120d",
+      "sha256": "d2a74fdadaec45bc73e4004b42e32bd5665b3ce5b74b77d5f99b0770e8ed9d2d",
       "with_ipa": 439562
     },
     "sk": {
-      "bytes": 1654701,
+      "bytes": 1526023,
       "entries": 53760,
       "file": "sk.db.gz",
-      "sha256": "d9b4e2153b40fb1503cd3d3d1d7b24aff0e7999193a01538de0e9815002bac5a",
+      "sha256": "6432a50fcd31c97c268e9e64469cc7a80d4a6e6565eadcaeea9d0b867240f0b3",
       "with_ipa": 16984
     },
     "sl": {
-      "bytes": 1263653,
+      "bytes": 1239035,
       "entries": 53277,
       "file": "sl.db.gz",
-      "sha256": "0d6d778339b71027db95939adfff6c579c8d4dd1db9636744323b0909a90faa9",
+      "sha256": "a95b0db9a4cca26bf1e0d0a8c29d7a0ad5aa979245af4d8bac2bacef3e20c4c3",
       "with_ipa": 5749
     },
     "sr": {
-      "bytes": 15787379,
+      "bytes": 15655206,
       "entries": 640057,
       "file": "sr.db.gz",
-      "sha256": "ad2420342b0632727a87fcb27188c66bb84906321057aa8335e6b6abffdbc940",
+      "sha256": "5d8f6ae97a2fb796b5c13dd2c58f5d1bc244210b6b53a70438fad4fa1d463623",
       "with_ipa": 53171
     },
     "sv": {
-      "bytes": 11163778,
+      "bytes": 11123941,
       "entries": 367171,
       "file": "sv.db.gz",
-      "sha256": "13ab9a23cd1f307e518912251323b5d8ff9351fe1a54d517d9062e263aecff94",
+      "sha256": "755fe57552ecdfa2d31cee8406757f66da9aebe4f42f9d52b4132881f541eab6",
       "with_ipa": 6661
     },
     "sw": {
-      "bytes": 1704288,
+      "bytes": 1696973,
       "entries": 61716,
       "file": "sw.db.gz",
-      "sha256": "4096d3cdcbb14825d7bc1f1a361a822234f151ded73ad07954cefbd47637d14b",
+      "sha256": "70f7924ca91c9559ba9d957ff4fd15c6d5847c47a8d5eb58cbf76bdf6e05676f",
       "with_ipa": 1188
     },
     "tr": {
-      "bytes": 41182307,
+      "bytes": 41001280,
       "entries": 1948777,
       "file": "tr.db.gz",
-      "sha256": "bb3290f5092d52b9b927267addff288302d92f14458bc8138a6d15581ea01f60",
+      "sha256": "1cdfa9ac61cb01cea76bc02d6fdfcd3a1ac41721aa73ae4c704285609697e897",
       "with_ipa": 18984
     },
     "uk": {
-      "bytes": 11286537,
+      "bytes": 11067769,
       "entries": 405826,
       "file": "uk.db.gz",
-      "sha256": "2d933f2b5b1225321c6cf5374ed1dab253e3109c1ffdd264e6eb2a8863c16c85",
+      "sha256": "c534f6423e064bb04b60ca8e1eb714a1bf20106233dbe5186a9793dd49018b36",
       "with_ipa": 59276
     },
     "vi": {
-      "bytes": 3084631,
+      "bytes": 2495647,
       "entries": 54218,
       "file": "vi.db.gz",
-      "sha256": "a04a0d7c0c3e15a9801d874a3d885d41966738239726ea8b0322792abf71433d",
+      "sha256": "520bc24f3ea0729a4206aa8b3c199a6d7b761b78e59acc51d428c60ea6557d6b",
       "with_ipa": 33996
     },
     "zh": {
-      "bytes": 14956815,
+      "bytes": 13951226,
       "entries": 332985,
       "file": "zh.db.gz",
-      "sha256": "643ada32806084775cf6ec02fde9c4b1579e664207b77baddc7fa1e188c933f1",
+      "sha256": "ef924b760f5658c36856b172ba13d2b2c5cb70781857c93272ebc09ebccdb85c",
       "with_ipa": 162168
     }
   },
   "license": "CC BY-SA 4.0. Text from Wiktionary contributors; extracted with Wiktextract (Ylonen, LREC 2022). Part-of-speech counts from Universal Dependencies treebanks (CC BY-SA or CC BY).",
-  "release": "dictionaries-2026-11-13-r86",
+  "release": "dictionaries-2026-11-13-r89",
   "source": "English Wiktionary, via kaikki.org (Wiktextract)",
-  "version": "2026-11-13-r86"
+  "version": "2026-11-13-r89"
 }
