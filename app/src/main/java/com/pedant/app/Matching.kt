@@ -73,8 +73,9 @@ object Matching {
     ): AttemptResult {
         val targetWords = words(target)
         val heardWords = words(transcript)
-        // Languages written without spaces (such as Chinese) are compared character by character.
-        val spaced = targetWords.size > 1
+        // Languages written without spaces (Chinese) are compared character by character. Decided by
+        // the writing, not the number of words: a one-word phrase ("Hej") is still checked by word.
+        val spaced = target.none { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN }
         val targetUnits = if (spaced) targetWords.map(::normalize) else chars(target)
         val heardUnits = if (spaced) heardWords.map(::normalize) else chars(transcript)
 
