@@ -13,6 +13,12 @@ object Phonemizer {
     private var started = false
 
     private external fun nativeInit(dataDir: String): Boolean
+
+    /** Whether espeak-ng is loaded and started on [dataDir] (started the first time it's asked). */
+    private fun ready(dataDir: File): Boolean {
+        if (loaded && !started) started = runCatching { nativeInit(dataDir.path) }.getOrDefault(false)
+        return started
+    }
     private external fun nativePhonemize(voice: String, text: String): String?
 
     /**
@@ -23,9 +29,7 @@ object Phonemizer {
      */
     @Synchronized
     fun words(dataDir: File, voice: String, phrase: String, words: List<String>): List<List<String>>? {
-        if (!loaded) return null
-        if (!started) started = runCatching { nativeInit(dataDir.path) }.getOrDefault(false)
-        if (!started) return null
+        if (!ready(dataDir)) return null
         val whole = nativePhonemize(voice, phrase)?.split(SPACES)?.filter { it.isNotEmpty() } ?: return null
         val each = if (whole.size == words.size) whole else words.map { w ->
             nativePhonemize(voice, w)?.replace(SPACES, "") ?: return null
@@ -39,9 +43,7 @@ object Phonemizer {
      */
     @Synchronized
     fun ipa(dataDir: File, voice: String, word: String): String? {
-        if (!loaded) return null
-        if (!started) started = runCatching { nativeInit(dataDir.path) }.getOrDefault(false)
-        if (!started) return null
+        if (!ready(dataDir)) return null
         return nativePhonemize(voice, word)?.replace(LANGUAGE_SWITCH, "")
             ?.filterNot { it.isWhitespace() || it.isDigit() }?.ifEmpty { null }
     }

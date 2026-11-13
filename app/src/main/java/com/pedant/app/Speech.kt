@@ -145,13 +145,13 @@ class SoundRecognizer(store: ModelStore) {
 }
 
 /**
- * Text-to-speech with a Piper voice (espeak-ng turns the text into sounds first). [rewrites] fix
- * text that espeak-ng misreads in this language, applied before every synthesis.
+ * Text-to-speech with a Piper voice (espeak-ng turns the text into sounds first). [espeakText]
+ * fixes text that espeak-ng misreads in this language, applied before every synthesis.
  */
 class TextToSpeech(
     store: ModelStore,
     voice: String,
-    private val rewrites: List<Pair<Regex, String>>,
+    private val espeakText: (String) -> String,
     private val workDir: File,
 ) {
     private val modelPath = store.voiceModel(voice).path
@@ -176,8 +176,7 @@ class TextToSpeech(
     )
 
     fun synthesize(text: String, speed: Float = 1.0f): Audio {
-        val fixed = rewrites.fold(text) { t, (pattern, replacement) -> pattern.replace(t, replacement) }
-        return tts.generate(fixed, sid = 0, speed = speed).toAudio()
+        return tts.generate(espeakText(text), sid = 0, speed = speed).toAudio()
     }
 
     private fun GeneratedAudio.toAudio() = Audio(samples, sampleRate)

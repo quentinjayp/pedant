@@ -56,30 +56,33 @@ data class WordLookup(
     val word: String,
     val sentence: String,
     val meaning: String? = null,
-    val soundsLike: String? = null,
     val sounds: String? = null,
     val error: String? = null,
     val loading: Boolean = true,
-    /** The meaning comes from the downloaded dictionary, not Gemma (whose meanings are labelled generated). */
-    val fromDictionary: Boolean = false,
     /** The IPA isn't the dictionary's but generated (espeak-ng's), and is labelled so. */
     val soundsGenerated: Boolean = true,
     /** The dictionary's meanings, a group per part of speech, to lay out; [meaning] is the same as text. */
     val groups: List<Dictionary.Group>? = null,
-)
+) {
+    /** [sounds] respelled the English way. */
+    val soundsLike: String? get() = sounds?.let(Respell::fromIpa)?.ifEmpty { null }
+
+    /** The meaning comes from the downloaded dictionary, not Gemma (whose meanings are labelled generated). */
+    val fromDictionary: Boolean get() = groups != null
+}
 
 sealed interface ChatItem {
-    /** What the learner said or typed; [sounds] is what ZIPA heard, when they spoke. */
-    data class User(val text: String, val sounds: String? = null) : ChatItem
+    /** What the learner typed, in English. */
+    data class User(val text: String) : ChatItem
     data class Tutor(val reply: String, val english: String? = null) : ChatItem
-    /** Learning mode: the phrase to say, translated from what the learner wanted to say. */
+    /** The phrase to say, translated from what the learner wanted to say. */
     data class Say(val english: String, val phrase: String) : ChatItem
-    /** Learning mode: one try at saying [phrase]. */
+    /** One try at saying [phrase]. */
     data class Attempt(val heard: String, val sounds: String, val result: AttemptResult, val phrase: String) : ChatItem
     data class Note(val text: String) : ChatItem
 }
 
-/** Learning mode: the phrase being practised, its audio and its expected sounds per word. */
+/** The phrase being practised, its audio and its expected sounds per word. */
 private class Drill(val phrase: String, val audio: Audio, val refWords: List<RefWord>) {
     /** The phrase said slowly, made the first time it's asked for. */
     var slowAudio: Audio? = null
@@ -130,7 +133,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         uiPrefs.edit().putBoolean("dockCollapsed", dockCollapsed).apply()
     }
     private var drill by mutableStateOf<Drill?>(null)
-    /** Learning mode: the phrase to repeat, or null while waiting for the next English line. */
+    /** The phrase to repeat, or null while waiting for the next English line. */
     val drillPhrase: String? get() = drill?.phrase
     var drillAttempts by mutableStateOf(0)
         private set
@@ -143,7 +146,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val conversationJobs = SupervisorJob(viewModelScope.coroutineContext[Job])
     private val conversationScope = CoroutineScope(viewModelScope.coroutineContext + conversationJobs)
     /**
-     * Learning mode: the chat index of the English line whose phrase is being practised. It can be
+     * The chat index of the English line whose phrase is being practised. It can be
      * edited (long press) until the phrase is said or skipped.
      */
     var editableIndex by mutableStateOf<Int?>(null)
@@ -185,7 +188,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 withProgress("Downloading Pedant's models") { report -> store.downloadCore(report) }
                 loadModels()
             } catch (e: Exception) {
-                progress = null
                 error = "Download failed: ${e.message}"
             }
         }
@@ -384,20 +386,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             stopConversationWork()
             conversationScope.launch {
                 val voice = try {
-                    // The language's first-choice voice, downloading it if need be (a language's voice
-                    // can change, as Ukrainian's did); an older one already here is used only if that
-                    // download fails, such as when offline.
-                    store.installedVoice(lang, firstChoiceOnly = true) ?: try {
-                        withProgress("Downloading the ${lang.englishName} voice") { report -> store.downloadVoice(lang, report) }
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Throwable) {
-                        store.installedVoice(lang) ?: throw e
-                    }
+                    store.installedVoice(lang)
+                        ?: withProgress("Downloading the ${lang.englishName} voice") { report -> store.downloadVoice(lang, report) }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {
-                    progress = null
                     error = "Could not start: ${e.message}"
                     return@launch
                 }
@@ -428,7 +421,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         // Gemma reads its instructions while the voice loads and the opening plays.
                         val started = async(Dispatchers.Default) {
                             val earlier = resume?.history
-                                ?: opening?.let { listOf(Tutor.Turn(true, Tutor.startMessage(register)), Tutor.Turn(false, it.first)) }
+                                ?: opening?.let { listOf(Tutor.Turn(true, Instructions.start(register)), Tutor.Turn(false, it.first)) }
                                 ?: emptyList()
                             checkNotNull(tutor).startConversation(lang, scenario, earlier)
                             diagnostics.log("Gemma ready for the ${lang.englishName} session")
@@ -436,7 +429,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         withContext(Dispatchers.Default) {
                             if (ttsVoice != voice) {
                                 tts?.release()
-                                tts = TextToSpeech(store, voice, lang.ttsRewrites, getApplication<Application>().cacheDir)
+                                tts = TextToSpeech(store, voice, lang::espeakText, getApplication<Application>().cacheDir)
                                 ttsVoice = voice
                                 wordSoundsCache.clear()
                                 diagnostics.log("Loaded the $voice voice")
@@ -459,7 +452,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         } else {
                             started.await()
                             diagnostics.step = null
-                            runTurn(Tutor.startMessage(register), saveOpening = openingKey to voice)
+                            runTurn(Instructions.start(register), saveOpening = openingKey to voice)
                         }
                     }
                 } catch (e: CancellationException) {
@@ -494,7 +487,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var gemmaDownloadJob: Job? = null
 
     /** [model]'s size on the phone, if it's downloaded. */
-    fun gemmaBytes(model: Gemma): Long? = store.gemmaFile(model)?.length()?.takeIf { model in downloadedGemmas }
+    fun gemmaBytes(model: Gemma): Long? = if (model in downloadedGemmas) store.gemmaFile(model)?.length() else null
 
     fun openSettings() {
         settingsError = null
@@ -554,10 +547,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Stops a voice download in progress, staying on the language list. */
     fun cancelVoiceDownload() {
-        viewModelScope.launch {
-            stopConversationWork()
-            progress = null
-        }
+        viewModelScope.launch { stopConversationWork() }
     }
 
     /** Goes back to the language list at any time, stopping whatever the conversation is doing. */
@@ -629,7 +619,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             when {
                 target != null -> practiceTry(target, audio)
                 d == null -> {
-                    // Learning mode, waiting for English: only the words matter here.
+                    // Waiting for English: only the words matter here.
                     val english = withContext(Dispatchers.Default) { checkNotNull(stt).transcribe(audio.samples) }
                     if (english.isNotBlank()) translate(english)
                 }
@@ -638,13 +628,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Learning mode: the learner typed what they want to say. */
+    /** The learner typed what they want to say. */
     fun submitEnglish(text: String) {
         if (busy != Busy.Idle || drill != null || text.isBlank()) return
         launchAction(Busy.Thinking) { translate(text.trim()) }
     }
 
-    /** Learning mode: plays the phrase again. */
+    /** Plays the phrase again. */
     fun hearAgain(slow: Boolean) {
         val d = drill ?: return
         if (busy != Busy.Idle) return
@@ -748,10 +738,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             word, sentence,
             meaning = d.text,
             groups = d.groups,
-            soundsLike = sounds?.let(Respell::fromIpa)?.ifEmpty { null },
             sounds = sounds,
             loading = false,
-            fromDictionary = true,
             soundsGenerated = d.ipa == null,
         )
     }
@@ -814,7 +802,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun lookUpSentence(lang: Language, sentence: String) {
         val words = tappableWords(sentence).distinctBy { it.lowercase() }
         // The dictionary first; espeak-ng only for words it has no IPA for, Gemma only for words it lacks.
-        val known = words.associateWith { fromDictionary(it) }
+        val known = withContext(Dispatchers.IO) { words.associateWith { fromDictionary(it) } }
         val sounds = withContext(Dispatchers.Default) {
             words.filter { known[it]?.ipa == null }.associateWith { w -> wordIpa(lang, w) }
         }
@@ -831,7 +819,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             lookupCache[w.lowercase() to sentence] = if (d != null) dictionaryLookup(w, sentence, d, wordSounds) else WordLookup(
                 w, sentence,
                 meaning = meanings[w.lowercase()],
-                soundsLike = wordSounds?.let(Respell::fromIpa)?.ifEmpty { null },
                 sounds = wordSounds,
                 loading = false,
             )
@@ -845,8 +832,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * can't be used.
      */
     private fun wordIpa(lang: Language, word: String): String {
-        val fixed = lang.ttsRewrites.fold(word) { t, (pattern, replacement) -> pattern.replace(t, replacement) }
-        return runCatching { Phonemizer.ipa(store.espeakData, lang.espeakVoice, fixed) }.getOrNull()
+        return runCatching { Phonemizer.ipa(store.espeakData, lang.espeakVoice, lang.espeakText(word)) }.getOrNull()
             ?: SoundRecognizer.display(wordSounds(word))
     }
 
@@ -857,14 +843,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val sounds = lookupCache[key]?.sounds ?: withContext(Dispatchers.Default) { wordIpa(lang, word) }
         val result = try {
             val meaning = Tutor.parseLookup(checkNotNull(tutor).lookUp(lang, word, sentence))
-            WordLookup(word, sentence, meaning, Respell.fromIpa(sounds).ifEmpty { null }, sounds, loading = false)
+            WordLookup(word, sentence, meaning, sounds, loading = false)
         } catch (e: CancellationException) {
             triedAlone -= key
             throw e
         } catch (e: Throwable) {
             WordLookup(
                 word, sentence,
-                soundsLike = Respell.fromIpa(sounds).ifEmpty { null },
                 sounds = sounds,
                 error = "Couldn't look this up: ${e.message}",
                 loading = false,
@@ -888,8 +873,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Opens the bubble for a tapped [word] from [sentence]: its meaning in that sentence from Gemma,
-     * and its sounds from ZIPA listening to Piper say it, with an English-style respelling of them.
+     * Opens the bubble for a tapped [word] from [sentence]: its meaning (the dictionary's, or Gemma's
+     * in that sentence) and its IPA (the dictionary's, or espeak-ng's), with an English-style respelling.
      */
     fun lookUp(word: String, sentence: String) {
         val d = fromDictionary(word)
@@ -938,7 +923,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Learning mode: replaces the English line at [index] with [text] (e.g. to fix a typo) and
+     * Replaces the English line at [index] with [text] (e.g. to fix a typo) and
      * translates it again, replacing the phrase being practised.
      */
     fun editEnglish(index: Int, text: String) {
@@ -950,7 +935,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         launchAction(Busy.Thinking) { translate(english, addLine = false) }
     }
 
-    /** Learning mode: removes the English line at [index] and its phrase, to say something else. */
+    /** Removes the English line at [index] and its phrase, to say something else. */
     fun deleteEnglish(index: Int) {
         if (busy != Busy.Idle || index != editableIndex) return
         while (chat.size > index) chat.removeAt(chat.lastIndex)
@@ -958,14 +943,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         editableIndex = null
     }
 
-    /** Learning mode: moves on without getting the phrase right (offered after [SKIP_AFTER_FAILS] failed tries). */
+    /** Moves on without getting the phrase right (offered after [SKIP_AFTER_FAILS] failed tries). */
     fun skip() {
         val d = drill ?: return
         if (busy != Busy.Idle) return
         chat += ChatItem.Note("Skipped")
-        startDrill(null)
-        editableIndex = null
-        launchAction(Busy.Thinking) { runTurn(Tutor.learningSaid(d.phrase, register)) }
+        launchAction(Busy.Thinking) { phraseDone(d.phrase) }
     }
 
     /** Hears the recording with both Omnilingual (words) and ZIPA (sounds), side by side. */
@@ -996,7 +979,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private class Graded(val transcript: String, val heardText: String, val result: AttemptResult, val recording: Recording)
 
-    /** Learning mode: translates what the learner wants to say and starts drilling it. */
+    /** Translates what the learner wants to say and starts drilling it. */
     private suspend fun translate(english: String, addLine: Boolean = true) {
         if (addLine) {
             chat += ChatItem.User(english)
@@ -1043,9 +1026,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      */
     private fun withShownSounds(phrase: String, refWords: List<RefWord>): List<RefWord> {
         val lang = language ?: return refWords
-        fun fixed(text: String) = lang.ttsRewrites.fold(text) { t, (pattern, replacement) -> pattern.replace(t, replacement) }
         val shown = runCatching {
-            Phonemizer.words(store.espeakData, lang.espeakVoice, fixed(phrase), refWords.map { fixed(it.word) })
+            Phonemizer.words(store.espeakData, lang.espeakVoice, lang.espeakText(phrase), refWords.map { lang.espeakText(it.word) })
         }.onFailure { diagnostics.log("espeak-ng: ${it.message}") }.getOrNull()
         if (shown == null || shown.size != refWords.size) return refWords
         return refWords.mapIndexed { i, r -> r.copy(shown = shown[i].ifEmpty { r.sounds }) }
@@ -1057,9 +1039,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         chat += ChatItem.Attempt(graded.transcript, graded.heardText, result, d.phrase)
         keepRecording(chat.lastIndex, graded.recording)
         if (result.passed) {
-            startDrill(null)
-            editableIndex = null
-            runTurn(Tutor.learningSaid(d.phrase, register))
+            phraseDone(d.phrase)
         } else {
             drillAttempts++
             busy = Busy.Speaking
@@ -1070,6 +1050,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun startDrill(d: Drill?) {
         drill = d
         drillAttempts = 0
+    }
+
+    /** The phrase being practised is done with (said right, or skipped): the tutor answers it. */
+    private suspend fun phraseDone(phrase: String) {
+        startDrill(null)
+        editableIndex = null
+        runTurn(Instructions.said(phrase, register))
     }
 
     /** Plays the saved opening [reply] for [key] (its saved audio, or Piper's if there is none yet). */
@@ -1093,7 +1080,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun runTurn(
         message: String,
         saveOpening: Pair<String, String>? = null,
-        remember: String = message,
     ) {
         busy = Busy.Thinking
         val index = chat.size
@@ -1105,7 +1091,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val lang = checkNotNull(language)
             var reply = ""
             diagnostics.step = "Generating a reply with Gemma"
-            checkNotNull(tutor).respond(message, remember).collect { raw ->
+            checkNotNull(tutor).respond(message).collect { raw ->
                 reply = Tutor.parse(raw).reply
                 update { it.copy(reply = reply) }
             }
@@ -1205,7 +1191,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     data class Practice(
         val chatIndex: Int,
         val phrase: String,
-        val transcript: String,
         val result: AttemptResult,
         val position: Int,
         val hasRecording: Boolean,
@@ -1233,7 +1218,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val item = chat.getOrNull(index) as? ChatItem.Attempt ?: return
         if (item.result.words.isEmpty()) return
         val first = item.result.words.indexOfFirst { !it.passed }.coerceAtLeast(0)
-        val p = Practice(index, item.phrase, item.heard, item.result, first, hasRecording = false)
+        val p = Practice(index, item.phrase, item.result, first, hasRecording = false)
         practice = p.copy(hasRecording = recordingFor(p) != null)
     }
 
@@ -1287,14 +1272,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     chat.drop(p.chatIndex + 1).none { it is ChatItem.Say }
                 if (current && r.passed && old?.result?.passed == false) {
                     practice = null
-                    startDrill(null)
-                    editableIndex = null
-                    runTurn(Tutor.learningSaid(p.phrase, register))
+                    phraseDone(p.phrase)
                     return
                 }
                 val scores = "Words ${(r.wordScore * 100).toInt()}% · Sounds ${(r.soundScore * 100).toInt()}%"
                 practice = p.copy(
-                    transcript = graded.transcript,
                     result = r,
                     hasRecording = latest,
                     note = when {

@@ -29,14 +29,13 @@ def packaged(voice):
         return False
 
 
-app = re.findall(r'Language\("([a-z]{2})", "([^"]+)", "[^"]+", listOf\(([^)]*)\)', open(LANGUAGES, encoding="utf-8").read())
+app = re.findall(r'Language\("([a-z]{2})", "([^"]+)", "[^"]+", "([^"]+)"', open(LANGUAGES, encoding="utf-8").read())
 voices = json.loads(get(f"{BASE}/voices.json"))
 by_family = {}
 for key, v in voices.items():
     by_family.setdefault(v["language"]["family"], []).append((key, v))
 
 for code, name, used in app:
-    used = re.findall(r'"([^"]+)"', used)
     found = sorted(by_family.get(code, []))
     espeak = []
     lines = []
@@ -46,7 +45,7 @@ for code, name, used in app:
         ok = packaged(key)
         if kind == "espeak" and ok:
             espeak.append(key)
-        mark = " (in use)" if key in used else ""
+        mark = " (in use)" if key == used else ""
         lines.append(f"    {key}: {v['quality']}, {v['num_speakers']} speaker(s), {kind}, "
                      f"{'in sherpa-onnx' if ok else 'not in sherpa-onnx'}{mark}")
     print(f"{code} {name}: {len(espeak)} usable espeak voice(s) of {len(found)}")

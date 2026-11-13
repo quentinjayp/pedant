@@ -28,9 +28,8 @@ data class WordResult(
 )
 
 
-/** Per word: expected and heard sounds, and the share of the expected sounds that went wrong. */
+/** Per word: heard sounds, and the share of the expected sounds that went wrong. */
 private data class WordSounds(
-    val expected: String,
     val heard: String,
     val ratio: Double,
 )
@@ -81,7 +80,7 @@ object Matching {
         val heardWords = words(transcript)
         // Languages written without spaces (Chinese) are compared character by character. Decided by
         // the writing, not the number of words: a one-word phrase ("Hej") is still checked by word.
-        val spaced = target.none { Character.UnicodeScript.of(it.code) == Character.UnicodeScript.HAN }
+        val spaced = !writtenWithoutSpaces(target)
         val targetUnits = if (spaced) targetWords.map(::normalize) else chars(target)
         val heardUnits = if (spaced) heardWords.map(::normalize) else chars(transcript)
 
@@ -129,7 +128,7 @@ object Matching {
         sounds: SoundComparison,
         judge: (Int, WordSounds) -> Pair<String?, Boolean>,
     ): List<WordResult> = refWords.mapIndexed { i, ref ->
-        val ws = sounds.words.getOrNull(i) ?: WordSounds("", "", 1.0)
+        val ws = sounds.words.getOrNull(i) ?: WordSounds("", 1.0)
         val (heardWord, passed) = judge(i, ws)
         WordResult(
             word = ref.word,
@@ -208,22 +207,21 @@ object Matching {
         )
     }
 
-    /** Overall sound score, and for each word its expected sounds, heard sounds and error ratio. */
+    /** Overall sound score, and for each word its heard sounds and error ratio. */
     private fun compareSounds(refWords: List<RefWord>, heardSounds: List<String>): SoundComparison {
         val refPhones = refWords.flatMap { it.sounds }
         val refWordOf = refWords.flatMapIndexed { w, word -> List(word.sounds.size) { w } }
-        if (refPhones.isEmpty()) return SoundComparison(0.0, refWords.map { WordSounds("", "", 1.0) })
+        if (refPhones.isEmpty()) return SoundComparison(0.0, refWords.map { WordSounds("", 1.0) })
 
         val steps = align(refPhones, heardSounds, ::soundCost, ::soundIndel)
         val score = score(steps, refPhones.sumOf { soundIndel(it) })
 
         // Extra sounds count against the word before them.
-        val expected = Array(refWords.size) { StringBuilder() }
         val heard = Array(refWords.size) { StringBuilder() }
         val wordCost = DoubleArray(refWords.size)
         var lastWord = 0
         for (step in steps) {
-            step.ref?.let { lastWord = refWordOf[it]; expected[lastWord].append(refPhones[it]) }
+            step.ref?.let { lastWord = refWordOf[it] }
             step.hyp?.let { heard[lastWord].append(heardSounds[it]) }
             wordCost[lastWord] += step.cost
         }
@@ -231,7 +229,6 @@ object Matching {
             score,
             refWords.indices.map { w ->
                 WordSounds(
-                    expected = expected[w].toString(),
                     heard = heard[w].toString(),
                     ratio = wordCost[w] / refWords[w].sounds.size.coerceAtLeast(1),
                 )

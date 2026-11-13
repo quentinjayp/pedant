@@ -76,6 +76,7 @@ class ModelStore(context: Context) {
     private val readyMarker = ".complete"
 
     private fun isReady(dir: File) = File(dir, readyMarker).exists()
+    private fun markReady(dir: File) = File(dir, readyMarker).createNewFile()
 
     fun coreReady() = listOf(gemmaDir(gemma), asrDir, zipaDir).all(::isReady)
 
@@ -84,7 +85,7 @@ class ModelStore(context: Context) {
     /** Downloads [model] (resuming a partial download). */
     suspend fun downloadGemma(model: Gemma, onProgress: (Long, Long, String) -> Unit) = withContext(Dispatchers.IO) {
         downloadAll(listOf(gemmaJob(model)).filterNot { (file, dest) -> dest.exists() && dest.length() == file.size }, onProgress)
-        File(gemmaDir(model), readyMarker).createNewFile()
+        markReady(gemmaDir(model))
     }
 
     /** Deletes [model]'s files, partial downloads included. Never the one in use. */
@@ -100,30 +101,20 @@ class ModelStore(context: Context) {
     }
 
     /**
-     * Deletes downloaded voices no longer needed: a fallback once its language's first choice is
-     * downloaded, any voice no language uses (such as Ukrainian's old voice, lada), and the dictionaries
-     * of languages the app no longer has.
+     * Deletes downloaded voices no language uses (such as Ukrainian's old voice, lada), and the
+     * dictionaries of languages the app no longer has.
      */
     fun deleteUnusedVoices() {
-        val keep = LANGUAGES.flatMap { lang ->
-            val first = lang.piperVoices.first()
-            if (isReady(voiceDir(first))) listOf(first) else lang.piperVoices
-        }.toSet()
+        val keep = LANGUAGES.map { it.piperVoice }.toSet()
         File(root, "piper").listFiles()?.filter { it.isDirectory && it.name !in keep }?.forEach { it.deleteRecursively() }
         // And dictionaries of languages the app no longer has (Arabic).
         val codes = LANGUAGES.map { it.code }.toSet()
         dictionaryDir.listFiles()?.filter { it.name.substringBefore('.').substringBefore('-') !in codes }?.forEach { it.delete() }
     }
 
-    /**
-     * The voice already downloaded for [language], if any: only its first choice when
-     * [firstChoiceOnly], otherwise any of its voices (such as one it used before a better one was
-     * added).
-     */
-    fun installedVoice(language: Language, firstChoiceOnly: Boolean = false): String? =
-        language.piperVoices.take(if (firstChoiceOnly) 1 else language.piperVoices.size).firstOrNull { voice ->
-            isReady(voiceDir(voice)) && isReady(espeakData)
-        }
+    /** [language]'s voice, if it's downloaded. */
+    fun installedVoice(language: Language): String? =
+        language.piperVoice.takeIf { isReady(voiceDir(it)) && isReady(espeakData) }
 
     /**
      * Downloads Gemma, the speech recognizer and ZIPA, skipping any already downloaded.
@@ -141,20 +132,20 @@ class ModelStore(context: Context) {
             asrFiles.map { it to File(asrDir, it.path) } +
             zipaFiles.map { it to File(zipaDir, it.path) }
         downloadAll(jobs.filterNot { (file, dest) -> dest.exists() && dest.length() == file.size }, onProgress)
-        listOf(gemmaDir(gemma), asrDir, zipaDir).forEach { File(it, readyMarker).createNewFile() }
+        listOf(gemmaDir(gemma), asrDir, zipaDir).forEach(::markReady)
     }
 
     /**
-     * Downloads the first available Piper voice for [language], plus espeak-ng's data the first
-     * time, and returns the voice's name. Voices come from sherpa-onnx's packaging on Hugging Face,
+     * Downloads [language]'s Piper voice, plus espeak-ng's data the first time, and returns the
+     * voice's name. Voices come from sherpa-onnx's packaging on Hugging Face,
      * or, for the ones it doesn't host, from this app's own "voices" release (see voices.yml).
      */
     suspend fun downloadVoice(language: Language, onProgress: (Long, Long, String) -> Unit): String =
         withContext(Dispatchers.IO) {
-            val (voice, files) = language.piperVoices.firstNotNullOfOrNull { v ->
-                runCatching { v to listRepo("csukuangfj/vits-piper-$v") }.getOrNull()
-                    ?: runCatching { v to ownVoice(v) }.getOrNull()
-            } ?: throw IOException("No voice found for ${language.englishName}")
+            val voice = language.piperVoice
+            val files = runCatching { listRepo("csukuangfj/vits-piper-$voice") }.getOrNull()
+                ?: runCatching { ownVoice(voice) }.getOrNull()
+                ?: throw IOException("No voice found for ${language.englishName}")
             val jobs = mutableListOf<Pair<HfFile, File>>()
             files.filter { it.path == "$voice.onnx" || it.path == "tokens.txt" }
                 .forEach { jobs += it to File(voiceDir(voice), it.path) }
@@ -167,8 +158,8 @@ class ModelStore(context: Context) {
                     .forEach { jobs += it to File(root, it.path) }
             }
             downloadAll(jobs, onProgress)
-            if (needEspeak) File(espeakData, readyMarker).createNewFile()
-            File(voiceDir(voice), readyMarker).createNewFile()
+            if (needEspeak) markReady(espeakData)
+            markReady(voiceDir(voice))
             voice
         }
 

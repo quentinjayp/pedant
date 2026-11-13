@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import java.io.File
 
-
 /** One tutor answer, split into its labelled parts: the reply, its English, or a phrase to say. */
 data class TutorTurn(
     val reply: String = "",
@@ -97,10 +96,9 @@ class Tutor(context: Context, modelFile: File) {
 
     /**
      * Streams the tutor's raw answer to [userText] as it is generated (cumulative text). Once the
-     * answer is complete, [remember] (what to keep of the message; [userText] by default) and the
-     * reply are added to [history].
+     * answer is complete, the message and the reply are added to [history].
      */
-    fun respond(userText: String, remember: String = userText): Flow<String> {
+    fun respond(userText: String): Flow<String> {
         val conv = checkNotNull(conversation) { "No conversation started" }
         val sb = StringBuilder()
         return conv.sendMessageAsync(Message.user(userText))
@@ -110,7 +108,7 @@ class Tutor(context: Context, modelFile: File) {
             }
             .onCompletion { error ->
                 if (error == null) synchronized(turns) {
-                    turns += Turn(true, remember)
+                    turns += Turn(true, userText)
                     turns += Turn(false, compact(sb.toString()))
                 }
             }
@@ -193,9 +191,6 @@ class Tutor(context: Context, modelFile: File) {
          */
         private const val HISTORY_CHARS = 2500
 
-        /** The message that asks Gemma to open the conversation. */
-        fun startMessage(register: Register) = Instructions.start(register)
-
         private fun systemPrompt(language: Language, scenario: Scenario) = Instructions.system(language, scenario)
 
         /**
@@ -203,22 +198,11 @@ class Tutor(context: Context, modelFile: File) {
          * tools/build_openings.py names the openings that ship with the app the same way.
          */
         fun openingKey(language: Language, scenario: Scenario, register: Register): String {
-            val hash = (systemPrompt(language, scenario) + startMessage(register)).hashCode()
+            val hash = (systemPrompt(language, scenario) + Instructions.start(register)).hashCode()
             // "Learning" stays in the name, as before Conversation mode was removed, so shipped and
             // saved openings still match.
             return "${language.code}-Learning-${scenario.name}-${register.name}-${Integer.toHexString(hash)}"
         }
-
-        fun learningSaid(phrase: String, register: Register) = Instructions.said(phrase, register)
-
-
-
-
-
-
-
-
-
 
         /** Splits a sentence lookup into word (lower case) → meaning. */
         fun parseSentenceLookup(raw: String): Map<String, String> =

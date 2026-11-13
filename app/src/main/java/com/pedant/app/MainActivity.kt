@@ -442,21 +442,15 @@ private fun SetupScreen(vm: AppViewModel) {
             }
             PeachNotice("Use Wi-Fi. The download keeps going if you leave the app.")
             Spacer(Modifier.height(6.dp))
-            // The download's progress shows in a notification too, which needs permission on Android 13
-            // and later; it's asked for as the download starts (and it goes ahead either way).
-            val context = LocalContext.current
-            val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+            // The download's progress shows in a notification too; permission is asked for as the
+            // download starts (and it goes ahead either way).
+            val askNotifications = rememberNotificationPermission()
             val p = vm.progress
             if (p != null) {
                 ProgressBlock(p)
             } else {
                 CtaButton("Download models", {
-                    if (Build.VERSION.SDK_INT >= 33 &&
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-                        PackageManager.PERMISSION_GRANTED
-                    ) {
-                        notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
+                    askNotifications()
                     vm.downloadCore()
                 })
             }
@@ -709,6 +703,33 @@ private fun HomeButton(
     }
 }
 
+/**
+ * Asks for permission to show notifications (needed on Android 13 and later), if it hasn't been
+ * given; nothing waits on the answer.
+ */
+@Composable
+private fun rememberNotificationPermission(): () -> Unit {
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    return {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+}
+
+/** A round white button, as in the headers. */
+@Composable
+private fun RoundButton(onClick: () -> Unit, modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+    Box(
+        modifier.size(36.dp).clip(CircleShape).background(Pastel.White.copy(alpha = 0.85f)).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+        content = content,
+    )
+}
+
 /** A round white button with a back arrow. */
 @Composable
 private fun BackButton(onClick: () -> Unit) = ChevronButton(Chevron.Left, onClick)
@@ -718,10 +739,7 @@ private enum class Chevron(val degrees: Float) { Left(0f), Up(90f), Right(180f),
 /** A round white button with an arrow. */
 @Composable
 private fun ChevronButton(direction: Chevron, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier.size(36.dp).clip(CircleShape).background(Pastel.White.copy(alpha = 0.85f)).clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
+    RoundButton(onClick, modifier) {
         // Drawn pointing left, then turned.
         Canvas(Modifier.size(14.dp).rotate(direction.degrees)) {
             val stroke = size.width * 0.16f
@@ -777,10 +795,7 @@ private fun ConversationSettings(vm: AppViewModel, onClose: () -> Unit) {
 /** A round white button with a gear. */
 @Composable
 private fun GearButton(onClick: () -> Unit) {
-    Box(
-        Modifier.size(36.dp).clip(CircleShape).background(Pastel.White.copy(alpha = 0.85f)).clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
+    RoundButton(onClick) {
         Text("⚙\uFE0E", fontSize = 18.sp, color = Pastel.Ink)
     }
 }
@@ -875,16 +890,9 @@ private fun LanguageScreen(vm: AppViewModel) {
 
 @Composable
 private fun ConversationScreen(vm: AppViewModel) {
-    // The "finishing a reply" notice needs permission to show on Android 13 and later.
-    val context = LocalContext.current
-    val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) {
-            notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
+    // The "finishing a reply" notice needs permission to show.
+    val askNotifications = rememberNotificationPermission()
+    LaunchedEffect(Unit) { askNotifications() }
     val listState = rememberLazyListState()
     LaunchedEffect(vm.chat.size, vm.chat.lastOrNull()) {
         if (vm.chat.isNotEmpty()) listState.animateScrollToItem(vm.chat.size - 1)
@@ -990,7 +998,6 @@ private fun ConversationScreen(vm: AppViewModel) {
                             item.text,
                             mine = true,
                             label = "You said in English",
-                            detail = item.sounds?.let { "/$it/" },
                             menu = if (!editable) null else listOf(
                                 "Edit" to { editing = index to item.text },
                                 "Delete" to { vm.deleteEnglish(index) },
@@ -1139,7 +1146,7 @@ private fun Bubble(
     }
 }
 
-/** Learning mode: the phrase to say. */
+/** The phrase to say. */
 @Composable
 private fun SayCard(item: ChatItem.Say, language: String?, onWord: (word: String, sentence: String) -> Unit) {
     Column(
@@ -1162,7 +1169,7 @@ private fun SayCard(item: ChatItem.Say, language: String?, onWord: (word: String
     }
 }
 
-/** Learning mode: how one try at the phrase went; tapping it opens the practice window. */
+/** How one try at the phrase went; tapping it opens the practice window. */
 @Composable
 private fun AttemptCard(item: ChatItem.Attempt, enabled: Boolean, onOpen: () -> Unit) {
     val r = item.result
@@ -1240,6 +1247,9 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
             if (p.hasRecording) PillButton("▶ My whole try", { vm.playMyRecording() }, PillStyle.Outline, idle)
         },
     ) {
+        val heardWord = w.heardWord
+        // Omnilingual heard a different word in its place.
+        val heardOther = heardWord != null && Matching.normalize(heardWord) != Matching.normalize(w.word)
         // The picked word.
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(w.word, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Pastel.PrimaryInk, modifier = Modifier.weight(1f))
@@ -1255,11 +1265,10 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
                 fontWeight = FontWeight.ExtraBold,
                 color = Pastel.VioletDark,
             )
-            val heardWord = w.heardWord
             when {
                 w.passed -> Tag("right", Pastel.PrimaryContainer, Pastel.PrimaryDark)
                 heardWord == null -> Tag("not heard", Pastel.SurfaceContainer, Pastel.InkSoft)
-                Matching.normalize(heardWord) != Matching.normalize(w.word) -> Tag("heard “$heardWord”", Pastel.CtaContainer, Pastel.CtaDark)
+                heardOther -> Tag("heard “$heardWord”", Pastel.CtaContainer, Pastel.CtaDark)
                 else -> Tag("word right, sounds off", Pastel.CtaContainer, Pastel.CtaDark)
             }
         }
@@ -1268,8 +1277,7 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             PillButton("▶ Correct", { vm.hearWord(w.word, false) }, PillStyle.Primary, idle)
             if (w.heard.isNotEmpty()) PillButton("▶ Heard sounds", { vm.saySounds(w.heard) }, PillStyle.Secondary, idle)
-            val heardWord = w.heardWord
-            if (heardWord != null && Matching.normalize(heardWord) != Matching.normalize(w.word)) {
+            if (heardWord != null && heardOther) {
                 PillButton("▶ Heard word", { vm.hearWord(heardWord, false) }, PillStyle.Secondary, idle)
             }
         }
@@ -1492,8 +1500,6 @@ private fun DictionaryStatus(vm: AppViewModel) {
 /** How a [PopupCard] is coloured: its border, its header's background, and the header's label. */
 private data class PopupStyle(val border: Color, val header: Color, val ink: Color)
 
-private val PrimaryPopup = PopupStyle(Pastel.Primary, Pastel.PrimaryContainer, Pastel.PrimaryDark)
-
 /**
  * A bubble laid over the screen, nearly as wide as it: a coloured header with a [label] and
  * [header] content, then the [body] and a Close button. The word bubble, the practice window and
@@ -1503,7 +1509,7 @@ private val PrimaryPopup = PopupStyle(Pastel.Primary, Pastel.PrimaryContainer, P
 private fun PopupCard(
     label: String,
     onClose: () -> Unit,
-    style: PopupStyle = PrimaryPopup,
+    style: PopupStyle = PopupStyle(Pastel.Primary, Pastel.PrimaryContainer, Pastel.PrimaryDark),
     closeStyle: PillStyle = PillStyle.Cta,
     headerSpacing: Dp = 6.dp,
     header: @Composable ColumnScope.() -> Unit = {},
@@ -1564,7 +1570,6 @@ private fun WordBubble(
     PopupCard(
         "Word lookup",
         onClose,
-        closeStyle = PillStyle.Cta,
         header = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
@@ -1657,7 +1662,7 @@ private fun WordBubble(
     }
 }
 
-/** Learning mode: edits the English line being practised; saving translates it again. */
+/** Edits the English line being practised; saving translates it again. */
 @Composable
 private fun EditLineDialog(original: String, onSave: (String) -> Unit, onCancel: () -> Unit) {
     var text by remember { mutableStateOf(original) }
@@ -1699,7 +1704,7 @@ private fun EnglishField(
     )
 }
 
-/** Learning mode: the English text box, or Hear again / Skip while practising a phrase. */
+/** The English text box, or Hear again / Skip while practising a phrase. */
 @Composable
 private fun LearningControls(vm: AppViewModel) {
     if (vm.busy != Busy.Idle) return

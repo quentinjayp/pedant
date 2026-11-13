@@ -133,7 +133,7 @@ jobs:
             list "$r" | jq -r '.[] | select(.type=="file") | .path' | grep -E 'onnx|tokens' || echo "MISSING $r"
           done
 
-          echo "== Piper voices (each language needs at least one)"
+          echo "== Piper voices"
           while read -r line; do
             lang=$(echo "$line" | grep -oE 'Language\("[a-z]+", "[^"]+"' | cut -d'"' -f4)
             ok=""
@@ -204,7 +204,7 @@ jobs:
         run: |
           set -u
           mkdir -p voices && cd voices
-          # Each language's voices, in the app's order; a missing one is skipped like the app does.
+          # Each language's voice.
           for v in $(grep -oE '"[a-z]{2}_[A-Z]{2}-[A-Za-z0-9_]+-(x_low|low|medium|high)"' ../app/src/main/java/com/pedant/app/Languages.kt | tr -d '"'); do
             curl -fsSL "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-$v.tar.bz2" | tar xj && continue
             # Or packaged by this app, on its "voices" release, with espeak-ng's data from another voice.

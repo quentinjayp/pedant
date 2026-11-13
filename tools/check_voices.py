@@ -27,14 +27,11 @@ os.makedirs(OUT, exist_ok=True)
 openings = json.load(open(OPENINGS, encoding="utf-8"))["openings"]
 failed = []
 for line in open(LANGUAGES, encoding="utf-8"):
-    m = re.search(r'Language\("([a-z]{2})", "([^"]+)", "([^"]+)", listOf\(([^)]*)\)', line)
+    m = re.search(r'Language\("([a-z]{2})", "([^"]+)", "([^"]+)", "([^"]+)"', line)
     if not m:
         continue
-    code, name, native, voices = m.groups()
-    voices = re.findall(r'"([^"]+)"', voices)
-    # The first voice that's there, as the app picks it.
-    voice = next((v for v in voices if os.path.isdir(f"{VOICES}/vits-piper-{v}")), None)
-    if voice is None:
+    code, name, native, voice = m.groups()
+    if not os.path.isdir(f"{VOICES}/vits-piper-{voice}"):
         print(f"{code} {name}: no voice downloaded")
         failed.append(code)
         continue

@@ -8,7 +8,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.IBinder
 import androidx.core.app.ServiceCompat
 
@@ -30,8 +29,9 @@ class DownloadService : Service() {
             },
         )
         val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Downloading"
-        val type = if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC else 0
-        ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(this, title, 0, 0), type)
+        ServiceCompat.startForeground(
+            this, NOTIFICATION_ID, notification(this, title, 0, 0), ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+        )
         running = true
         return START_NOT_STICKY
     }

@@ -15,7 +15,7 @@ data class SavedConversation(
     val chat: List<ChatItem>,
     /** What was said to and by Gemma, so it can pick up the conversation. */
     val history: List<Tutor.Turn>,
-    /** Learning mode: the phrase being practised and its expected sounds, if any. */
+    /** The phrase being practised and its expected sounds, if any. */
     val drillPhrase: String?,
     val drillWords: List<RefWord>,
     val drillAttempts: Int,
@@ -37,10 +37,6 @@ data class SavedConversation(
             return saved
         }
 
-        fun delete(dir: File) {
-            file(dir).delete()
-        }
-
         private fun fromJson(o: JSONObject) = SavedConversation(
             languageCode = o.getString("language"),
             scenario = Scenario.valueOf(o.getString("scenario")),
@@ -56,7 +52,7 @@ data class SavedConversation(
         )
 
         private fun chatItem(o: JSONObject): ChatItem = when (o.getString("type")) {
-            "user" -> ChatItem.User(o.getString("text"), o.optStringOrNull("sounds"))
+            "user" -> ChatItem.User(o.getString("text"))
             "tutor" -> ChatItem.Tutor(o.getString("reply"), o.optStringOrNull("english"))
             "say" -> ChatItem.Say(o.getString("english"), o.getString("phrase"))
             "attempt" -> ChatItem.Attempt(
@@ -108,7 +104,7 @@ data class SavedConversation(
     }
 
     private fun json(item: ChatItem): JSONObject = when (item) {
-        is ChatItem.User -> JSONObject().put("type", "user").put("text", item.text).put("sounds", item.sounds)
+        is ChatItem.User -> JSONObject().put("type", "user").put("text", item.text)
         is ChatItem.Tutor -> JSONObject().put("type", "tutor").put("reply", item.reply)
             .put("english", item.english)
         is ChatItem.Say -> JSONObject().put("type", "say").put("english", item.english).put("phrase", item.phrase)
