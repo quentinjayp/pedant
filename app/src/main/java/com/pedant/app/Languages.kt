@@ -33,7 +33,7 @@ val LANGUAGES = listOf(
     Language("hu", "Hungarian", "Magyar", listOf("hu_HU-anna-medium")),
     Language("id", "Indonesian", "Bahasa Indonesia", listOf("id_ID-news_tts-medium")),
     Language("it", "Italian", "Italiano", listOf("it_IT-paola-medium")),
-    Language("nl", "Dutch", "Nederlands", listOf("nl_NL-ronnie-medium", "nl_NL-alex-medium", "nl_BE-nathalie-medium")),
+    Language("nl", "Dutch", "Nederlands", listOf("nl_BE-nathalie-medium")),
     Language("no", "Norwegian", "Norsk", listOf("no_NO-talesyntese-medium")),
     Language("pl", "Polish", "Polski", listOf("pl_PL-gosia-medium")),
     Language("pt", "Portuguese", "Português", listOf("pt_BR-faber-medium")),
@@ -47,5 +47,5 @@ val LANGUAGES = listOf(
     Language("tr", "Turkish", "Türkçe", listOf("tr_TR-dfki-medium")),
     Language("uk", "Ukrainian", "Українська", listOf("uk_UA-tetiana-high", "uk_UA-lada-x_low")),
     Language("vi", "Vietnamese", "Tiếng Việt", listOf("vi_VN-vais1000-medium")),
-    Language("zh", "Mandarin", "中文", listOf("zh_CN-huayan-medium", "zh_CN-chaowen-medium")),
+    Language("zh", "Mandarin", "中文", listOf("zh_CN-huayan-medium")),
 )

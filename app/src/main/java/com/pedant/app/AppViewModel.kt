@@ -382,8 +382,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             stopConversationWork()
             conversationScope.launch {
                 val voice = try {
-                    store.installedVoice(lang)
-                        ?: withProgress("Downloading the ${lang.englishName} voice") { report -> store.downloadVoice(lang, report) }
+                    // The language's first-choice voice, downloading it if need be (a language's voice
+                    // can change, as Ukrainian's did); an older one already here is used only if that
+                    // download fails, such as when offline.
+                    store.installedVoice(lang, firstChoiceOnly = true) ?: try {
+                        withProgress("Downloading the ${lang.englishName} voice") { report -> store.downloadVoice(lang, report) }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        store.installedVoice(lang) ?: throw e
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Throwable) {

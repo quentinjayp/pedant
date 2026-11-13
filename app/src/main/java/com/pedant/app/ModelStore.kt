@@ -99,9 +99,13 @@ class ModelStore(context: Context) {
         return file to File(gemmaDir(model), file.path.substringAfterLast('/'))
     }
 
-    /** The voice already downloaded for [language], if any. */
-    fun installedVoice(language: Language): String? =
-        language.piperVoices.firstOrNull { voice ->
+    /**
+     * The voice already downloaded for [language], if any: only its first choice when
+     * [firstChoiceOnly], otherwise any of its voices (such as one it used before a better one was
+     * added).
+     */
+    fun installedVoice(language: Language, firstChoiceOnly: Boolean = false): String? =
+        language.piperVoices.take(if (firstChoiceOnly) 1 else language.piperVoices.size).firstOrNull { voice ->
             isReady(voiceDir(voice)) && isReady(espeakData)
         }
 
