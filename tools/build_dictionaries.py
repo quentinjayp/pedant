@@ -233,6 +233,11 @@ SKIP_TABLE_TAGS = {"table-tags", "inflection-template", "canonical", "romanizati
                    "obsolete", "archaic", "dialectal", "rare", "nonstandard", "misspelling", "colloquial"}
 
 
+# Languages left without table forms: Finnish nouns have hundreds of forms each (cases with possessive
+# and clitic endings), which took its dictionary from 15 MB to 485 MB.
+NO_TABLE_FORMS = {"fi"}
+
+
 def table_forms(entry):
     """(form, description) for each form in [entry]'s inflection table."""
     word = entry.get("word") or ""
@@ -321,7 +326,7 @@ def main():
         meanings, form_of = pick_senses(entry.get("senses"))
         if not meanings:
             continue
-        if args.forms and form_of is None:
+        if args.forms and form_of is None and code not in NO_TABLE_FORMS:
             dbs[code].executemany(
                 "INSERT INTO table_forms VALUES (?, ?, ?, ?, ?)",
                 [(key_of(f), f, entry.get("pos"), d, word) for f, d in table_forms(entry)],

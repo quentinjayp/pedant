@@ -50,7 +50,7 @@ jobs:
           pip install --quiet orjson
           curl -fsSL --retry 3 https://kaikki.org/dictionary/raw-wiktextract-data.jsonl.gz \
             | gzip -dc \
-            | python3 tools/build_dictionaries.py --out out --ud ud \
+            | python3 tools/build_dictionaries.py --forms --out out --ud ud \
                 --languages app/src/main/java/com/pedant/app/Languages.kt
           ls -l out
 
