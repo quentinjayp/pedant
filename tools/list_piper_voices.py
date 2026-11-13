@@ -8,6 +8,7 @@ packaging). Run in CI, which can reach Hugging Face.
 
 import json
 import re
+import urllib.parse
 import urllib.request
 
 LANGUAGES = "app/src/main/java/com/pedant/app/Languages.kt"
@@ -22,7 +23,7 @@ def get(url):
 
 def packaged(voice):
     try:
-        get(SHERPA.format(voice))
+        get(SHERPA.format(urllib.parse.quote(voice)))
         return True
     except Exception:
         return False
@@ -41,7 +42,7 @@ for code, name, used in app:
     lines = []
     for key, v in found:
         config = next(p for p in v["files"] if p.endswith(".onnx.json"))
-        kind = json.loads(get(f"{BASE}/{config}")).get("phoneme_type", "espeak")
+        kind = json.loads(get(f"{BASE}/{urllib.parse.quote(config)}")).get("phoneme_type", "espeak")
         ok = packaged(key)
         if kind == "espeak" and ok:
             espeak.append(key)
