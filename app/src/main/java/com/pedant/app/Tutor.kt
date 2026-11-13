@@ -199,9 +199,7 @@ class Tutor(context: Context, modelFile: File) {
          */
         fun openingKey(language: Language, scenario: Scenario, register: Register): String {
             val hash = (systemPrompt(language, scenario) + Instructions.start(register)).hashCode()
-            // "Learning" stays in the name, as before Conversation mode was removed, so shipped and
-            // saved openings still match.
-            return "${language.code}-Learning-${scenario.name}-${register.name}-${Integer.toHexString(hash)}"
+            return "${language.code}-${scenario.name}-${register.name}-${Integer.toHexString(hash)}"
         }
 
         /** Splits a sentence lookup into word (lower case) → meaning. */

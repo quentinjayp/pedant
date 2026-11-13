@@ -28,8 +28,6 @@ from app_languages import dictionary_key, languages
 ROOT = "app/src/main"
 INSTRUCTIONS = f"{ROOT}/assets/instructions.json"
 OPENINGS = f"{ROOT}/assets/openings.json"
-# Part of each key, as the app names openings (Tutor.openingKey).
-MODE = "Learning"
 # The app's Register names; Gemma is told them in lower case.
 REGISTERS = ["Formal", "Casual"]
 
@@ -57,7 +55,8 @@ def jobs(ins):
             system = system_prompt(ins, name, scenario)
             for register in REGISTERS:
                 start = ins["start"].replace("{register}", register.lower())
-                key = f"{code}-{MODE}-{scenario}-{register}-{java_hash_hex(system + start)}"
+                # As the app names openings (Tutor.openingKey).
+                key = f"{code}-{scenario}-{register}-{java_hash_hex(system + start)}"
                 out.append((key, name, system, start))
     return out
 
@@ -108,7 +107,7 @@ def text_of(message):
 
 
 def part(raw, label):
-    """The text after LABEL: up to the next label, as the app's Tutor.parse reads it."""
+    """The text after LABEL: in Gemma's answer, up to the next label, as the app's Tutor.parse reads it."""
     m = re.search(re.escape(label) + r"(.*?)(?=\n?(?:REPLY|ENGLISH|SAY):|\Z)", raw, re.S)
     return m.group(1).strip() if m else ""
 
@@ -126,7 +125,7 @@ def to_write(ins, words):
         key = job[0]
         if key not in existing:
             out.append(job)
-        elif words and key not in retried and words.unknown(code_of(key), part(existing[key], "REPLY:")):
+        elif words and key not in retried and words.unknown(code_of(key), existing[key]["reply"]):
             out.append(job)
     return out
 
@@ -166,12 +165,10 @@ def build(args):
             if not reply:
                 print(f"{key}: no reply, skipped", flush=True)
                 continue
-            opening = f"REPLY: {reply}"
             translate = ins["replyTranslate"].replace("{language}", name)
             with engine.create_conversation(system_message=translate, sampler_config=exact) as conv:
                 english = part(text_of(conv.send_message(reply)), "ENGLISH:")
-            if english:
-                opening += f"\nENGLISH: {english}"
+            opening = {"reply": reply, "english": english or None}
             written[key] = opening
             print(f"{key} ({time.time() - started:.0f} s): {opening!r}", flush=True)
     json.dump({"openings": written, "retried": retried}, open(args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)

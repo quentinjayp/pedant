@@ -6,6 +6,9 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+/** An opening: Gemma's first line in the language being learned, and its English. */
+data class Opening(val reply: String, val english: String?)
+
 /**
  * Gemma's opening line for each language and scenario, with Piper's audio of it, so a new
  * conversation can start without waiting for Gemma. The same choices always open the same way.
@@ -24,12 +27,23 @@ class OpeningCache(parent: File, private val assets: AssetManager) {
         }.getOrDefault(JSONObject())
     }
 
-    /** Gemma's raw opening answer for [key]: the one shipped with the app, or one saved on the phone. */
-    fun text(key: String): String? =
-        bundled.optString(key).ifBlank { null }
-            ?: File(dir, "$key.txt").takeIf { it.exists() }?.readText()?.ifBlank { null }
+    /** The opening for [key]: the one shipped with the app, or one saved on the phone. */
+    fun get(key: String): Opening? = runCatching {
+        val o = bundled.optJSONObject(key)
+            ?: File(dir, "$key.json").takeIf { it.exists() }?.let { JSONObject(it.readText()) }
+        o?.let { Opening(it.getString("reply"), if (it.isNull("english")) null else it.getString("english")) }
+    }.getOrNull()
 
-    fun saveText(key: String, raw: String) = write(File(dir, "$key.txt"), raw.toByteArray())
+    fun save(key: String, opening: Opening) =
+        write(File(dir, "$key.json"), JSONObject().put("reply", opening.reply).put("english", opening.english).toString().toByteArray())
+
+    /**
+     * Deletes what was saved under the old names (which had "Learning" in them, and the text as
+     * Gemma wrote it): nothing looks them up any more.
+     */
+    fun deleteOld() {
+        dir.listFiles()?.filter { "-Learning-" in it.name }?.forEach { it.delete() }
+    }
 
     /** The opening's audio in [voice], if saved. */
     fun audio(key: String, voice: String): Audio? {

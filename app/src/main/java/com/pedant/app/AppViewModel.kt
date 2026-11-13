@@ -406,9 +406,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     return@launch
                 }
                 val openingKey = Tutor.openingKey(lang, scenario, register)
-                val opening = if (resume != null) null else {
-                    withContext(Dispatchers.IO) { openings.text(openingKey) }?.let { it to Tutor.parse(it) }
-                }
+                val opening = if (resume != null) null else withContext(Dispatchers.IO) { openings.get(openingKey) }
 
                 // Open the conversation straight away (with the saved opening, or the conversation
                 // being continued).
@@ -423,7 +421,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 editableIndex = resume?.editableIndex
                 busy = Busy.Starting
                 screen = Screen.Conversation
-                opening?.let { (_, turn) -> chat += ChatItem.Tutor(turn.reply, turn.english) }
+                opening?.let { chat += ChatItem.Tutor(it.reply, it.english) }
                 conversationScope.launch { checkDictionary(lang) }
 
                 try {
@@ -432,7 +430,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         // Gemma reads its instructions while the voice loads and the opening plays.
                         val started = async(Dispatchers.Default) {
                             val earlier = resume?.history
-                                ?: opening?.let { listOf(Tutor.Turn(true, Instructions.start(register)), Tutor.Turn(false, it.first)) }
+                                ?: opening?.let { listOf(Tutor.Turn(true, Instructions.start(register)), Tutor.Turn(false, "REPLY: ${it.reply}")) }
                                 ?: emptyList()
                             checkNotNull(tutor).startConversation(lang, scenario, earlier)
                             diagnostics.log("Gemma ready for the ${lang.englishName} session")
@@ -456,7 +454,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             started.await()
                             diagnostics.step = null
                         } else if (opening != null) {
-                            playOpening(openingKey, voice, opening.second.reply)
+                            playOpening(openingKey, voice, opening.reply)
                             busy = Busy.Starting
                             started.await()
                             diagnostics.step = null
@@ -1131,7 +1129,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 extra.await()
             }
             if (saveOpening != null && reply.isNotBlank()) {
-                openings.saveText(saveOpening.first, "REPLY: $reply" + english?.let { "\nENGLISH: $it" }.orEmpty())
+                openings.save(saveOpening.first, Opening(reply, english))
                 openings.saveAudio(saveOpening.first, saveOpening.second, audio)
             }
             queueLookups(reply)
@@ -1323,7 +1321,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
-        viewModelScope.launch(Dispatchers.IO) { runCatching { store.deleteUnusedVoices() } }
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { store.deleteUnusedVoices() }
+            runCatching { openings.deleteOld() }
+        }
         crashReport = diagnostics.takeCrashReport()
         when {
             crashReport != null -> screen = Screen.Crashed

@@ -61,12 +61,11 @@ jobs:
       - name: Each language's opening, in phonemes
         run: |
           PYTHONPATH=tools python3 - > lines.txt <<'PY'
-          import json, re
+          import json
           from app_languages import languages
           openings = json.load(open("app/src/main/assets/openings.json", encoding="utf-8"))["openings"]
           for code, voice in ((lang.code, lang.espeak) for lang in languages()):
-              raw = next(v for k, v in openings.items() if k.startswith(f"{code}-Learning-Default-Formal-"))
-              text = re.search(r"REPLY:\s*(.*?)(?:\nENGLISH:|$)", raw, re.S).group(1).strip().replace("\n", " ")
+              text = next(v["reply"] for k, v in openings.items() if k.startswith(f"{code}-Default-Formal-")).replace("\n", " ")
               print(f"{voice}\t{text}")
           PY
           ./espeak-build/pedant_espeak_test vits-piper-en_US-lessac-medium/espeak-ng-data < lines.txt
@@ -220,7 +219,7 @@ jobs:
           path: voice-check/
 
   calibrate-scoring:
-    # Scores real people's speech (FLEURS) against correct and wrong phrases, to set Learning mode's pass marks.
+    # Scores real people's speech (FLEURS) against correct and wrong phrases, to set the pass marks.
     # Runs on manual dispatch, or on pushes whose commit message contains [calibrate].
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[calibrate]')
     runs-on: ubuntu-latest

@@ -46,8 +46,7 @@ class DictionaryReportTest {
         val openings = JSONObject(File("src/main/assets/openings.json").readText()).getJSONObject("openings")
         val sentences = sortedMapOf<String, MutableList<String>>()
         for (key in openings.keys()) {
-            val reply = Regex("REPLY:\\s*(.*?)(?:\\nENGLISH:|$)", RegexOption.DOT_MATCHES_ALL)
-                .find(openings.getString(key))?.groupValues?.get(1)?.trim() ?: continue
+            val reply = openings.getJSONObject(key).getString("reply")
             sentences.getOrPut(key.substringBefore('-')) { mutableListOf() } += reply
         }
 
