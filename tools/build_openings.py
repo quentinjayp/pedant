@@ -6,6 +6,11 @@ Gemma is told exactly what the app tells it, from app/src/main/assets/instructio
 opening is stored under the same key the app looks it up by (Tutor.openingKey). Openings whose key
 is already in the file are kept, so only the ones whose instructions changed are written again.
 
+With --dicts (the app's word dictionaries, unzipped), each opening's words are checked against its
+language's dictionary: Gemma sometimes writes words that don't exist, or answers in English. An
+opening with unknown words gets up to five tries, and the one with the fewest is kept; an existing
+one with unknown words is written again once (the file's "retried" list).
+
     python3 tools/build_openings.py --model gemma.litertlm [--shard 0 --shards 4] --out part.json
     python3 tools/build_openings.py --merge part*.json   # into the assets file
 """
@@ -13,9 +18,12 @@ is already in the file are kept, so only the ones whose instructions changed are
 import argparse
 import glob
 import json
+import os
 import re
+import sqlite3
 import sys
 import time
+import unicodedata
 
 ROOT = "app/src/main"
 INSTRUCTIONS = f"{ROOT}/assets/instructions.json"
@@ -59,6 +67,43 @@ def jobs(ins):
     return out
 
 
+# Mandarin is looked up a character at a time, which its dictionary doesn't cover well enough to judge.
+UNCHECKED = {"zh"}
+TRIES = 5
+
+
+class Words:
+    """Whether a language's words are in its dictionary, as the word bubble looks them up: whole,
+    then in their parts at an apostrophe or hyphens ("allez-vous")."""
+
+    def __init__(self, dicts):
+        self.dicts = dicts
+        self.dbs = {}
+
+    def known(self, code, word):
+        if code not in self.dbs:
+            path = os.path.join(self.dicts, f"{code}.db")
+            self.dbs[code] = sqlite3.connect(path) if os.path.exists(path) else None
+        db = self.dbs[code]
+        if db is None:
+            return True
+        key = unicodedata.normalize("NFC", word).lower().replace("’", "'")
+        if db.execute("SELECT 1 FROM entries WHERE key = ? LIMIT 1", (key,)).fetchone():
+            return True
+        cut = next((i for i, c in enumerate(word) if c in "'’"), -1)
+        if 0 < cut < len(word) - 1:
+            return self.known(code, word[:cut + 1]) and self.known(code, word[cut + 1:])
+        parts = [p for p in word.split("-") if p]
+        return len(parts) > 1 and all(self.known(code, p) for p in parts)
+
+    def unknown(self, code, text):
+        """The words of [text] that aren't in [code]'s dictionary."""
+        if code in UNCHECKED:
+            return []
+        words = [w.strip("-") for w in re.findall(r"[\w'’-]+", text)]
+        return [w for w in words if w and not w.isdigit() and not self.known(code, w)]
+
+
 def text_of(message):
     content = message.get("content") if isinstance(message, dict) else message
     if isinstance(content, str):
@@ -74,23 +119,56 @@ def part(raw, label):
     return m.group(1).strip() if m else ""
 
 
+def code_of(key):
+    return key.split("-", 1)[0]
+
+
+def to_write(ins, words):
+    """The openings to write: new ones, and (with [words]) existing ones with unknown words not yet retried."""
+    data = json.load(open(OPENINGS, encoding="utf-8"))
+    existing, retried = data["openings"], set(data.get("retried", []))
+    out = []
+    for job in jobs(ins):
+        key = job[0]
+        if key not in existing:
+            out.append(job)
+        elif words and key not in retried and words.unknown(code_of(key), part(existing[key], "REPLY:")):
+            out.append(job)
+    return out
+
+
 def build(args):
     import litert_lm
 
     ins = json.load(open(INSTRUCTIONS, encoding="utf-8"))
-    existing = json.load(open(OPENINGS, encoding="utf-8"))["openings"]
-    todo = [j for i, j in enumerate(jobs(ins)) if i % args.shards == args.shard and j[0] not in existing]
+    words = Words(args.dicts) if args.dicts else None
+    todo = [j for i, j in enumerate(to_write(ins, words)) if i % args.shards == args.shard]
     print(f"{len(todo)} openings to write", flush=True)
 
     # The app's settings: CPU, the same sampling for replies, and plain sampling for translations.
-    reply_sampling = litert_lm.SamplerConfig(top_k=40, top_p=0.95, temperature=0.7, seed=1)
     exact = litert_lm.SamplerConfig(top_k=1, top_p=1.0, temperature=0.0)
-    written = {}
+    written, retried = {}, []
     with litert_lm.Engine(args.model, backend=litert_lm.Backend.CPU(), max_num_tokens=2048) as engine:
         for key, name, system, start in todo:
             started = time.time()
-            with engine.create_conversation(system_message=system, sampler_config=reply_sampling) as conv:
-                reply = part(text_of(conv.send_message(start)), "REPLY:")
+            # Up to TRIES replies, each with its own sampling, until one has no unknown words; the one
+            # with the fewest is kept.
+            best, best_unknown = "", None
+            for attempt in range(TRIES if words else 1):
+                sampling = litert_lm.SamplerConfig(top_k=40, top_p=0.95, temperature=0.7, seed=1 + attempt)
+                with engine.create_conversation(system_message=system, sampler_config=sampling) as conv:
+                    reply = part(text_of(conv.send_message(start)), "REPLY:")
+                if not reply:
+                    continue
+                unknown = words.unknown(code_of(key), reply) if words else []
+                if best_unknown is None or len(unknown) < len(best_unknown):
+                    best, best_unknown = reply, unknown
+                if not unknown:
+                    break
+                print(f"{key} try {attempt + 1}: unknown words {unknown}", flush=True)
+            reply = best
+            if words:
+                retried.append(key)
             if not reply:
                 print(f"{key}: no reply, skipped", flush=True)
                 continue
@@ -102,7 +180,7 @@ def build(args):
                 opening += f"\nENGLISH: {english}"
             written[key] = opening
             print(f"{key} ({time.time() - started:.0f} s): {opening!r}", flush=True)
-    json.dump(written, open(args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    json.dump({"openings": written, "retried": retried}, open(args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
 
 def merge(paths):
@@ -111,9 +189,13 @@ def merge(paths):
     data = json.load(open(OPENINGS, encoding="utf-8"))
     current = {key for key, *_ in jobs(ins)}
     openings = {k: v for k, v in data["openings"].items() if k in current}
+    retried = set(data.get("retried", [])) & current
     for path in paths:
-        openings.update(json.load(open(path, encoding="utf-8")))
+        part_data = json.load(open(path, encoding="utf-8"))
+        openings.update(part_data["openings"])
+        retried.update(part_data["retried"])
     data["openings"] = dict(sorted(openings.items()))
+    data["retried"] = sorted(retried)
     with open(OPENINGS, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write("\n")
@@ -128,13 +210,13 @@ if __name__ == "__main__":
     ap.add_argument("--shards", type=int, default=1)
     ap.add_argument("--out", default="openings-part.json")
     ap.add_argument("--merge", nargs="*")
-    ap.add_argument("--count", action="store_true", help="print how many openings are missing")
+    ap.add_argument("--count", action="store_true", help="print how many openings are to be written")
+    ap.add_argument("--dicts", help="the app's word dictionaries, unzipped (<code>.db), to check words against")
     a = ap.parse_args()
     if a.merge is not None:
         merge([p for pattern in a.merge for p in glob.glob(pattern)])
     elif a.count:
         ins = json.load(open(INSTRUCTIONS, encoding="utf-8"))
-        have = json.load(open(OPENINGS, encoding="utf-8"))["openings"]
-        print(sum(1 for key, *_ in jobs(ins) if key not in have))
+        print(len(to_write(ins, Words(a.dicts) if a.dicts else None)))
     else:
         build(a)

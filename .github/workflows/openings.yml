@@ -3,7 +3,8 @@ name: Openings
 # Writes Gemma's openings for every language, mode and built-in scenario into
 # app/src/main/assets/openings.json, so the app can open a conversation without waiting for Gemma.
 # Runs whenever Gemma's instructions (or the language list) change, and on demand. Only openings
-# whose instructions changed are written again. When done, it commits the file and starts a new
+# whose instructions changed are written again, plus, once, any with words that aren't in the
+# language's dictionary (Gemma sometimes makes words up or answers in English; see build_openings.py). When done, it commits the file and starts a new
 # APK build so the app ships with them.
 
 on:
@@ -35,8 +36,16 @@ jobs:
       missing: ${{ steps.count.outputs.missing }}
     steps:
       - uses: actions/checkout@v4
+      - name: Download the word dictionaries (to check the openings' words)
+        run: |
+          set -eu
+          mkdir -p dict
+          release=$(python3 -c "import json; print(json.load(open('dictionaries/manifest.json'))['release'])")
+          for f in $(python3 -c "import json; print(' '.join(json.load(open('dictionaries/manifest.json'))['languages']))"); do
+            curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/$release/$f.db.gz" | gunzip > "dict/$f.db"
+          done
       - id: count
-        run: echo "missing=$(python3 tools/build_openings.py --count)" >> "$GITHUB_OUTPUT"
+        run: echo "missing=$(python3 tools/build_openings.py --count --dicts dict)" >> "$GITHUB_OUTPUT"
 
   write:
     needs: plan
@@ -56,9 +65,17 @@ jobs:
         run: pip install --quiet litert-lm-api==0.19.1
       - name: Download Gemma
         run: curl -fsSL --retry 3 -o gemma.litertlm "$GEMMA_URL" && ls -l gemma.litertlm
+      - name: Download the word dictionaries (to check the openings' words)
+        run: |
+          set -eu
+          mkdir -p dict
+          release=$(python3 -c "import json; print(json.load(open('dictionaries/manifest.json'))['release'])")
+          for f in $(python3 -c "import json; print(' '.join(json.load(open('dictionaries/manifest.json'))['languages']))"); do
+            curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/$release/$f.db.gz" | gunzip > "dict/$f.db"
+          done
       - name: Write this shard's openings
         run: |
-          python3 tools/build_openings.py --model gemma.litertlm \
+          python3 tools/build_openings.py --model gemma.litertlm --dicts dict \
             --shard ${{ matrix.shard }} --shards "$SHARDS" --out openings-part-${{ matrix.shard }}.json
       - uses: actions/upload-artifact@v4
         with:
