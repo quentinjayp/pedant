@@ -140,6 +140,32 @@ def score(steps, total):
     return 0.0 if total <= 0 else max(0.0, min(1.0, 1.0 - sum(c for _, _, c in steps) / total))
 
 
+def segment_best(phrase_sounds, isolated):
+    """Splits the phrase's sounds into one stretch per word, in order, so that each word's stretch
+    is as close as possible to the word said on its own (least total cost)."""
+    sounds = [x for x in phrase_sounds if x != "▁"]
+    n, m = len(isolated), len(sounds)
+    inf = float("inf")
+    best = [[inf] * (m + 1) for _ in range(n + 1)]
+    cut = [[0] * (m + 1) for _ in range(n + 1)]
+    best[0][0] = 0.0
+    for w in range(n):
+        guide = [x for x in isolated[w][1] if x != "▁"]
+        for i in range(m + 1):
+            if best[w][i] == inf:
+                continue
+            for j in range(i, m + 1):
+                c = best[w][i] + sum(st[2] for st in align(guide, sounds[i:j], sound_cost, sound_indel))
+                if c < best[w + 1][j]:
+                    best[w + 1][j], cut[w + 1][j] = c, i
+    out, j = [], m
+    for w in range(n, 0, -1):
+        i = cut[w][j]
+        out.append((isolated[w - 1][0], sounds[i:j] or isolated[w - 1][1]))
+        j = i
+    return out[::-1]
+
+
 def segment(phrase_sounds, isolated):
     if len(isolated) <= 1:
         return [(isolated[0][0] if isolated else "", phrase_sounds)]
@@ -441,6 +467,19 @@ def fleurs_sentences(code):
             break
     return out
 
+
+# Phrases to show in detail: the sounds heard, each word said alone, and both ways of splitting.
+DEBUG_PHRASES = {"fr": ["J'ai eu un petit imprévu mais j'ai géré."]}
+for lang, phrases in DEBUG_PHRASES.items():
+    voice = tts(LANGS[lang]["ref"])
+    for phrase in phrases:
+        heard = sounds(voice.generate(phrase, sid=0, speed=1.0))
+        isolated = [(w, sounds(voice.generate(w, sid=0, speed=1.0))) for w in words(phrase)]
+        print(f"== Debug {lang}: {phrase}")
+        print("   phrase:   " + " ".join(heard))
+        print("   alone:    " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in isolated))
+        print("   split:    " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in segment(heard, isolated)))
+        print("   best:     " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in segment_best(heard, isolated)), flush=True)
 
 rows = []
 linked_found = {}
