@@ -76,19 +76,29 @@ class Dictionary(file: File) : Closeable {
      *     to have
      *     to own
      *
-     * An elided word the dictionary doesn't have whole, like "d'encouragement", shows the main word
-     * with the elided part added after, and their IPA joined. Null if the dictionary doesn't have
-     * the word.
+     * A word the dictionary doesn't have whole is looked up in its parts, split at an apostrophe
+     * ("d'encouragement": d' + encouragement) or hyphens ("allez-vous": allez + vous; "n'est-ce":
+     * n' + est + ce), each part's groups labelled with the part, in order, and their IPA joined.
+     * Words written with a hyphen that are one word ("peut-être", "guarda-chuva") have their own
+     * entries, so they're never split. Null if no part is in the dictionary.
      */
-    fun describe(word: String): Description? {
-        describeWhole(word)?.let { return it }
+    fun describe(word: String): Description? = describeWhole(word) ?: describeParts(word)
+
+    private fun describeParts(word: String): Description? {
         val cut = word.indexOfFirst { it == '\'' || it == '’' }
-        if (cut <= 0 || cut == word.lastIndex) return null
-        val elided = word.substring(0, cut + 1)
-        val main = describeWhole(word.substring(cut + 1)) ?: return null
-        val part = entries(elided).firstOrNull() ?: return null
-        val ipa = if (main.ipa != null && part.ipa != null) part.ipa.trimEnd('‿') + main.ipa else null
-        return Description(main.groups + Group(part.word, part.meanings.take(MAX_MEANINGS)), ipa)
+        val parts = when {
+            cut in 1 until word.lastIndex -> listOf(word.substring(0, cut + 1), word.substring(cut + 1))
+            '-' in word.trim('-') -> word.split('-').filter { it.isNotEmpty() }
+            else -> return null
+        }
+        val found = parts.map { part -> part to describe(part) }
+        if (found.all { it.second == null }) return null
+        val groups = found.flatMap { (part, d) ->
+            d?.groups.orEmpty().map { g -> Group(listOfNotNull(part, g.label).joinToString(" · "), g.meanings) }
+        }
+        val ipas = found.map { it.second?.ipa }
+        val ipa = if (ipas.all { it != null }) ipas.joinToString("") { it!!.trimEnd('‿') } else null
+        return Description(groups, ipa)
     }
 
     private fun describeWhole(word: String): Description? {
