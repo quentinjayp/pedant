@@ -253,15 +253,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         File("/proc/self/statm").readText().trim().split(' ')[1].toLong() * Os.sysconf(OsConstants._SC_PAGESIZE)
     }.getOrDefault(0L)
 
-    /** Loads one model, recording how long it took and the free memory before and after. */
+    /** Loads one model, recording how long it took (the log adds the memory before and after). */
     private fun <T> timedLoad(name: String, load: () -> T): T {
-        val before = diagnostics.memorySummary()
         loadingStep = name
-        diagnostics.step = "Loading $name ($before)"
-        diagnostics.log("Loading $name: start, $before")
+        diagnostics.step = "Loading $name"
         val start = System.currentTimeMillis()
         val result = load()
-        diagnostics.log("Loading $name: done in ${(System.currentTimeMillis() - start) / 1000.0} s, ${diagnostics.memorySummary()}")
+        diagnostics.log("Loading $name: done in ${(System.currentTimeMillis() - start) / 1000.0} s")
         return result
     }
 
@@ -834,7 +832,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (backgroundJob?.isActive == true || busy != Busy.Idle || !appVisible) return
         if (pendingSentences.isEmpty() && pendingWord == null) return
         val lang = language ?: return
-        diagnostics.log("Background lookups: start (${diagnostics.memorySummary()})")
+        diagnostics.log("Background lookups: start")
         backgroundJob = viewModelScope.launch {
             while (true) {
                 val word = pendingWord

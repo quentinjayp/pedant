@@ -3,6 +3,8 @@ package com.pedant.app
 import android.app.ActivityManager
 import android.app.ApplicationExitInfo
 import android.content.Context
+import android.system.Os
+import android.system.OsConstants
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -34,22 +36,38 @@ class Diagnostics(private val context: Context) {
 
     private val eventLog = File(context.filesDir, "events.log")
 
-    /** Adds a timestamped line to a short rolling log that is included in crash reports. */
+    /**
+     * Adds a timestamped line to a short rolling log that is included in crash reports, with the
+     * memory in use at that moment, so a report shows what grew before the phone ran short.
+     */
     fun log(event: String) {
         runCatching {
             val time = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
-            eventLog.appendText("$time $event\n")
+            eventLog.appendText("$time $event · ${appMemory()}, ${phoneMemory()}\n")
             // Trim now and then rather than rewriting the file on every event.
-            if (eventLog.length() > 16_384) eventLog.writeText(eventLog.readLines().takeLast(40).joinToString("\n") + "\n")
+            if (eventLog.length() > 32_768) eventLog.writeText(eventLog.readLines().takeLast(60).joinToString("\n") + "\n")
         }
     }
 
-    /** Free memory right now, for crash reports. */
-    fun memorySummary(): String {
-        val am = context.getSystemService(ActivityManager::class.java) ?: return ""
+    /**
+     * The app's memory right now: all of it, then the part that is its own (which Android can't
+     * take back) and the part that is files (mostly the models' files, which Android can drop and
+     * the app then has to read again).
+     */
+    private fun appMemory(): String = runCatching {
+        val fields = File("/proc/self/statm").readText().trim().split(' ')
+        val page = Os.sysconf(OsConstants._SC_PAGESIZE)
+        val all = fields[1].toLong() * page / 1_000_000
+        val files = fields[2].toLong() * page / 1_000_000
+        "app $all MB (${all - files} its own, $files files)"
+    }.getOrDefault("app memory unknown")
+
+    /** The phone's free memory right now, and whether Android counts it as low. */
+    private fun phoneMemory(): String {
+        val am = context.getSystemService(ActivityManager::class.java) ?: return "phone memory unknown"
         val info = ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
-        return "free ${info.availMem / 1_000_000} MB of ${info.totalMem / 1_000_000} MB" +
-            if (info.lowMemory) ", low memory" else ""
+        return "phone free ${info.availMem / 1_000_000} of ${info.totalMem / 1_000_000} MB" +
+            if (info.lowMemory) ", LOW" else ""
     }
 
     /** The step in progress, saved synchronously so it survives a native crash. */
@@ -96,7 +114,7 @@ class Diagnostics(private val context: Context) {
             if (eventLog.exists()) {
                 appendLine()
                 appendLine("Recent events:")
-                eventLog.readLines().takeLast(15).forEach { appendLine(it) }
+                eventLog.readLines().takeLast(25).forEach { appendLine(it) }
             }
             javaTrace?.let { appendLine(); append(it.take(4000)) }
         }
