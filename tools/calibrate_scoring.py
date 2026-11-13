@@ -547,6 +547,7 @@ for lang, cfg in LANGS.items():
         # The recording is always the real sentence; the wrong cases score it against a wrong target.
         cases = [("correct", text)] + list(variants(text, cfg["swap"][i % len(cfg["swap"])])) + [("different sentence", other)]
         for kind, target in cases:
+            scored = {}
             for method, refs in references(target):
                 ws, ss, per_word = check(target, transcript, refs, heard_sounds)
                 # Sound-alike check: the reference voice says what Omnilingual heard.
@@ -554,6 +555,12 @@ for lang, cfg in LANGS.items():
                 # Per word: (Omnilingual heard it, ZIPA's sound error ratio, the sound-alike ratio).
                 per_word = [(heard, ratio, alike_ratio) for (heard, ratio), alike_ratio in zip(per_word, alike)]
                 rows.append((lang, kind, os.path.basename(path), 0, ws, ss, per_word, method))
+                scored[method] = (ws, ss, per_word)
+            # "either": espeak-ng's sounds are shown, and a word counts as right when what was said
+            # is close to them or to ZIPA's hearing of Piper (current), whichever is closer.
+            (ws, ss_c, cur), (_, ss_e, esp) = scored["current"], scored["espeak"]
+            either = [(h1 or h2, min(r1, r2), min(a1, a2)) for (h1, r1, a1), (h2, r2, a2) in zip(cur, esp)]
+            rows.append((lang, kind, os.path.basename(path), 0, ws, max(ss_c, ss_e), either, "either"))
         print(f"{lang} heard: {transcript}", flush=True)
 
 print("\n== Words with dictionary IPA, by language ==")
@@ -585,7 +592,7 @@ def bad_words(r, rule=RULES["All three (the app)"]):
 
 
 print(f"\n== espeak-ng's words lined up with the phrase's: {ESPEAK_SPLIT}")
-for method in ["current", "dictionary", "checked", "linked", "best split", "espeak"]:
+for method in ["current", "dictionary", "checked", "linked", "best split", "espeak", "either"]:
     group_rows = [r for r in rows if r[7] == method]
     print(f"\n== Expected sounds: {method} ==")
     for kind in KINDS:
