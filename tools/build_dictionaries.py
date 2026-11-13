@@ -31,7 +31,8 @@ import os
 import re
 import sqlite3
 import sys
-import unicodedata
+
+from app_languages import dictionary_key, languages
 
 try:
     import orjson
@@ -89,38 +90,22 @@ MAX_ROWS_PER_WORD = 4
 SKIP_SENSE_TAGS = {"obsolete", "archaic", "dated", "rare", "historical"}
 
 
-def key_of(word):
-    """The lookup key; the app normalizes tapped words the same way."""
-    return unicodedata.normalize("NFC", word).lower()
-
-
-def app_codes(languages_kt):
-    with open(languages_kt, encoding="utf-8") as f:
-        return re.findall(r'Language\("([a-z]{2})"', f.read())
-
-
 def pick_ipa(sounds, code):
-    """The pronunciation shown for the entry (the accent of the app's voice where tagged), and every
-    pronunciation listed, for the app to choose the one that matches what's being said."""
+    """The pronunciation shown for the entry: the accent of the app's voice where tagged."""
     candidates = [s for s in sounds or [] if isinstance(s, dict) and s.get("ipa")]
     if code == "zh":
         # Only Mandarin readings fit the app's voice.
         candidates = [s for s in candidates if "Mandarin" in (s.get("tags") or [])]
     if not candidates:
-        return None, []
+        return None
     shown = candidates[0]
     for tag in PREFERRED_ACCENT.get(code, []):
         tagged = [s for s in candidates if tag in (s.get("tags") or [])]
         if tagged:
             shown = tagged[0]
             break
-    variants = []
-    for s in [shown] + candidates:
-        for v in split_ipa(s["ipa"]):
-            if v not in variants:
-                variants.append(v)
     first = split_ipa(shown["ipa"])
-    return (first[0] if first else None), variants
+    return first[0] if first else None
 
 
 def split_ipa(ipa):
@@ -144,12 +129,12 @@ def fix_form_links(db):
     spelling reform"); each is cut back to its longest start that is a word in the dictionary."""
     fixed = 0
     for row, base in db.execute("SELECT rowid, form_of FROM entries WHERE form_of LIKE '% %'").fetchall():
-        if db.execute("SELECT 1 FROM entries WHERE key = ? LIMIT 1", (key_of(base),)).fetchone():
+        if db.execute("SELECT 1 FROM entries WHERE key = ? LIMIT 1", (dictionary_key(base),)).fetchone():
             continue
         words = base.split(" ")
         for n in range(len(words) - 1, 0, -1):
             prefix = " ".join(words[:n]).rstrip(",;:")
-            if db.execute("SELECT 1 FROM entries WHERE key = ? LIMIT 1", (key_of(prefix),)).fetchone():
+            if db.execute("SELECT 1 FROM entries WHERE key = ? LIMIT 1", (dictionary_key(prefix),)).fetchone():
                 db.execute("UPDATE entries SET form_of = ? WHERE rowid = ?", (prefix, row))
                 fixed += 1
                 break
@@ -220,7 +205,7 @@ def ud_counts(code, ud_dir):
                     continue
                 upos = "CONTRACTION" if "-" in cols[0] else cols[3]
                 for pos in UD_TO_POS.get(upos, ()):
-                    k = (key_of(cols[1]), pos)
+                    k = (dictionary_key(cols[1]), pos)
                     counts[k] = counts.get(k, 0) + 1
     return counts, used
 
@@ -257,7 +242,7 @@ def add_table_forms(db, freq):
         "WHERE key NOT IN (SELECT key FROM entries) GROUP BY key, pos ORDER BY key"
     ).fetchall()
     db.executemany(
-        "INSERT INTO entries VALUES (?, ?, ?, NULL, NULL, ?, ?, ?)",
+        "INSERT INTO entries VALUES (?, ?, ?, NULL, ?, ?, ?)",
         [(k, w, pos, d, base, freq.get((k, pos), 0)) for k, w, pos, d, base in rows],
     )
     db.execute("DROP TABLE table_forms")
@@ -269,7 +254,7 @@ def open_db(path):
         os.remove(path)
     db = sqlite3.connect(path)
     db.execute(
-        "CREATE TABLE entries (key TEXT NOT NULL, word TEXT NOT NULL, pos TEXT, ipa TEXT, ipas TEXT,"
+        "CREATE TABLE entries (key TEXT NOT NULL, word TEXT NOT NULL, pos TEXT, ipa TEXT,"
         " meanings TEXT NOT NULL, form_of TEXT, freq INTEGER NOT NULL)"
     )
     db.execute("CREATE TABLE meta (name TEXT PRIMARY KEY, value TEXT)")
@@ -291,7 +276,7 @@ def main():
     if not args.out or not args.languages:
         ap.error("--out and --languages are required")
 
-    codes = app_codes(args.languages)
+    codes = [lang.code for lang in languages(args.languages)]
     missing = [c for c in codes if c not in WIKTIONARY_NAMES]
     if missing:
         sys.exit(f"No Wiktionary name for app languages: {missing}")
@@ -329,23 +314,23 @@ def main():
         if args.forms and form_of is None and code not in NO_TABLE_FORMS:
             dbs[code].executemany(
                 "INSERT INTO table_forms VALUES (?, ?, ?, ?, ?)",
-                [(key_of(f), f, entry.get("pos"), d, word) for f, d in table_forms(entry)],
+                [(dictionary_key(f), f, entry.get("pos"), d, word) for f, d in table_forms(entry)],
             )
-        key = key_of(word)
+        key = dictionary_key(word)
         if rows[code].get(key, 0) >= MAX_ROWS_PER_WORD:
             continue
         rows[code][key] = rows[code].get(key, 0) + 1
-        ipa, variants = pick_ipa(entry.get("sounds"), code)
+        ipa = pick_ipa(entry.get("sounds"), code)
         dbs[code].execute(
-            "INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (key, word, entry.get("pos"), ipa, "\t".join(variants) or None, "\n".join(meanings), form_of,
+            "INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (key, word, entry.get("pos"), ipa, "\n".join(meanings), form_of,
              freq[code].get((key, entry.get("pos")), 0)),
         )
         stats[code]["entries"] += 1
         stats[code]["with_ipa"] += ipa is not None
 
     print(f"{lines:,} lines read in total", file=sys.stderr)
-    languages = {}
+    built = {}
     for code, db in dbs.items():
         db.execute("CREATE INDEX entries_key ON entries (key)")
         print(f"{code}: {fix_form_links(db):,} form links cut back to their word", file=sys.stderr)
@@ -372,7 +357,7 @@ def main():
                 dst.write(src.read())
         os.remove(db_path)
         data = open(gz_path, "rb").read()
-        languages[code] = {
+        built[code] = {
             "file": f"{code}.db.gz",
             "bytes": len(data),
             "sha256": hashlib.sha256(data).hexdigest(),
@@ -382,7 +367,7 @@ def main():
               f"{len(data) / 1e6:.1f} MB", file=sys.stderr)
 
     with open(os.path.join(args.out, "languages.json"), "w", encoding="utf-8") as f:
-        json.dump(languages, f, indent=2, sort_keys=True)
+        json.dump(built, f, indent=2, sort_keys=True)
 
 
 if __name__ == "__main__":

@@ -19,18 +19,15 @@ from array import array
 
 import sherpa_onnx
 
+from app_languages import languages
+
 VOICES, OUT = sys.argv[1], sys.argv[2]
-LANGUAGES = "app/src/main/java/com/pedant/app/Languages.kt"
 OPENINGS = "app/src/main/assets/openings.json"
 
 os.makedirs(OUT, exist_ok=True)
 openings = json.load(open(OPENINGS, encoding="utf-8"))["openings"]
 failed = []
-for line in open(LANGUAGES, encoding="utf-8"):
-    m = re.search(r'Language\("([a-z]{2})", "([^"]+)", "([^"]+)", "([^"]+)"', line)
-    if not m:
-        continue
-    code, name, native, voice = m.groups()
+for code, name, native, voice, _ in languages():
     if not os.path.isdir(f"{VOICES}/vits-piper-{voice}"):
         print(f"{code} {name}: no voice downloaded")
         failed.append(code)

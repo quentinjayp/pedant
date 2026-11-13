@@ -21,14 +21,13 @@ import json
 import os
 import re
 import sqlite3
-import sys
 import time
-import unicodedata
+
+from app_languages import dictionary_key, languages
 
 ROOT = "app/src/main"
 INSTRUCTIONS = f"{ROOT}/assets/instructions.json"
 OPENINGS = f"{ROOT}/assets/openings.json"
-LANGUAGES = f"{ROOT}/java/com/pedant/app/Languages.kt"
 # Part of each key, as the app names openings (Tutor.openingKey).
 MODE = "Learning"
 # The app's Register names; Gemma is told them in lower case.
@@ -44,10 +43,6 @@ def java_hash_hex(text):
     return format(h, "x")
 
 
-def languages():
-    return re.findall(r'Language\("([a-z]{2})", "([^"]+)"', open(LANGUAGES, encoding="utf-8").read())
-
-
 def system_prompt(ins, name, scenario):
     role = ins["roles"][scenario]
     opening = ins["openDefault"] if role is None else ins["openRole"].replace("{role}", role)
@@ -57,7 +52,7 @@ def system_prompt(ins, name, scenario):
 def jobs(ins):
     """(key, language name, system prompt, start message) for every opening, in a fixed order."""
     out = []
-    for code, name in languages():
+    for code, name in ((lang.code, lang.name) for lang in languages()):
         for scenario in ins["roles"]:
             system = system_prompt(ins, name, scenario)
             for register in REGISTERS:
@@ -87,8 +82,7 @@ class Words:
         db = self.dbs[code]
         if db is None:
             return True
-        key = unicodedata.normalize("NFC", word).lower().replace("’", "'")
-        if db.execute("SELECT 1 FROM entries WHERE key = ? LIMIT 1", (key,)).fetchone():
+        if db.execute("SELECT 1 FROM entries WHERE key = ? LIMIT 1", (dictionary_key(word),)).fetchone():
             return True
         cut = next((i for i, c in enumerate(word) if c in "'’"), -1)
         if 0 < cut < len(word) - 1:
@@ -115,7 +109,7 @@ def text_of(message):
 
 def part(raw, label):
     """The text after LABEL: up to the next label, as the app's Tutor.parse reads it."""
-    m = re.search(re.escape(label) + r"(.*?)(?=\n?(?:CORRECTION|REPLY|ENGLISH|SAY):|\Z)", raw, re.S)
+    m = re.search(re.escape(label) + r"(.*?)(?=\n?(?:REPLY|ENGLISH|SAY):|\Z)", raw, re.S)
     return m.group(1).strip() if m else ""
 
 

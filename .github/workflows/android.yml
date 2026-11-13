@@ -60,11 +60,11 @@ jobs:
         run: curl -fsSL https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2 | tar xj
       - name: Each language's opening, in phonemes
         run: |
-          python3 - > lines.txt <<'PY'
+          PYTHONPATH=tools python3 - > lines.txt <<'PY'
           import json, re
-          langs = re.findall(r'Language\("([a-z]{2})".*espeakVoice = "([^"]+)"', open("app/src/main/java/com/pedant/app/Languages.kt", encoding="utf-8").read())
+          from app_languages import languages
           openings = json.load(open("app/src/main/assets/openings.json", encoding="utf-8"))["openings"]
-          for code, voice in langs:
+          for code, voice in ((lang.code, lang.espeak) for lang in languages()):
               raw = next(v for k, v in openings.items() if k.startswith(f"{code}-Learning-Default-Formal-"))
               text = re.search(r"REPLY:\s*(.*?)(?:\nENGLISH:|$)", raw, re.S).group(1).strip().replace("\n", " ")
               print(f"{voice}\t{text}")
@@ -90,14 +90,7 @@ jobs:
           curl -fsSL -o app/libs/sherpa-onnx-1.13.8.aar \
             https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
       - name: Download the dictionaries
-        run: |
-          set -eu
-          mkdir -p dict
-          release=$(python3 -c "import json; print(json.load(open('dictionaries/manifest.json'))['release'])")
-          for f in $(python3 -c "import json; print(' '.join(json.load(open('dictionaries/manifest.json'))['languages']))"); do
-            curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/download/$release/$f.db.gz" | gunzip > dict/$f.db
-          done
-          ls -l dict
+        run: tools/download_dictionaries.sh dict
       - name: Run the report
         run: DICT_DIR=$PWD/dict ./gradlew --no-daemon :app:testDebugUnitTest --tests com.pedant.app.DictionaryReportTest
       - name: Show the summary
@@ -134,23 +127,18 @@ jobs:
           done
 
           echo "== Piper voices"
-          while read -r line; do
-            lang=$(echo "$line" | grep -oE 'Language\("[a-z]+", "[^"]+"' | cut -d'"' -f4)
-            ok=""
-            for v in $(echo "$line" | grep -oE '"[a-z]{2}_[A-Z]{2}-[A-Za-z0-9_]+-(x_low|low|medium|high)"' | tr -d '"'); do
-              files=$(list "csukuangfj/vits-piper-$v" 2>/dev/null | jq -r '.[] | select(.type=="file") | .path' || true)
-              if echo "$files" | grep -qx "$v.onnx" && echo "$files" | grep -qx tokens.txt && echo "$files" | grep -q '^espeak-ng-data/'; then
-                ok=$v; break
-              fi
-              # Or packaged by this app, on its "voices" release (voices.yml).
-              own="https://github.com/$GITHUB_REPOSITORY/releases/download/voices/$v"
-              if curl -fsIL -o /dev/null "$own.onnx" && curl -fsIL -o /dev/null "$own.tokens.txt"; then
-                ok="$v (this app's release)"; break
-              fi
-              echo "  missing $v"
-            done
-            if [ -n "$ok" ]; then echo "OK $lang: $ok"; else echo "NO VOICE $lang"; fail=1; fi
-          done < <(grep -E '^\s+Language\(' app/src/main/java/com/pedant/app/Languages.kt)
+          while IFS=$'\t' read -r code lang v espeak; do
+            files=$(list "csukuangfj/vits-piper-$v" 2>/dev/null | jq -r '.[] | select(.type=="file") | .path' || true)
+            # Or packaged by this app, on its "voices" release (voices.yml).
+            own="https://github.com/$GITHUB_REPOSITORY/releases/download/voices/$v"
+            if echo "$files" | grep -qx "$v.onnx" && echo "$files" | grep -qx tokens.txt && echo "$files" | grep -q '^espeak-ng-data/'; then
+              echo "OK $lang: $v"
+            elif curl -fsIL -o /dev/null "$own.onnx" && curl -fsIL -o /dev/null "$own.tokens.txt"; then
+              echo "OK $lang: $v (this app's release)"
+            else
+              echo "NO VOICE $lang: $v"; fail=1
+            fi
+          done < <(python3 tools/app_languages.py)
           exit $fail
 
   check-zipa:
@@ -205,7 +193,7 @@ jobs:
           set -u
           mkdir -p voices && cd voices
           # Each language's voice.
-          for v in $(grep -oE '"[a-z]{2}_[A-Z]{2}-[A-Za-z0-9_]+-(x_low|low|medium|high)"' ../app/src/main/java/com/pedant/app/Languages.kt | tr -d '"'); do
+          for v in $(python3 ../tools/app_languages.py | cut -f3); do
             curl -fsSL "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-$v.tar.bz2" | tar xj && continue
             # Or packaged by this app, on its "voices" release, with espeak-ng's data from another voice.
             own="https://github.com/$GITHUB_REPOSITORY/releases/download/voices/$v"

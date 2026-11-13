@@ -1,4 +1,4 @@
-"""Calibrates Learning mode's pass marks with real speech.
+"""Calibrates the pass marks with real speech.
 
 Learners are real people reading sentences, from Google's FLEURS dataset (CC-BY). Each recording
 is scored against its own sentence (should pass) and against wrong versions of it: one word
@@ -62,23 +62,11 @@ def is_mark(s):
     return bool(s) and all(unicodedata.category(c) == "Mn" or c in "ˈˌːˑ˞ʰʲʷ" for c in s)
 
 
-# A carried consonant (French liaison, like the z of "les enfants") is written "‿z". It's expected,
-# but leaving it out costs half a sound, since some liaisons are optional.
-CARRIED = "‿"
-
-
-def base(s):
-    return s[1:] if s.startswith(CARRIED) else s
-
-
 def sound_indel(s):
-    if s.startswith(CARRIED):
-        return 0.5
     return 0.3 if is_mark(s) else 1.0
 
 
 def sound_cost(a, b):
-    a, b = base(a), base(b)
     if a == b:
         return 0.0
     if is_mark(a) or is_mark(b):
@@ -223,14 +211,12 @@ def check(target, transcript, ref_words, heard_sounds):
     return word_score, sound_score, list(zip(word_ok, ratios_from_steps(ref_words, sound_steps)))
 
 
-# ---- Expected sounds from the dictionary (option B) --------------------------------------------
-
 IPA_DROP = set("/[].ˈˌ‿͜͡ -")
 
 
 def ipa_symbols(ipa):
-    """Dictionary IPA as ZIPA-style symbols: one per character, combining marks on their own,
-    without syllable dots, stress marks, link marks, tie bars or optional (bracketed) sounds."""
+    """espeak-ng's IPA as ZIPA-style symbols: one per character, combining marks on their own,
+    without syllable dots, stress marks, link marks or tie bars."""
     ipa = re.sub(r"\([^)]*\)", "", unicodedata.normalize("NFD", ipa))
     return [c for c in ipa if c not in IPA_DROP and not c.isspace()]
 
@@ -368,13 +354,13 @@ for lang, cfg in LANGS.items():
                 alike = word_ratios(refs, alike_sounds) if alike_sounds else [1.0] * len(per_word)
                 # Per word: (Omnilingual heard it, ZIPA's sound error ratio, the sound-alike ratio).
                 per_word = [(heard, ratio, alike_ratio) for (heard, ratio), alike_ratio in zip(per_word, alike)]
-                rows.append((lang, kind, os.path.basename(path), 0, ws, ss, per_word, method))
+                rows.append((lang, kind, os.path.basename(path), ws, ss, per_word, method))
                 scored[method] = (ws, ss, per_word)
             # "either": espeak-ng's sounds are shown, and a word counts as right when what was said
             # is close to them or to ZIPA's hearing of Piper (current), whichever is closer.
             (ws, ss_c, cur), (_, ss_e, esp) = scored["current"], scored["espeak"]
             either = [(h1 or h2, min(r1, r2), min(a1, a2)) for (h1, r1, a1), (h2, r2, a2) in zip(cur, esp)]
-            rows.append((lang, kind, os.path.basename(path), 0, ws, max(ss_c, ss_e), either, "either"))
+            rows.append((lang, kind, os.path.basename(path), ws, max(ss_c, ss_e), either, "either"))
         print(f"{lang} heard: {transcript}", flush=True)
 
 # The app's rule: a word is right if Omnilingual heard it, OR ZIPA's sounds for it are close
@@ -392,15 +378,15 @@ RULES = {
 
 
 def bad_words(r, rule=RULES["All three (the app)"]):
-    return [i for i, w in enumerate(r[6]) if not rule(*w)]
+    return [i for i, w in enumerate(r[5]) if not rule(*w)]
 
 
 print(f"\n== espeak-ng's words lined up with the phrase's: {ESPEAK_SPLIT}")
 for method in ["current", "espeak", "either"]:
-    group_rows = [r for r in rows if r[7] == method]
+    group_rows = [r for r in rows if r[6] == method]
     print(f"\n== Expected sounds: {method} ==")
     for kind in KINDS:
-        for metric, idx in [("words", 4), ("sounds", 5)]:
+        for metric, idx in [("words", 3), ("sounds", 4)]:
             vals = [r[idx] for r in group_rows if r[1] == kind]
             print(f"{kind:18} {metric:6} min {min(vals):.2f} mean {sum(vals) / len(vals):.2f} max {max(vals):.2f}")
     print(f"{'rule':28}" + "".join(f"{k:>20}" for k in KINDS))
@@ -416,4 +402,4 @@ for method in ["current", "espeak", "either"]:
     print("Correct attempts that fail the app's rule:")
     for r in group_rows:
         if r[1] == "correct" and bad_words(r):
-            print("  ", r[0], r[2], r[3], "bad word indexes", bad_words(r))
+            print("  ", r[0], r[2], "bad word indexes", bad_words(r))

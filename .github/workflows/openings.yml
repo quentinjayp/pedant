@@ -37,13 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Download the word dictionaries (to check the openings' words)
-        run: |
-          set -eu
-          mkdir -p dict
-          release=$(python3 -c "import json; print(json.load(open('dictionaries/manifest.json'))['release'])")
-          for f in $(python3 -c "import json; print(' '.join(json.load(open('dictionaries/manifest.json'))['languages']))"); do
-            curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/$release/$f.db.gz" | gunzip > "dict/$f.db"
-          done
+        run: tools/download_dictionaries.sh dict
       - id: count
         run: echo "missing=$(python3 tools/build_openings.py --count --dicts dict)" >> "$GITHUB_OUTPUT"
 
@@ -66,13 +60,7 @@ jobs:
       - name: Download Gemma
         run: curl -fsSL --retry 3 -o gemma.litertlm "$GEMMA_URL" && ls -l gemma.litertlm
       - name: Download the word dictionaries (to check the openings' words)
-        run: |
-          set -eu
-          mkdir -p dict
-          release=$(python3 -c "import json; print(json.load(open('dictionaries/manifest.json'))['release'])")
-          for f in $(python3 -c "import json; print(' '.join(json.load(open('dictionaries/manifest.json'))['languages']))"); do
-            curl -fsSL --retry 3 "https://github.com/$GITHUB_REPOSITORY/releases/download/$release/$f.db.gz" | gunzip > "dict/$f.db"
-          done
+        run: tools/download_dictionaries.sh dict
       - name: Write this shard's openings
         run: |
           python3 tools/build_openings.py --model gemma.litertlm --dicts dict \

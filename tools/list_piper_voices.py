@@ -7,11 +7,11 @@ packaging). Run in CI, which can reach Hugging Face.
 """
 
 import json
-import re
 import urllib.parse
 import urllib.request
 
-LANGUAGES = "app/src/main/java/com/pedant/app/Languages.kt"
+from app_languages import languages
+
 BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
 SHERPA = "https://huggingface.co/api/models/csukuangfj/vits-piper-{}/tree/main"
 
@@ -29,13 +29,12 @@ def packaged(voice):
         return False
 
 
-app = re.findall(r'Language\("([a-z]{2})", "([^"]+)", "[^"]+", "([^"]+)"', open(LANGUAGES, encoding="utf-8").read())
 voices = json.loads(get(f"{BASE}/voices.json"))
 by_family = {}
 for key, v in voices.items():
     by_family.setdefault(v["language"]["family"], []).append((key, v))
 
-for code, name, used in app:
+for code, name, _, used, _ in languages():
     found = sorted(by_family.get(code, []))
     espeak = []
     lines = []
