@@ -42,7 +42,7 @@ except ImportError:  # pragma: no cover
 
 # English Wiktionary's names for each app language.
 WIKTIONARY_NAMES = {
-    "ar": ["Arabic"], "cs": ["Czech"], "da": ["Danish"], "de": ["German"], "el": ["Greek"],
+    "cs": ["Czech"], "da": ["Danish"], "de": ["German"], "el": ["Greek"],
     "en": ["English"], "es": ["Spanish"], "fi": ["Finnish"], "fr": ["French"], "hi": ["Hindi"],
     "hu": ["Hungarian"], "id": ["Indonesian"], "it": ["Italian"], "nl": ["Dutch"],
     "no": ["Norwegian Bokmål", "Norwegian"], "pl": ["Polish"], "pt": ["Portuguese"],
@@ -62,7 +62,7 @@ PREFERRED_ACCENT = {
 # license is checked when it's read (see ud_license_ok); Hungarian's only treebank is
 # NonCommercial, so Hungarian has none.
 UD_TREEBANKS = {
-    "ar": ["Arabic-PUD"], "cs": ["Czech-CAC", "Czech-CLTT"], "da": ["Danish-DDT"],
+    "cs": ["Czech-CAC", "Czech-CLTT"], "da": ["Danish-DDT"],
     "de": ["German-GSD", "German-HDT"], "el": ["Greek-GUD"], "en": ["English-EWT"],
     "es": ["Spanish-AnCora", "Spanish-GSD"], "fi": ["Finnish-TDT", "Finnish-FTB"], "fr": ["French-GSD"],
     "hi": ["Hindi-PUD"], "hu": [], "id": ["Indonesian-GSD", "Indonesian-CSUI", "Indonesian-PUD"],

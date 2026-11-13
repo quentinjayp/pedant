@@ -20,9 +20,12 @@ data class Language(
  */
 private val FRENCH_HYPHEN_Y = Regex("(?<=\\p{L})-[yY](?![\\p{L}\\p{N}])") to "-i"
 
-/** The 28 languages supported by Gemma 4 E4B, Omnilingual ASR, ZIPA and Piper together. */
+/**
+ * The languages supported by Gemma 4 E4B, Omnilingual ASR, ZIPA and Piper together. Arabic was
+ * removed: it's written without most vowels, so its expected sounds (espeak-ng's) are often guesses,
+ * and the app teaches and judges by sounds.
+ */
 val LANGUAGES = listOf(
-    Language("ar", "Arabic", "العربية", listOf("ar_JO-kareem-medium"), espeakVoice = "ar"),
     Language("cs", "Czech", "Čeština", listOf("cs_CZ-jirka-medium"), espeakVoice = "cs"),
     Language("da", "Danish", "Dansk", listOf("da_DK-talesyntese-medium"), espeakVoice = "da"),
     Language("de", "German", "Deutsch", listOf("de_DE-thorsten-medium"), espeakVoice = "de"),

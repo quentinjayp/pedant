@@ -101,7 +101,8 @@ class ModelStore(context: Context) {
 
     /**
      * Deletes downloaded voices no longer needed: a fallback once its language's first choice is
-     * downloaded, and any voice no language uses (such as Ukrainian's old voice, lada).
+     * downloaded, any voice no language uses (such as Ukrainian's old voice, lada), and the dictionaries
+     * of languages the app no longer has.
      */
     fun deleteUnusedVoices() {
         val keep = LANGUAGES.flatMap { lang ->
@@ -109,6 +110,9 @@ class ModelStore(context: Context) {
             if (isReady(voiceDir(first))) listOf(first) else lang.piperVoices
         }.toSet()
         File(root, "piper").listFiles()?.filter { it.isDirectory && it.name !in keep }?.forEach { it.deleteRecursively() }
+        // And dictionaries of languages the app no longer has (Arabic).
+        val codes = LANGUAGES.map { it.code }.toSet()
+        dictionaryDir.listFiles()?.filter { it.name.substringBefore('.').substringBefore('-') !in codes }?.forEach { it.delete() }
     }
 
     /**
