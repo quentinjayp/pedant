@@ -89,19 +89,60 @@ private fun OfflineRecognizer.recognize(samples: FloatArray, sampleRate: Int): O
     }
 }
 
-/** Speech-to-text with Omnilingual ASR. Writes down exactly what it hears, mistakes included. */
-class SpeechToText(store: ModelStore) {
-    private val recognizer = recognizer(
-        OfflineModelConfig(
-            omnilingual = OfflineOmnilingualAsrCtcModelConfig(model = store.asrModel.path),
-            tokens = store.asrTokens.path,
-        ),
-    )
+/**
+ * Speech-to-text with Omnilingual ASR. Writes down exactly what it hears, mistakes included.
+ *
+ * Its model is only in memory while the learner is being heard: [warm] loads it as they start
+ * talking, and it's released once they've been heard. The rest of the time Gemma has that memory
+ * (about 500 MB, and more after a long recording). [onEvent] is told each time it loads.
+ */
+class SpeechToText(private val store: ModelStore, private val onEvent: (String) -> Unit = {}) {
+    private var recognizer: OfflineRecognizer? = null
 
-    fun transcribe(samples: FloatArray): String =
-        if (samples.size < SAMPLE_RATE / 4) "" else recognizer.recognize(samples, SAMPLE_RATE).text.trim()
+    private fun loaded(): OfflineRecognizer = recognizer ?: run {
+        val start = System.currentTimeMillis()
+        recognizer(
+            OfflineModelConfig(
+                omnilingual = OfflineOmnilingualAsrCtcModelConfig(model = store.asrModel.path),
+                tokens = store.asrTokens.path,
+            ),
+        ).also {
+            recognizer = it
+            onEvent("Speech recognizer loaded in ${(System.currentTimeMillis() - start) / 1000.0} s")
+        }
+    }
 
-    fun release() = recognizer.release()
+    /** Whether speech is on its way: set as the learner starts talking, cleared once it's been heard. */
+    @Volatile private var expecting = false
+
+    /** The learner has started talking, so [warm] may load the model. */
+    fun expectSpeech() {
+        expecting = true
+    }
+
+    /**
+     * Loads the model ahead of [transcribe], if speech is still on its way: by the time this runs
+     * the learner may already have been heard, and the model must not be left in memory.
+     */
+    @Synchronized
+    fun warm() {
+        if (expecting) loaded()
+    }
+
+    /** What was said in [samples]. The model is released afterwards. */
+    @Synchronized
+    fun transcribe(samples: FloatArray): String = try {
+        if (samples.size < SAMPLE_RATE / 4) "" else loaded().recognize(samples, SAMPLE_RATE).text.trim()
+    } finally {
+        release()
+    }
+
+    @Synchronized
+    fun release() {
+        expecting = false
+        recognizer?.release()
+        recognizer = null
+    }
 }
 
 /**

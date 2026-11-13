@@ -253,14 +253,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         File("/proc/self/statm").readText().trim().split(' ')[1].toLong() * Os.sysconf(OsConstants._SC_PAGESIZE)
     }.getOrDefault(0L)
 
-    /**
-     * Loads one model, recording how long it took and the free memory before and after. [shown] is
-     * what the loading screen says meanwhile: more than this model when others load alongside it.
-     */
-    private fun <T> timedLoad(name: String, shown: String = name, load: () -> T): T {
+    /** Loads one model, recording how long it took and the free memory before and after. */
+    private fun <T> timedLoad(name: String, load: () -> T): T {
         val before = diagnostics.memorySummary()
-        loadingStep = shown
-        diagnostics.step = "Loading $shown ($before)"
+        loadingStep = name
+        diagnostics.step = "Loading $name ($before)"
         diagnostics.log("Loading $name: start, $before")
         val start = System.currentTimeMillis()
         val result = load()
@@ -268,18 +265,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return result
     }
 
-    /** Loads Gemma (on the CPU), the speech recognizer and ZIPA, whichever aren't loaded, then opens [then]. */
+    /**
+     * Loads Gemma (on the CPU) and ZIPA, whichever aren't loaded, then opens [then]. The speech
+     * recognizer isn't loaded here: it loads each time the learner starts talking (see [SpeechToText]).
+     */
     private fun loadModels(then: Screen = Screen.Home) {
         error = null
         screen = Screen.Loading
         viewModelScope.launch {
             // Only a full load is a fair guide for next time; otherwise the files' size is.
-            val loadingAll = tutor == null && stt == null && zipa == null
-            val growthKey = "growth-${store.gemma.name}"
+            val loadingAll = tutor == null && zipa == null
+            val growthKey = "loading-${store.gemma.name}"
             val startBytes = residentBytes()
             val files = listOfNotNull(
                 store.gemmaFile().takeIf { tutor == null },
-                store.asrModel.takeIf { stt == null },
                 store.zipaModel.takeIf { zipa == null },
             )
             val expected = loadPrefs.getLong(growthKey, 0L).takeIf { it > 0 && loadingAll }
@@ -301,15 +300,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             Tutor(getApplication(), checkNotNull(store.gemmaFile()) { "Gemma model file is missing" })
                         }
                     }
-                    // The speech recognizer and ZIPA load together: neither needs the other.
-                    val both = listOfNotNull("Omnilingual ASR".takeIf { stt == null }, "ZIPA".takeIf { zipa == null })
-                        .joinToString(" and ")
-                    coroutineScope {
-                        val loadingStt = if (stt != null) null else async { timedLoad("Omnilingual ASR", both) { SpeechToText(store) } }
-                        val loadingZipa = if (zipa != null) null else async { timedLoad("ZIPA", both) { SoundRecognizer(store) } }
-                        loadingStt?.let { stt = it.await() }
-                        loadingZipa?.let { zipa = it.await() }
-                    }
+                    if (stt == null) stt = SpeechToText(store, diagnostics::log)
+                    if (zipa == null) zipa = timedLoad("ZIPA") { SoundRecognizer(store) }
                     diagnostics.step = null
                     loadingStep = null
                 }
@@ -622,7 +614,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         practiceTarget = null
         tutor?.cancelGeneration()
         tts?.stopPlayback()
-        if (busy == Busy.Listening) withContext(Dispatchers.Default) { recorder.stop() }
+        if (busy == Busy.Listening) {
+            withContext(Dispatchers.Default) {
+                recorder.stop()
+                // Loaded when the talking started, and now not needed.
+                stt?.release()
+            }
+        }
         conversationJobs.children.toList().also { jobs -> jobs.forEach { it.cancel() } }.joinAll()
         pauseBackground()
         // Clear the lookup queue too, or the background lookups would restart once the app is idle.
@@ -636,6 +634,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (busy != Busy.Idle) return
         busy = Busy.Listening
         recorder.start()
+        // The speech recognizer loads while the learner talks, ready for when they've finished.
+        stt?.expectSpeech()
+        viewModelScope.launch(Dispatchers.Default) { runCatching { stt?.warm() } }
         viewModelScope.launch { pauseBackground() }
     }
 
@@ -663,18 +664,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun stopTalking() {
         if (busy != Busy.Listening) return
         launchAction(Busy.Transcribing) {
-            val audio = withContext(Dispatchers.Default) { Audio(recorder.stop(), SAMPLE_RATE) }
-            val d = drill
-            val target = practiceTarget
-            practiceTarget = null
-            when {
-                target != null -> practiceTry(target, audio)
-                d == null -> {
-                    // Waiting for English: only the words matter here.
-                    val english = withContext(Dispatchers.Default) { checkNotNull(stt).transcribe(audio.samples) }
-                    if (english.isNotBlank()) translate(english)
+            try {
+                val audio = withContext(Dispatchers.Default) { Audio(recorder.stop(), SAMPLE_RATE) }
+                val d = drill
+                val target = practiceTarget
+                practiceTarget = null
+                when {
+                    target != null -> practiceTry(target, audio)
+                    d == null -> {
+                        // Waiting for English: only the words matter here.
+                        val english = withContext(Dispatchers.Default) { checkNotNull(stt).transcribe(audio.samples) }
+                        if (english.isNotBlank()) translate(english)
+                    }
+                    else -> checkAttempt(d, audio)
                 }
-                else -> checkAttempt(d, audio)
+            } finally {
+                // The speech recognizer is released as soon as it has heard the learner; this covers
+                // a try it never hears (a word on its own, which only ZIPA hears) or one that's stopped.
+                viewModelScope.launch(Dispatchers.Default) { stt?.release() }
             }
         }
     }
