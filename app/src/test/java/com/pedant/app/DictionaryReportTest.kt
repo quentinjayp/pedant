@@ -84,7 +84,8 @@ class DictionaryReportTest {
                 summary.append("  ${problem.name} (${list2.size}): ${list2.take(12).joinToString(", ")}\n")
             }
         }
-        val header = StringBuilder("$words words checked\n")
+        val release = runCatching { JSONObject(File("../dictionaries/manifest.json").readText()).getString("release") }.getOrDefault("?")
+        val header = StringBuilder("$words words checked, dictionaries $release\n")
         for ((problem, n) in totals) header.append("  ${problem.name}: $n — ${problem.about}\n")
         File(out, "summary.txt").writeText(header.append("\n").append(summary).toString())
         File(out, "words.tsv").writeText(rows.toString())
