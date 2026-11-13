@@ -100,6 +100,18 @@ class ModelStore(context: Context) {
     }
 
     /**
+     * Deletes downloaded voices no longer needed: a fallback once its language's first choice is
+     * downloaded (lada, once tetiana is here), and any voice no language uses.
+     */
+    fun deleteUnusedVoices() {
+        val keep = LANGUAGES.flatMap { lang ->
+            val first = lang.piperVoices.first()
+            if (isReady(voiceDir(first))) listOf(first) else lang.piperVoices
+        }.toSet()
+        File(root, "piper").listFiles()?.filter { it.isDirectory && it.name !in keep }?.forEach { it.deleteRecursively() }
+    }
+
+    /**
      * The voice already downloaded for [language], if any: only its first choice when
      * [firstChoiceOnly], otherwise any of its voices (such as one it used before a better one was
      * added).

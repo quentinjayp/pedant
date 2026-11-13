@@ -1303,6 +1303,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+        viewModelScope.launch(Dispatchers.IO) { runCatching { store.deleteUnusedVoices() } }
         crashReport = diagnostics.takeCrashReport()
         when {
             crashReport != null -> screen = Screen.Crashed
