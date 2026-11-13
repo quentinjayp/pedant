@@ -468,19 +468,6 @@ def fleurs_sentences(code):
     return out
 
 
-# Phrases to show in detail: the sounds heard, each word said alone, and both ways of splitting.
-DEBUG_PHRASES = {"fr": ["J'ai eu un petit imprévu mais j'ai géré."]}
-for lang, phrases in DEBUG_PHRASES.items():
-    voice = tts(LANGS[lang]["ref"])
-    for phrase in phrases:
-        heard = sounds(voice.generate(phrase, sid=0, speed=1.0))
-        isolated = [(w, sounds(voice.generate(w, sid=0, speed=1.0))) for w in words(phrase)]
-        print(f"== Debug {lang}: {phrase}")
-        print("   phrase:   " + " ".join(heard))
-        print("   alone:    " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in isolated))
-        print("   split:    " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in segment(heard, isolated)))
-        print("   best:     " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in segment_best(heard, isolated)), flush=True)
-
 rows = []
 linked_found = {}
 coverage = {}
@@ -506,13 +493,15 @@ for lang, cfg in LANGS.items():
             print("   current:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in ref_words))
             print("   dictionary: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in dict_words))
             print("   checked:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in checked_words), flush=True)
+            best_words = segment_best(phrase_sounds, isolated)
             linked_words = mark_carried(ref_words, isolated, lang)
             for w, ss in linked_words:
                 if any(x.startswith(CARRIED) for x in ss):
                     linked_found.setdefault(lang, []).append(f"{w} /{''.join(ss)}/")
             print("   linked:     " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in linked_words), flush=True)
+            print("   best split: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in best_words), flush=True)
             references_cache[phrase] = [("current", ref_words), ("dictionary", dict_words), ("checked", checked_words),
-                                        ("linked", linked_words)]
+                                        ("linked", linked_words), ("best split", best_words)]
         return references_cache[phrase]
 
     sentences = fleurs_sentences(cfg["fleurs"])
@@ -563,7 +552,7 @@ def bad_words(r, rule=RULES["All three (the app)"]):
     return [i for i, w in enumerate(r[6]) if not rule(*w)]
 
 
-for method in ["current", "dictionary", "checked", "linked"]:
+for method in ["current", "dictionary", "checked", "linked", "best split"]:
     group_rows = [r for r in rows if r[7] == method]
     print(f"\n== Expected sounds: {method} ==")
     for kind in KINDS:
@@ -584,3 +573,17 @@ for method in ["current", "dictionary", "checked", "linked"]:
     for r in group_rows:
         if r[1] == "correct" and bad_words(r):
             print("  ", r[0], r[2], r[3], "bad word indexes", bad_words(r))
+
+
+# Phrases to show in detail: the sounds heard, each word said alone, and both ways of splitting.
+DEBUG_PHRASES = {"fr": ["J'ai eu un petit imprévu mais j'ai géré."]}
+for lang, phrases in DEBUG_PHRASES.items():
+    voice = tts(LANGS[lang]["ref"])
+    for phrase in phrases:
+        heard = sounds(voice.generate(phrase, sid=0, speed=1.0))
+        isolated = [(w, sounds(voice.generate(w, sid=0, speed=1.0))) for w in words(phrase)]
+        print(f"== Debug {lang}: {phrase}")
+        print("   phrase:   " + " ".join(heard))
+        print("   alone:    " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in isolated))
+        print("   split:    " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in segment(heard, isolated)))
+        print("   best:     " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in segment_best(heard, isolated)), flush=True)
