@@ -57,10 +57,6 @@ object Matching {
      */
     const val WORD_SOUND_LIMIT = 0.5
 
-    /** For languages written without spaces, where words can't be checked one by one. */
-    const val PASS_WORDS = 0.7
-    const val PASS_SOUNDS = 0.6
-
     /** A word counts as right if its spelling is at least this close (e.g. "toa" for "toi"). */
     private const val CLOSE_WORD = 0.66
 
@@ -76,35 +72,23 @@ object Matching {
         heardSounds: List<String>,
         transcriptSounds: List<String>? = null,
     ): AttemptResult {
-        val targetWords = words(target)
-        val heardWords = words(transcript)
-        // Languages written without spaces (Chinese) are compared character by character. Decided by
-        // the writing, not the number of words: a one-word phrase ("Hej") is still checked by word.
-        val spaced = !writtenWithoutSpaces(target)
-        val targetUnits = if (spaced) targetWords.map(::normalize) else chars(target)
-        val heardUnits = if (spaced) heardWords.map(::normalize) else chars(transcript)
+        // Words as the app splits them everywhere (each Chinese character is one).
+        val targetWords = wordsOf(target)
+        val heardWords = wordsOf(transcript)
 
-        val wordSteps = align(targetUnits, heardUnits, ::wordCost, indel = { 1.0 })
-        val wordScore = score(wordSteps, targetUnits.size.toDouble())
+        val wordSteps = align(targetWords.map(::normalize), heardWords.map(::normalize), ::wordCost, indel = { 1.0 })
+        val wordScore = score(wordSteps, targetWords.size.toDouble())
 
         // For each target word, what was heard in its place and whether it counts as wrong.
-        val heardFor = arrayOfNulls<String>(targetUnits.size)
-        val wordWrong = BooleanArray(targetUnits.size)
+        val heardFor = arrayOfNulls<String>(targetWords.size)
+        val wordWrong = BooleanArray(targetWords.size)
         for (step in wordSteps) {
             val r = step.ref ?: continue
-            step.hyp?.let { h -> heardFor[r] = if (spaced) heardWords[h] else heardUnits[h] }
+            step.hyp?.let { h -> heardFor[r] = heardWords[h] }
             if (step.cost > 0) wordWrong[r] = true
         }
 
         val sounds = compareBoth(refWords, heardSounds)
-        if (!spaced) {
-            return AttemptResult(
-                wordScore = wordScore,
-                soundScore = sounds.score,
-                passed = wordScore >= PASS_WORDS && sounds.score >= PASS_SOUNDS,
-                words = wordResults(refWords, sounds) { _, ws -> null to (ws.ratio <= WORD_SOUND_LIMIT) },
-            )
-        }
         // Both recognizers slip now and then on correct speech, but rarely on the same word, so a
         // word only counts as wrong when neither heard it right, and what Omnilingual heard
         // doesn't sound like it either.
@@ -118,26 +102,18 @@ object Matching {
             wordScore = wordScore,
             soundScore = sounds.score,
             passed = targetWords.isNotEmpty() && wrong.isEmpty(),
-            words = wordResults(refWords, sounds) { i, _ -> heardFor.getOrNull(i) to (i !in wrong) },
-        )
-    }
-
-    /** Each word's result; [judge] gives what Omnilingual heard in its place and whether it passed. */
-    private fun wordResults(
-        refWords: List<RefWord>,
-        sounds: SoundComparison,
-        judge: (Int, WordSounds) -> Pair<String?, Boolean>,
-    ): List<WordResult> = refWords.mapIndexed { i, ref ->
-        val ws = sounds.words.getOrNull(i) ?: WordSounds("", 1.0)
-        val (heardWord, passed) = judge(i, ws)
-        WordResult(
-            word = ref.word,
-            expected = ref.shown,
-            reference = ref.sounds,
-            heard = ws.heard.replace("▁", ""),
-            score = (1.0 - ws.ratio).coerceIn(0.0, 1.0),
-            heardWord = heardWord,
-            passed = passed,
+            words = refWords.mapIndexed { i, ref ->
+                val ws = sounds.words.getOrNull(i) ?: WordSounds("", 1.0)
+                WordResult(
+                    word = ref.word,
+                    expected = ref.shown,
+                    reference = ref.sounds,
+                    heard = ws.heard.replace("▁", ""),
+                    score = (1.0 - ws.ratio).coerceIn(0.0, 1.0),
+                    heardWord = heardFor.getOrNull(i),
+                    passed = i !in wrong,
+                )
+            },
         )
     }
 
@@ -182,12 +158,6 @@ object Matching {
             .replace(MARKS, "")
         return noAccents.replace(PUNCTUATION, " ").replace(SPACES, " ").trim()
     }
-
-    /** The words of [text] as written, without surrounding punctuation, for per-word reference sounds. */
-    fun words(text: String): List<String> =
-        text.split(SPACES).map { it.trim { c -> !c.isLetterOrDigit() } }.filter { it.isNotEmpty() }
-
-    private fun chars(text: String): List<String> = normalize(text).filter { it != ' ' }.map { it.toString() }
 
     /**
      * [compareSounds] against both of each word's expected sounds: each word's error ratio is the

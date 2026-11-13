@@ -65,7 +65,7 @@ class DictionaryReportTest {
             val seen = mutableSetOf<String>()
             Dictionary(file).use { dict ->
                 for (sentence in list) {
-                    for (word in tappableWords(sentence)) {
+                    for (word in wordsOf(sentence)) {
                         if (!seen.add(word.lowercase())) continue
                         words++
                         val d = dict.describe(word)

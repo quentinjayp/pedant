@@ -438,8 +438,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             is Start.Continue -> {
                                 // Back to the phrase being practised, with the tries made so far.
                                 start.saved.drillPhrase?.let { phrase ->
-                                    val audio = withContext(Dispatchers.Default) { checkNotNull(tts).synthesize(phrase) }
-                                    drill = Drill(phrase, audio, start.saved.drillWords)
+                                    drill = withContext(Dispatchers.Default) {
+                                        val audio = checkNotNull(tts).synthesize(phrase)
+                                        // Words saved before they were split as they are now (Mandarin's,
+                                        // by character) are worked out again.
+                                        val saved = start.saved.drillWords
+                                        Drill(phrase, audio, if (saved.map { it.word } == wordsOf(phrase)) saved else expectedSounds(phrase, audio))
+                                    }
                                     drillAttempts = start.saved.drillAttempts
                                 }
                                 gemmaReady.await()
@@ -846,7 +851,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Works out the meaning and sounds of every word in [sentence] and stores them. */
     private suspend fun lookUpSentence(lang: Language, sentence: String) {
-        val words = tappableWords(sentence).distinctBy { it.lowercase() }
+        val words = wordsOf(sentence).distinctBy { it.lowercase() }
         // The dictionary first; espeak-ng only for words it has no IPA for, Gemma only for words it lacks.
         val known = withContext(Dispatchers.IO) { words.associateWith { fromDictionary(it) } }
         val sounds = withContext(Dispatchers.Default) {
@@ -1049,13 +1054,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val voice = checkNotNull(tts)
         val audio = withContext(Dispatchers.Default) { voice.synthesize(phrase) }
         val refWords = coroutineScope {
-            // Expected sounds: ZIPA listens to Piper saying the whole phrase (the audio you hear).
-            // Each word said on its own only guides where the word boundaries fall. The sounds shown
-            // are the phonemes Piper was given (espeak-ng's). This runs while the phrase plays.
-            val expected = async(Dispatchers.Default) {
-                val isolated = Matching.words(phrase).map { w -> RefWord(w, wordSounds(w)) }
-                withShownSounds(phrase, Matching.segmentReference(checkNotNull(zipa).sounds(audio), isolated))
-            }
+            // Worked out while the phrase plays.
+            val expected = async(Dispatchers.Default) { expectedSounds(phrase, audio) }
             busy = Busy.Speaking
             withContext(Dispatchers.Default) { voice.play(audio) }
             busy = Busy.Preparing
@@ -1063,6 +1063,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         startDrill(Drill(phrase, audio, refWords))
         queueLookups(phrase)
+    }
+
+    /**
+     * The expected sounds of [phrase], word by word: ZIPA listens to Piper saying the whole phrase
+     * ([audio], what the learner hears), and each word said on its own only guides where the word
+     * boundaries fall. The sounds shown are the phonemes Piper was given (espeak-ng's).
+     */
+    private fun expectedSounds(phrase: String, audio: Audio): List<RefWord> {
+        val isolated = wordsOf(phrase).map { w -> RefWord(w, wordSounds(w)) }
+        return withShownSounds(phrase, Matching.segmentReference(checkNotNull(zipa).sounds(audio), isolated))
     }
 
     /**

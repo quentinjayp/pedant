@@ -1444,7 +1444,7 @@ private fun TappableText(
 
 /**
  * [text] with each word a link that calls [onWord] with the word and its position among the
- * words (the order of [tappableWords]), plus the range of each word. The word at [highlight] is
+ * words (the order of [wordsOf]), plus the range of each word. The word at [highlight] is
  * picked out.
  */
 private fun tappableAnnotated(
@@ -1457,17 +1457,14 @@ private fun tappableAnnotated(
     val wordRanges = mutableListOf<IntRange>()
     val annotated = buildAnnotatedString {
         var last = 0
-        for (match in WORD_PATTERN.findAll(text)) {
-            append(text.substring(last, match.range.first))
-            for (piece in splitWord(match.value)) {
-                val start = length
-                val position = wordRanges.size
-                withLink(LinkAnnotation.Clickable(piece, linkStyle) { onWord(piece, position) }) {
-                    if (position == highlight) withStyle(picked) { append(piece) } else append(piece)
-                }
-                wordRanges += start until length
+        for ((range, word) in wordSpans(text)) {
+            append(text.substring(last, range.first))
+            val position = wordRanges.size
+            withLink(LinkAnnotation.Clickable(word, linkStyle) { onWord(word, position) }) {
+                if (position == highlight) withStyle(picked) { append(word) } else append(word)
             }
-            last = match.range.last + 1
+            wordRanges += range
+            last = range.last + 1
         }
         append(text.substring(last))
     }
@@ -1555,7 +1552,7 @@ private fun WordBubble(
     onHear: (String, Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
-    val words = remember(lookup.sentence) { tappableWords(lookup.sentence) }
+    val words = remember(lookup.sentence) { wordsOf(lookup.sentence) }
     // Where the shown word is in the sentence; kept here so a word that appears twice is told apart.
     var position by remember(lookup.sentence) {
         mutableStateOf(words.indexOfFirst { it.equals(lookup.word, ignoreCase = true) }.coerceAtLeast(0))
