@@ -48,13 +48,12 @@ CLOSE_SOUNDS = [
     {"o", "ɔ", "ɒ", "ʌ", "ɤ"},
     {"u", "ʊ", "ɯ", "w"},
     {"r", "ʁ", "ɹ", "ʀ", "ɾ", "ɻ", "χ"},
-    {"g", "ɡ"},
     {"ʃ", "ʂ", "ɕ"},
     {"ʒ", "ʐ", "ʑ"},
     {"n", "ŋ", "ɲ"},
     {"l", "ɫ", "ʎ"},
 ]
-VOICING = {(a, b) for a, b in [("p", "b"), ("t", "d"), ("k", "g"), ("k", "ɡ"), ("s", "z"), ("f", "v"), ("ʃ", "ʒ"), ("θ", "ð")]}
+VOICING = {(a, b) for a, b in [("p", "b"), ("t", "d"), ("k", "ɡ"), ("s", "z"), ("f", "v"), ("ʃ", "ʒ"), ("θ", "ð")]}
 VOICING |= {(b, a) for a, b in VOICING}
 
 
@@ -66,7 +65,12 @@ def sound_indel(s):
     return 0.3 if is_mark(s) else 1.0
 
 
+def one_g(s):
+    return "ɡ" if s == "g" else s
+
+
 def sound_cost(a, b):
+    a, b = one_g(a), one_g(b)
     if a == b:
         return 0.0
     if is_mark(a) or is_mark(b):

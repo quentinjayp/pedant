@@ -262,22 +262,28 @@ object Matching {
         setOf("o", "ɔ", "ɒ", "ʌ", "ɤ"),
         setOf("u", "ʊ", "ɯ", "w"),
         setOf("r", "ʁ", "ɹ", "ʀ", "ɾ", "ɻ", "χ"),
-        setOf("g", "ɡ"),
         setOf("ʃ", "ʂ", "ɕ"),
         setOf("ʒ", "ʐ", "ʑ"),
         setOf("n", "ŋ", "ɲ"),
         setOf("l", "ɫ", "ʎ"),
     )
-    private val VOICING_PAIRS = listOf("p" to "b", "t" to "d", "k" to "g", "k" to "ɡ", "s" to "z", "f" to "v", "ʃ" to "ʒ", "θ" to "ð")
+    private val VOICING_PAIRS = listOf("p" to "b", "t" to "d", "k" to "ɡ", "s" to "z", "f" to "v", "ʃ" to "ʒ", "θ" to "ð")
         .flatMap { (a, b) -> listOf(a to b, b to a) }.toSet()
 
+    /** The keyboard's "g" and the IPA letter "ɡ" are two ways of writing the same sound. */
+    private fun oneG(s: String) = if (s == "g") "ɡ" else s
+
     /** Cost of hearing sound [b] for sound [a]: 0 if equal, small for close sounds, 1 otherwise. */
-    private fun soundCost(a: String, b: String): Double = when {
-        a == b -> 0.0
-        isMark(a) || isMark(b) -> 0.3
-        CLOSE_SOUNDS.any { a in it && b in it } -> 0.35
-        (a to b) in VOICING_PAIRS -> 0.5
-        else -> 1.0
+    private fun soundCost(a: String, b: String): Double {
+        val x = oneG(a)
+        val y = oneG(b)
+        return when {
+            x == y -> 0.0
+            isMark(x) || isMark(y) -> 0.3
+            CLOSE_SOUNDS.any { x in it && y in it } -> 0.35
+            (x to y) in VOICING_PAIRS -> 0.5
+            else -> 1.0
+        }
     }
 
     /** One step of an alignment: a pair, a reference item alone, or a heard item alone. */
