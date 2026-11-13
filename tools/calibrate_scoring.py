@@ -33,7 +33,11 @@ LANGS = {
     "es": {"ref": "es_ES-davefx-medium", "fleurs": "es_419", "swap": ["perro", "rojo", "nunca", "casa"]},
     "de": {"ref": "de_DE-thorsten-medium", "fleurs": "de_de", "swap": ["Hund", "rot", "niemals", "Haus"]},
     "en": {"ref": "en_US-lessac-medium", "fleurs": "en_us", "swap": ["dog", "red", "never", "house"]},
+    # Mandarin's words are its characters, and FLEURS has few sentences of 12 or fewer.
+    "zh": {"ref": "zh_CN-huayan-medium", "fleurs": "cmn_hans_cn", "swap": ["狗", "红", "不", "家"], "max_words": 20},
 }
+# Reported apart: Mandarin, written without spaces, is graded a character at a time.
+GROUPS = {"fr, es, de, en": ["fr", "es", "de", "en"], "zh": ["zh"]}
 # Sentences per language, and their length in words (the app's phrases are short).
 PER_LANGUAGE = 25
 MIN_WORDS, MAX_WORDS = 4, 12
@@ -114,15 +118,31 @@ def normalize(text):
     return " ".join(t.split())
 
 
+def is_han(c):
+    """Whether [c] is a Chinese character (the main blocks; the app asks for its Unicode script)."""
+    return "\u3400" <= c <= "\u4dbf" or "\u4e00" <= c <= "\u9fff" or "\uf900" <= c <= "\ufaff" or "\U00020000" <= c <= "\U0003ffff"
+
+
 def words(text):
-    out = []
-    for w in text.split():
-        while w and not w[0].isalnum():
-            w = w[1:]
-        while w and not w[-1].isalnum():
-            w = w[:-1]
-        if w:
-            out.append(w)
+    """The words of [text], as the app's wordsOf splits them: runs of letters, marks, digits,
+    apostrophes and hyphens with at least one letter or digit, and each Chinese character on its own."""
+    out, run = [], ""
+
+    def end_run():
+        nonlocal run
+        if any(c.isalnum() for c in run):
+            out.append(run)
+        run = ""
+
+    for c in text:
+        if is_han(c):
+            end_run()
+            out.append(c)
+        elif unicodedata.category(c)[0] in "LMN" or c in "'’-":
+            run += c
+        else:
+            end_run()
+    end_run()
     return out
 
 
@@ -220,9 +240,9 @@ IPA_DROP = set("/[].ˈˌ‿͜͡ -")
 
 def ipa_symbols(ipa):
     """espeak-ng's IPA as ZIPA-style symbols: one per character, combining marks on their own,
-    without syllable dots, stress marks, link marks or tie bars."""
+    without syllable dots, stress marks, link marks, tie bars or tone numbers."""
     ipa = re.sub(r"\([^)]*\)", "", unicodedata.normalize("NFD", ipa))
-    return [c for c in ipa if c not in IPA_DROP and not c.isspace()]
+    return [c for c in ipa if c not in IPA_DROP and not c.isspace() and not c.isdigit()]
 
 
 # ---- Models -----------------------------------------------------------------------------------
@@ -264,10 +284,17 @@ def sounds(audio):
 
 
 def variants(phrase, swap):
+    # The recording can't lose a word, so for "skip" the target gains one the speaker never said.
+    han = [i for i, c in enumerate(phrase) if is_han(c)]
+    if han:
+        # Written without spaces: the middle character is the word swapped or added.
+        k = han[len(han) // 2]
+        yield "swap one word", phrase[:k] + swap + phrase[k + 1:]
+        yield "skip one word", phrase[:k] + swap + phrase[k:]
+        return
     ws = phrase.split()
     k = len(ws) // 2
     yield "swap one word", " ".join(ws[:k] + [swap] + ws[k + 1:])
-    # The recording can't lose a word, so the target gains one the speaker never said.
     yield "skip one word", " ".join(ws[:k] + [swap] + ws[k:])
 
 
@@ -299,8 +326,8 @@ def read_wav(path):
     return Clip(values[::channels], rate)
 
 
-def fleurs_sentences(code):
-    """Short FLEURS sentences without numbers, with their recordings."""
+def fleurs_sentences(code, max_words):
+    """Short FLEURS sentences without numbers (or, in Chinese, other writing mixed in), with their recordings."""
     d = os.path.join(MODELS, "fleurs", code)
     wavs = {os.path.basename(p): p for p in glob.glob(f"{d}/**/*.wav", recursive=True)}
     out, seen = [], set()
@@ -312,7 +339,9 @@ def fleurs_sentences(code):
         file, text = cols[1], cols[2]
         if file not in wavs or text in seen or any(c.isdigit() for c in text):
             continue
-        if not MIN_WORDS <= len(words(text)) <= MAX_WORDS:
+        if any(is_han(c) for c in text) and any(c.isascii() and c.isalpha() for c in text):
+            continue
+        if not MIN_WORDS <= len(words(text)) <= max_words:
             continue
         seen.add(text)
         out.append((text, wavs[file]))
@@ -325,12 +354,19 @@ rows = []
 for lang, cfg in LANGS.items():
     ref_tts = tts(cfg["ref"])
     references_cache = {}
+    alone_cache = {}
+
+    def alone(word):
+        """The sounds of [word] said on its own, remembered as the app does."""
+        if word not in alone_cache:
+            alone_cache[word] = sounds(ref_tts.generate(word, sid=0, speed=1.0))
+        return alone_cache[word]
 
     def references(phrase):
         """The expected sounds for [phrase], by each method."""
         if phrase not in references_cache:
             audio = ref_tts.generate(phrase, sid=0, speed=1.0)
-            isolated = [(w, sounds(ref_tts.generate(w, sid=0, speed=1.0))) for w in words(phrase)]
+            isolated = [(w, alone(w)) for w in words(phrase)]
             phrase_sounds = sounds(audio)
             ref_words = segment(phrase_sounds, isolated)
             espeak_ref = espeak_words(phrase, espeak_voice(cfg["ref"]))
@@ -340,7 +376,7 @@ for lang, cfg in LANGS.items():
             references_cache[phrase] = [("current", ref_words), ("espeak", espeak_ref)]
         return references_cache[phrase]
 
-    sentences = fleurs_sentences(cfg["fleurs"])
+    sentences = fleurs_sentences(cfg["fleurs"], cfg.get("max_words", MAX_WORDS))
     print(f"== {lang}: {len(sentences)} FLEURS sentences", flush=True)
     for i, (text, path) in enumerate(sentences):
         clip = read_wav(path)
@@ -387,23 +423,25 @@ def bad_words(r, rule=RULES["All three (the app)"]):
 
 print(f"\n== espeak-ng's words lined up with the phrase's: {ESPEAK_SPLIT}")
 for method in ["current", "espeak", "either"]:
-    group_rows = [r for r in rows if r[6] == method]
-    print(f"\n== Expected sounds: {method} ==")
-    for kind in KINDS:
-        for metric, idx in [("words", 3), ("sounds", 4)]:
-            vals = [r[idx] for r in group_rows if r[1] == kind]
-            print(f"{kind:18} {metric:6} min {min(vals):.2f} mean {sum(vals) / len(vals):.2f} max {max(vals):.2f}")
-    print(f"{'rule':28}" + "".join(f"{k:>20}" for k in KINDS))
-    for name, rule in RULES.items():
-        cells = []
+    for group, codes in GROUPS.items():
+        group_rows = [r for r in rows if r[6] == method and r[0] in codes]
+        print(f"\n== Expected sounds: {method}, {group} ==")
         for kind in KINDS:
-            group = [r for r in group_rows if r[1] == kind]
-            cells.append(f"{sum(not bad_words(r, rule) for r in group) / max(1, len(group)):>20.0%}")
-        print(f"{name:28}" + "".join(cells))
-    print("By language, correct attempts passing the app's rule: " + ", ".join(
-        f"{lang} {sum(not bad_words(r) for r in group_rows if r[0] == lang and r[1] == 'correct') / max(1, sum(1 for r in group_rows if r[0] == lang and r[1] == 'correct')):.0%}"
-        for lang in LANGS))
-    print("Correct attempts that fail the app's rule:")
-    for r in group_rows:
-        if r[1] == "correct" and bad_words(r):
-            print("  ", r[0], r[2], "bad word indexes", bad_words(r))
+            for metric, idx in [("words", 3), ("sounds", 4)]:
+                vals = [r[idx] for r in group_rows if r[1] == kind]
+                print(f"{kind:18} {metric:6} min {min(vals):.2f} mean {sum(vals) / len(vals):.2f} max {max(vals):.2f}")
+        print(f"{'rule':28}" + "".join(f"{k:>20}" for k in KINDS))
+        by_kind = {kind: [r for r in group_rows if r[1] == kind] for kind in KINDS}
+        for name, rule in RULES.items():
+            print(f"{name:28}" + "".join(
+                f"{sum(not bad_words(r, rule) for r in by_kind[kind]) / max(1, len(by_kind[kind])):>20.0%}" for kind in KINDS))
+        # Before its characters were graded one by one, Mandarin passed on the whole phrase's scores.
+        print(f"{'Whole phrase (0.7 and 0.6)':28}" + "".join(
+            f"{sum(r[3] >= 0.7 and r[4] >= 0.6 for r in by_kind[kind]) / max(1, len(by_kind[kind])):>20.0%}" for kind in KINDS))
+        print("By language, correct attempts passing the app's rule: " + ", ".join(
+            f"{lang} {sum(not bad_words(r) for r in by_kind['correct'] if r[0] == lang) / max(1, sum(1 for r in by_kind['correct'] if r[0] == lang)):.0%}"
+            for lang in codes))
+        print("Correct attempts that fail the app's rule:")
+        for r in by_kind["correct"]:
+            if bad_words(r):
+                print("  ", r[0], r[2], "bad word indexes", bad_words(r))
