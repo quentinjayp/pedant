@@ -1009,11 +1009,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val audio = withContext(Dispatchers.Default) { voice.synthesize(phrase) }
         val refWords = coroutineScope {
             // Expected sounds: ZIPA listens to Piper saying the whole phrase (the audio you hear).
-            // Each word said on its own only guides where the word boundaries fall. This runs
-            // while the phrase plays.
+            // Each word said on its own only guides where the word boundaries fall. The sounds shown
+            // are the phonemes Piper was given (espeak-ng's). This runs while the phrase plays.
             val expected = async(Dispatchers.Default) {
                 val isolated = Matching.words(phrase).map { w -> RefWord(w, wordSounds(w)) }
-                Matching.segmentReference(checkNotNull(zipa).sounds(audio), isolated)
+                withShownSounds(phrase, Matching.segmentReference(checkNotNull(zipa).sounds(audio), isolated))
             }
             busy = Busy.Speaking
             withContext(Dispatchers.Default) { voice.play(audio) }
@@ -1022,6 +1022,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         startDrill(Drill(phrase, audio, refWords))
         queueLookups(phrase)
+    }
+
+    /**
+     * [refWords] with the sounds to show: espeak-ng's phonemes for each word of [phrase], as Piper is
+     * given them (after the language's fixes for text espeak-ng misreads). Unchanged if espeak-ng
+     * can't be used.
+     */
+    private fun withShownSounds(phrase: String, refWords: List<RefWord>): List<RefWord> {
+        val lang = language ?: return refWords
+        fun fixed(text: String) = lang.ttsRewrites.fold(text) { t, (pattern, replacement) -> pattern.replace(t, replacement) }
+        val shown = runCatching {
+            Phonemizer.words(store.espeakData, lang.espeakVoice, fixed(phrase), refWords.map { fixed(it.word) })
+        }.onFailure { diagnostics.log("espeak-ng: ${it.message}") }.getOrNull()
+        if (shown == null || shown.size != refWords.size) return refWords
+        return refWords.mapIndexed { i, r -> r.copy(shown = shown[i].ifEmpty { r.sounds }) }
     }
 
     private suspend fun checkAttempt(d: Drill, audio: Audio) {
@@ -1237,7 +1252,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Grades a try made in the practice window. Nothing is said back, and the conversation doesn't move on. */
     private suspend fun practiceTry(target: PracticeTarget, audio: Audio) {
         val p = practice ?: return
-        val refWords = p.result.words.map { RefWord(it.word, it.expected) }
+        val refWords = p.result.words.map { RefWord(it.word, it.reference, it.expected) }
         when (target) {
             PracticeTarget.Phrase -> {
                 val graded = grade(p.phrase, refWords, audio)

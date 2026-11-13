@@ -18,7 +18,9 @@ data class AttemptResult(
  */
 data class WordResult(
     val word: String,
+    /** The expected sounds shown (espeak-ng's), and ZIPA's hearing of Piper, also accepted; see [RefWord]. */
     val expected: List<String>,
+    val reference: List<String>,
     val heard: String,
     val score: Double,
     val heardWord: String?,
@@ -35,8 +37,12 @@ private data class WordSounds(
 
 private data class SoundComparison(val score: Double, val words: List<WordSounds>)
 
-/** A word of the target phrase and its expected sounds. */
-data class RefWord(val word: String, val sounds: List<String>)
+/**
+ * A word of the target phrase and its expected sounds, two ways: [sounds], ZIPA's hearing of Piper
+ * saying the phrase, and [shown], the phonemes Piper was given (espeak-ng's), which are what the
+ * learner sees. A word counts as said right when it's close to either (see compareBoth).
+ */
+data class RefWord(val word: String, val sounds: List<String>, val shown: List<String> = sounds)
 
 /**
  * Scores an attempt at a phrase. Both recognizers make small mistakes even on perfect speech, so
@@ -91,7 +97,7 @@ object Matching {
             if (step.cost > 0) wordWrong[r] = true
         }
 
-        val sounds = compareSounds(refWords, heardSounds)
+        val sounds = compareBoth(refWords, heardSounds)
         if (!spaced) {
             return AttemptResult(
                 wordScore = wordScore,
@@ -103,7 +109,7 @@ object Matching {
         // Both recognizers slip now and then on correct speech, but rarely on the same word, so a
         // word only counts as wrong when neither heard it right, and what Omnilingual heard
         // doesn't sound like it either.
-        val soundAlike = transcriptSounds?.let { compareSounds(refWords, it) }
+        val soundAlike = transcriptSounds?.let { compareBoth(refWords, it) }
         val wrong = targetWords.indices.filter { i ->
             val soundRatio = sounds.words.getOrNull(i)?.ratio ?: 1.0
             val alikeRatio = soundAlike?.words?.getOrNull(i)?.ratio ?: 1.0
@@ -127,7 +133,8 @@ object Matching {
         val (heardWord, passed) = judge(i, ws)
         WordResult(
             word = ref.word,
-            expected = ref.sounds,
+            expected = ref.shown,
+            reference = ref.sounds,
             heard = ws.heard.replace("▁", ""),
             score = (1.0 - ws.ratio).coerceIn(0.0, 1.0),
             heardWord = heardWord,
@@ -140,7 +147,7 @@ object Matching {
      * 1) and the sounds heard.
      */
     fun checkWord(ref: RefWord, heardSounds: List<String>): Pair<Double, String> {
-        val ws = compareSounds(listOf(ref), heardSounds.filter { it != "▁" }).words.first()
+        val ws = compareBoth(listOf(ref), heardSounds.filter { it != "▁" }).words.first()
         return (1.0 - ws.ratio).coerceIn(0.0, 1.0) to ws.heard
     }
 
@@ -182,6 +189,24 @@ object Matching {
         text.split(SPACES).map { it.trim { c -> !c.isLetterOrDigit() } }.filter { it.isNotEmpty() }
 
     private fun chars(text: String): List<String> = normalize(text).filter { it != ' ' }.map { it.toString() }
+
+    /**
+     * [compareSounds] against both of each word's expected sounds: each word's error ratio is the
+     * smaller, the heard sounds are lined up with the shown ones, and the score is the better.
+     * Tested in tools/calibrate_scoring.py ("either"): it passes correct speech as often as ZIPA's
+     * hearing of Piper alone, and judges each word's sounds right more often.
+     */
+    private fun compareBoth(refWords: List<RefWord>, heardSounds: List<String>): SoundComparison {
+        val heard = compareSounds(refWords, heardSounds)
+        if (refWords.all { it.shown == it.sounds }) return heard
+        val shown = compareSounds(refWords.map { RefWord(it.word, it.shown) }, heardSounds)
+        return SoundComparison(
+            maxOf(heard.score, shown.score),
+            refWords.indices.map { w ->
+                shown.words[w].copy(ratio = minOf(heard.words[w].ratio, shown.words[w].ratio))
+            },
+        )
+    }
 
     /** Overall sound score, and for each word its expected sounds, heard sounds and error ratio. */
     private fun compareSounds(refWords: List<RefWord>, heardSounds: List<String>): SoundComparison {

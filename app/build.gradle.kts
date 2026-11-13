@@ -45,6 +45,14 @@ android {
         compose = true
     }
 
+    // espeak-ng, for the expected sounds shown (src/main/cpp, Phonemizer.kt).
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
     packaging {
         jniLibs {
             pickFirsts += "**/libc++_shared.so"

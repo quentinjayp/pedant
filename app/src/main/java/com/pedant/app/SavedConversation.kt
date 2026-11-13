@@ -25,7 +25,7 @@ data class SavedConversation(
         fun file(dir: File) = File(dir, "conversation.json")
 
         /** Bumped when the saved format changes; a conversation saved in another format is discarded. */
-        private const val VERSION = 3
+        private const val VERSION = 4
 
         fun load(dir: File): SavedConversation? {
             val file = file(dir)
@@ -49,7 +49,7 @@ data class SavedConversation(
             history = o.getJSONArray("history").objects().map { Tutor.Turn(it.getBoolean("learner"), it.getString("text")) },
             drillPhrase = o.optStringOrNull("drillPhrase"),
             drillWords = o.optJSONArray("drillWords")?.objects()?.map {
-                RefWord(it.getString("word"), it.getJSONArray("sounds").strings())
+                RefWord(it.getString("word"), it.getJSONArray("sounds").strings(), it.getJSONArray("shown").strings())
             }.orEmpty(),
             drillAttempts = o.optInt("drillAttempts"),
             editableIndex = if (o.has("editableIndex")) o.getInt("editableIndex") else null,
@@ -73,6 +73,7 @@ data class SavedConversation(
                 WordResult(
                     word = it.getString("word"),
                     expected = it.getJSONArray("expected").strings(),
+                    reference = it.getJSONArray("reference").strings(),
                     heard = it.getString("heard"),
                     score = it.getDouble("score"),
                     heardWord = it.optStringOrNull("heardWord"),
@@ -96,7 +97,9 @@ data class SavedConversation(
             .put("chat", JSONArray(chat.map { json(it) }))
             .put("history", JSONArray(history.map { JSONObject().put("learner", it.fromLearner).put("text", it.text) }))
             .put("drillPhrase", drillPhrase)
-            .put("drillWords", JSONArray(drillWords.map { JSONObject().put("word", it.word).put("sounds", JSONArray(it.sounds)) }))
+            .put("drillWords", JSONArray(drillWords.map {
+                JSONObject().put("word", it.word).put("sounds", JSONArray(it.sounds)).put("shown", JSONArray(it.shown))
+            }))
             .put("drillAttempts", drillAttempts)
             .put("editableIndex", editableIndex)
         val tmp = File(dir, "conversation.json.tmp")
@@ -119,7 +122,8 @@ data class SavedConversation(
         .put("soundScore", r.soundScore)
         .put("passed", r.passed)
         .put("words", JSONArray(r.words.map {
-            JSONObject().put("word", it.word).put("expected", JSONArray(it.expected)).put("heard", it.heard)
+            JSONObject().put("word", it.word).put("expected", JSONArray(it.expected)).put("reference", JSONArray(it.reference))
+                .put("heard", it.heard)
                 .put("score", it.score).put("heardWord", it.heardWord).put("passed", it.passed)
         }))
 }
