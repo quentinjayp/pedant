@@ -6,15 +6,19 @@ swapped, one word added that the speaker skipped, and a different sentence (shou
 as app/src/main/java/com/pedant/app/Matching.kt, which this file mirrors; keep the two in step.
 
 Usage: python calibrate_scoring.py <models dir>
-The models dir holds the reference vits-piper-* voices, the Omnilingual ASR model, ZIPA, the word
-dictionaries (dict/) and FLEURS (fleurs/<code>/); see the CI job.
+Expected sounds, three ways: "current", ZIPA's hearing of the app's voice saying the phrase;
+"espeak", the phonemes the voice is given (espeak-ng's, which the app shows); and "either", the app's
+rule: a word counts as right when it's close to either. Earlier experiments (Wiktionary's IPA, Piper
+checked against it, liaison marking, another word split) lost to these and were removed.
+
+The models dir holds the reference vits-piper-* voices, the Omnilingual ASR model, ZIPA and FLEURS
+(fleurs/<code>/); see the CI job. espeak-ng must be installed.
 """
 from array import array
 import glob
 import os
 import re
 import json
-import sqlite3
 import subprocess
 import sys
 import unicodedata
@@ -170,32 +174,6 @@ def espeak_words(phrase, voice):
     return [(w, ipa_symbols("".join(espeak_ipa(w, voice)))) for w in ws]
 
 
-def segment_best(phrase_sounds, isolated):
-    """Splits the phrase's sounds into one stretch per word, in order, so that each word's stretch
-    is as close as possible to the word said on its own (least total cost)."""
-    sounds = [x for x in phrase_sounds if x != "▁"]
-    n, m = len(isolated), len(sounds)
-    inf = float("inf")
-    best = [[inf] * (m + 1) for _ in range(n + 1)]
-    cut = [[0] * (m + 1) for _ in range(n + 1)]
-    best[0][0] = 0.0
-    for w in range(n):
-        guide = [x for x in isolated[w][1] if x != "▁"]
-        for i in range(m + 1):
-            if best[w][i] == inf:
-                continue
-            for j in range(i, m + 1):
-                c = best[w][i] + sum(st[2] for st in align(guide, sounds[i:j], sound_cost, sound_indel))
-                if c < best[w + 1][j]:
-                    best[w + 1][j], cut[w + 1][j] = c, i
-    out, j = [], m
-    for w in range(n, 0, -1):
-        i = cut[w][j]
-        out.append((isolated[w - 1][0], sounds[i:j] or isolated[w - 1][1]))
-        j = i
-    return out[::-1]
-
-
 def segment(phrase_sounds, isolated):
     if len(isolated) <= 1:
         return [(isolated[0][0] if isolated else "", phrase_sounds)]
@@ -247,8 +225,6 @@ def check(target, transcript, ref_words, heard_sounds):
 
 # ---- Expected sounds from the dictionary (option B) --------------------------------------------
 
-DICTS = os.path.join(MODELS, "dict")
-VOWELS = set("aeiouyøœɛɔəɑɐɒæɪʊʏɨʉɯɤɜɞʌɘɵ")
 IPA_DROP = set("/[].ˈˌ‿͜͡ -")
 
 
@@ -257,149 +233,6 @@ def ipa_symbols(ipa):
     without syllable dots, stress marks, link marks, tie bars or optional (bracketed) sounds."""
     ipa = re.sub(r"\([^)]*\)", "", unicodedata.normalize("NFD", ipa))
     return [c for c in ipa if c not in IPA_DROP and not c.isspace()]
-
-
-def dict_key(word):
-    return unicodedata.normalize("NFC", word).lower().replace("’", "'")
-
-
-def dict_ipa(db, word):
-    """The dictionary's IPA for [word] as symbols, as the app finds it (elided words by their parts)."""
-    def whole(w):
-        row = db.execute("SELECT ipa FROM entries WHERE key = ? AND ipa IS NOT NULL LIMIT 1", (dict_key(w),)).fetchone()
-        return ipa_symbols(row[0]) if row else None
-    found = whole(word)
-    if found:
-        return found
-    cut = next((i for i, c in enumerate(word) if c in "'’"), -1)
-    if 0 < cut < len(word) - 1:
-        part, main = whole(word[:cut + 1]), whole(word[cut + 1:])
-        if part and main:
-            return part + main
-    return None
-
-
-def dict_candidates(db, word):
-    """Every pronunciation the dictionary lists for [word], as symbols (elided words by their parts)."""
-    def whole(w):
-        rows = db.execute("SELECT ipas FROM entries WHERE key = ? AND ipas IS NOT NULL", (dict_key(w),)).fetchall()
-        out = []
-        for (ipas,) in rows:
-            for v in ipas.split("\t"):
-                syms = ipa_symbols(v)
-                if syms and syms not in out:
-                    out.append(syms)
-        return out
-    found = whole(word)
-    if found:
-        return found
-    cut = next((i for i, c in enumerate(word) if c in "'’"), -1)
-    if 0 < cut < len(word) - 1:
-        parts, mains = whole(word[:cut + 1]), whole(word[cut + 1:])
-        return [p + m for p in parts for m in mains]
-    return []
-
-
-# Piper's sounds for a word count as agreeing with the dictionary when they're this close to one of
-# its pronunciations (cost per expected sound).
-AGREE = 0.15
-# Past this, the dictionary's closest pronunciation is likely another word spelled the same ("est",
-# east, for "est", is), so Piper's sounds are kept.
-FAR = 0.5
-# Languages whose words carry a final consonant over to a next word that starts with a vowel.
-LIAISON = {"fr"}
-
-
-def drop_liaison_forms(cands):
-    """Without the pronunciations that are another one plus a final consonant (vous /vuz/ beside
-    /vu/, un /œ̃n/ beside /œ̃/): those are the liaison forms, which carrying a consonant covers."""
-    return [c for c in cands if not (is_consonant(c[-1]) and c[:-1] in cands)]
-
-
-def pron_ratio(said, expected):
-    return sum(c for _, _, c in align(expected, said, sound_cost, sound_indel)) / max(1, len(expected))
-
-
-def is_consonant(s):
-    return bool(s) and not is_mark(s) and s not in VOWELS and s != "▁"
-
-
-def dict_reference(db, phrase_sounds, current, lang, check=False):
-    """Option B: each word's sounds from the dictionary (Piper's where it has none), plus the
-    consonants Piper carries over from one word to a next word that starts with a vowel, in
-    languages with liaison.
-
-    Option B2 ([check]): Piper's sounds for a word are kept when they agree with one of the
-    dictionary's pronunciations, replaced by the closest one when they don't, and kept when even the
-    closest is far off."""
-    refs = []
-    for w, piper in current:
-        piper = [x for x in piper if x != "▁"]
-        if check:
-            cands = dict_candidates(db, w) if db else []
-            if lang in LIAISON:
-                cands = drop_liaison_forms(cands)
-            best = min(cands, key=lambda c: pron_ratio(piper, c)) if cands else None
-            if best is None or not AGREE < pron_ratio(piper, best) <= FAR:
-                refs.append((w, piper, False))
-            else:
-                refs.append((w, best, True))
-            continue
-        ipa = dict_ipa(db, w) if db else None
-        refs.append((w, ipa if ipa else list(piper), ipa is not None))
-    ref = [s for _, ss, _ in refs for s in ss]
-    word_of = [i for i, (_, ss, _) in enumerate(refs) for _ in ss]
-    carried = {}
-    last_ref = None
-    steps = align(ref, [s for s in phrase_sounds if s != "▁"], sound_cost, sound_indel) if lang in LIAISON else []
-    for r, h, _ in steps:
-        if r is not None:
-            last_ref = r
-            continue
-        # A sound Piper said between the end of one word and the start of the next.
-        if last_ref is None or last_ref + 1 >= len(ref):
-            continue
-        w = word_of[last_ref]
-        if word_of[last_ref + 1] != w + 1 or last_ref != max(i for i, x in enumerate(word_of) if x == w):
-            continue
-        sound = [s for s in phrase_sounds if s != "▁"][h]
-        nxt = refs[w + 1][1]
-        # A glottal stop belongs to the start of the next word, not the end of this one.
-        if is_consonant(sound) and sound != "ʔ" and nxt and base(nxt[0]) in VOWELS:
-            carried[w] = CARRIED + sound
-    out = [(w, ss + ([carried[i]] if i in carried else [])) for i, (w, ss, _) in enumerate(refs)]
-    coverage = sum(1 for _, _, from_dict in refs if from_dict) / max(1, len(refs))
-    return out, coverage
-
-
-def mark_carried(ref_words, isolated, lang):
-    """Option A2: Piper's sounds (option A), with each liaison consonant marked as carried.
-
-    A liaison consonant is one Piper says at the end of a word (or the start of the next) in the
-    sentence but not when it says the word on its own, before a word that starts with a vowel: the z
-    of "les enfants". It's moved to the end of the word it belongs to and written "‿z". A consonant
-    the word always has, moved onto the next word ("avec elle"), isn't one."""
-    if lang not in LIAISON:
-        return ref_words
-    seg = [[x for x in ss if x != "▁"] for _, ss in ref_words]
-    iso = [[x for x in ss if x != "▁"] for _, ss in isolated]
-    for k in range(len(seg) - 1):
-        nxt_iso = [x for x in iso[k + 1] if not is_mark(x)]
-        if not nxt_iso or base(nxt_iso[0]) not in VOWELS or not seg[k]:
-            continue
-        steps = align(seg[k], iso[k], sound_cost, sound_indel)
-        if steps and steps[-1][1] is None and is_consonant(seg[k][-1]):
-            seg[k][-1] = CARRIED + seg[k][-1]
-            continue
-        if not seg[k + 1]:
-            continue
-        first = seg[k + 1][0]
-        steps = align(seg[k + 1], iso[k + 1], sound_cost, sound_indel)
-        own_end = iso[k][-1] if iso[k] else None
-        if (steps and steps[0] == (0, None, sound_indel(first)) and is_consonant(first)
-                and first != "ʔ" and own_end != first):
-            seg[k].append(CARRIED + seg[k + 1].pop(0))
-    return [(w, ss or orig) for (w, orig), ss in zip(ref_words, seg)]
 
 
 # ---- Models -----------------------------------------------------------------------------------
@@ -499,12 +332,7 @@ def fleurs_sentences(code):
 
 
 rows = []
-linked_found = {}
-coverage = {}
-replacements = {}
 for lang, cfg in LANGS.items():
-    db_path = os.path.join(DICTS, f"{lang}.db")
-    db = sqlite3.connect(db_path) if os.path.exists(db_path) else None
     ref_tts = tts(cfg["ref"])
     references_cache = {}
 
@@ -515,25 +343,11 @@ for lang, cfg in LANGS.items():
             isolated = [(w, sounds(ref_tts.generate(w, sid=0, speed=1.0))) for w in words(phrase)]
             phrase_sounds = sounds(audio)
             ref_words = segment(phrase_sounds, isolated)
-            dict_words, cov = dict_reference(db, phrase_sounds, ref_words, lang)
-            checked_words, replaced = dict_reference(db, phrase_sounds, ref_words, lang, check=True)
-            coverage.setdefault(lang, []).append(cov)
-            replacements.setdefault(lang, []).append(replaced)
-            print(f"{lang} {phrase}")
-            print("   current:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in ref_words))
-            print("   dictionary: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in dict_words))
-            print("   checked:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in checked_words), flush=True)
-            best_words = segment_best(phrase_sounds, isolated)
             espeak_ref = espeak_words(phrase, espeak_voice(cfg["ref"]))
-            print("   espeak:     " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in espeak_ref), flush=True)
-            linked_words = mark_carried(ref_words, isolated, lang)
-            for w, ss in linked_words:
-                if any(x.startswith(CARRIED) for x in ss):
-                    linked_found.setdefault(lang, []).append(f"{w} /{''.join(ss)}/")
-            print("   linked:     " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in linked_words), flush=True)
-            print("   best split: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in best_words), flush=True)
-            references_cache[phrase] = [("current", ref_words), ("dictionary", dict_words), ("checked", checked_words),
-                                        ("linked", linked_words), ("best split", best_words), ("espeak", espeak_ref)]
+            print(f"{lang} {phrase}")
+            print("   current: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in ref_words))
+            print("   espeak:  " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in espeak_ref), flush=True)
+            references_cache[phrase] = [("current", ref_words), ("espeak", espeak_ref)]
         return references_cache[phrase]
 
     sentences = fleurs_sentences(cfg["fleurs"])
@@ -563,16 +377,6 @@ for lang, cfg in LANGS.items():
             rows.append((lang, kind, os.path.basename(path), 0, ws, max(ss_c, ss_e), either, "either"))
         print(f"{lang} heard: {transcript}", flush=True)
 
-print("\n== Words with dictionary IPA, by language ==")
-for lang, covs in coverage.items():
-    print(f"{lang} {sum(covs) / len(covs):.0%}")
-print("\n== Liaison consonants marked as carried (linked) ==")
-for lang, found in linked_found.items():
-    print(f"{lang} {len(found)}: " + ", ".join(found))
-print("\n== Words where Piper disagreed with the dictionary and were replaced (checked) ==")
-for lang, reps in replacements.items():
-    print(f"{lang} {sum(reps) / len(reps):.0%}")
-
 # The app's rule: a word is right if Omnilingual heard it, OR ZIPA's sounds for it are close
 # enough, OR what Omnilingual heard sounds like it (the sound-alike check). Each part alone and in
 # pairs shows how much each recognizer adds.
@@ -592,7 +396,7 @@ def bad_words(r, rule=RULES["All three (the app)"]):
 
 
 print(f"\n== espeak-ng's words lined up with the phrase's: {ESPEAK_SPLIT}")
-for method in ["current", "dictionary", "checked", "linked", "best split", "espeak", "either"]:
+for method in ["current", "espeak", "either"]:
     group_rows = [r for r in rows if r[7] == method]
     print(f"\n== Expected sounds: {method} ==")
     for kind in KINDS:
@@ -613,18 +417,3 @@ for method in ["current", "dictionary", "checked", "linked", "best split", "espe
     for r in group_rows:
         if r[1] == "correct" and bad_words(r):
             print("  ", r[0], r[2], r[3], "bad word indexes", bad_words(r))
-
-
-# Phrases to show in detail: the sounds heard, each word said alone, and both ways of splitting.
-DEBUG_PHRASES = {"fr": ["J'ai eu un petit imprévu mais j'ai géré."]}
-for lang, phrases in DEBUG_PHRASES.items():
-    voice = tts(LANGS[lang]["ref"])
-    for phrase in phrases:
-        heard = sounds(voice.generate(phrase, sid=0, speed=1.0))
-        isolated = [(w, sounds(voice.generate(w, sid=0, speed=1.0))) for w in words(phrase)]
-        print(f"== Debug {lang}: {phrase}")
-        print("   phrase:   " + " ".join(heard))
-        print("   alone:    " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in isolated))
-        print("   split:    " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in segment(heard, isolated)))
-        print("   best:     " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in segment_best(heard, isolated)))
-        print("   espeak:   " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in espeak_words(phrase, espeak_voice(LANGS[lang]["ref"]))), flush=True)

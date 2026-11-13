@@ -252,12 +252,6 @@ jobs:
           curl -fsSL https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12.tar.bz2 | tar xj
           curl -fsSL -o zipa/model.int8.onnx https://huggingface.co/anyspeech/zipa-large-crctc-500k/resolve/main/model.int8.onnx
           curl -fsSL -o zipa/tokens.txt https://huggingface.co/anyspeech/zipa-large-crctc-500k/resolve/main/tokens.txt
-          # The word dictionaries, for expected sounds taken from the dictionary.
-          mkdir -p dict
-          release=$(python3 -c "import json; print(json.load(open('../dictionaries/manifest.json'))['release'])")
-          for l in fr es de en; do
-            curl -fsSL "https://github.com/$GITHUB_REPOSITORY/releases/download/$release/$l.db.gz" | gunzip > dict/$l.db
-          done
           # Real speech: FLEURS (Google, CC-BY), people reading sentences, from its dev and test splits.
           for code in fr_fr es_419 de_de en_us; do
             mkdir -p fleurs/$code
