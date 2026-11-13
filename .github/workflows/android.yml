@@ -139,6 +139,8 @@ jobs:
           for v in $(grep -oE '"[a-z]{2}_[A-Z]{2}-[A-Za-z0-9_]+-(x_low|low|medium|high)"' ../app/src/main/java/com/pedant/app/Languages.kt | tr -d '"'); do
             curl -fsSL "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-$v.tar.bz2" | tar xj || echo "missing $v"
           done
+      - name: List the Piper voices for each language
+        run: python tools/list_piper_voices.py
       - name: Have each voice speak
         run: |
           pip install sherpa-onnx==1.13.8
