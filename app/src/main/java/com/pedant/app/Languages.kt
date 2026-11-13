@@ -45,7 +45,7 @@ val LANGUAGES = listOf(
     Language("sv", "Swedish", "Svenska", listOf("sv_SE-nst-medium")),
     Language("sw", "Swahili", "Kiswahili", listOf("sw_CD-lanfrica-medium")),
     Language("tr", "Turkish", "Türkçe", listOf("tr_TR-dfki-medium")),
-    Language("uk", "Ukrainian", "Українська", listOf("uk_UA-tetiana-high")),
+    Language("uk", "Ukrainian", "Українська", listOf("uk_UA-tetiana-high", "uk_UA-lada-x_low")),
     Language("vi", "Vietnamese", "Tiếng Việt", listOf("vi_VN-vais1000-medium")),
     Language("zh", "Mandarin", "中文", listOf("zh_CN-huayan-medium")),
 )
