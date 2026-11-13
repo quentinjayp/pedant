@@ -13,7 +13,9 @@ from array import array
 import glob
 import os
 import re
+import json
 import sqlite3
+import subprocess
 import sys
 import unicodedata
 
@@ -138,6 +140,34 @@ def word_cost(a, b):
 
 def score(steps, total):
     return 0.0 if total <= 0 else max(0.0, min(1.0, 1.0 - sum(c for _, _, c in steps) / total))
+
+
+def espeak_voice(voice):
+    """The espeak-ng voice a Piper voice reads its text with (from its .onnx.json)."""
+    return json.load(open(glob.glob(f"{MODELS}/vits-piper-{voice}/*.onnx.json")[0], encoding="utf-8"))["espeak"]["voice"]
+
+
+def espeak_ipa(text, voice):
+    """espeak-ng's IPA for [text], a string per word, as Piper is given it (without stress marks
+    and the like, which ipa_symbols drops)."""
+    out = subprocess.run(["espeak-ng", "-q", "--ipa", "-v", voice], input=text, capture_output=True, text=True).stdout
+    out = re.sub(r"\([a-z-]+\)", "", out)  # language switches, like (en)
+    return out.split()
+
+
+ESPEAK_SPLIT = {"matched": 0, "word by word": 0}
+
+
+def espeak_words(phrase, voice):
+    """The expected sounds per word from espeak-ng. The phrase's IPA, said as a whole (with its
+    liaisons), when it has a word for each of the phrase's words; otherwise each word on its own."""
+    ws = words(phrase)
+    whole = espeak_ipa(phrase, voice)
+    if len(whole) == len(ws):
+        ESPEAK_SPLIT["matched"] += 1
+        return [(w, ipa_symbols(i)) for w, i in zip(ws, whole)]
+    ESPEAK_SPLIT["word by word"] += 1
+    return [(w, ipa_symbols("".join(espeak_ipa(w, voice)))) for w in ws]
 
 
 def segment_best(phrase_sounds, isolated):
@@ -494,6 +524,8 @@ for lang, cfg in LANGS.items():
             print("   dictionary: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in dict_words))
             print("   checked:    " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in checked_words), flush=True)
             best_words = segment_best(phrase_sounds, isolated)
+            espeak_ref = espeak_words(phrase, espeak_voice(cfg["ref"]))
+            print("   espeak:     " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in espeak_ref), flush=True)
             linked_words = mark_carried(ref_words, isolated, lang)
             for w, ss in linked_words:
                 if any(x.startswith(CARRIED) for x in ss):
@@ -501,7 +533,7 @@ for lang, cfg in LANGS.items():
             print("   linked:     " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in linked_words), flush=True)
             print("   best split: " + " | ".join(f"{w} /{''.join(ss)}/" for w, ss in best_words), flush=True)
             references_cache[phrase] = [("current", ref_words), ("dictionary", dict_words), ("checked", checked_words),
-                                        ("linked", linked_words), ("best split", best_words)]
+                                        ("linked", linked_words), ("best split", best_words), ("espeak", espeak_ref)]
         return references_cache[phrase]
 
     sentences = fleurs_sentences(cfg["fleurs"])
@@ -552,7 +584,8 @@ def bad_words(r, rule=RULES["All three (the app)"]):
     return [i for i, w in enumerate(r[6]) if not rule(*w)]
 
 
-for method in ["current", "dictionary", "checked", "linked", "best split"]:
+print(f"\n== espeak-ng's words lined up with the phrase's: {ESPEAK_SPLIT}")
+for method in ["current", "dictionary", "checked", "linked", "best split", "espeak"]:
     group_rows = [r for r in rows if r[7] == method]
     print(f"\n== Expected sounds: {method} ==")
     for kind in KINDS:
@@ -586,4 +619,5 @@ for lang, phrases in DEBUG_PHRASES.items():
         print("   phrase:   " + " ".join(heard))
         print("   alone:    " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in isolated))
         print("   split:    " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in segment(heard, isolated)))
-        print("   best:     " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in segment_best(heard, isolated)), flush=True)
+        print("   best:     " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in segment_best(heard, isolated)))
+        print("   espeak:   " + " | ".join(f"{w} /{' '.join(ss)}/" for w, ss in espeak_words(phrase, espeak_voice(LANGS[lang]["ref"]))), flush=True)

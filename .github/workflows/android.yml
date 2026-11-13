@@ -205,5 +205,7 @@ jobs:
           done
       - name: Score learner voices
         run: |
+          # espeak-ng, for the expected sounds Piper is given (the "espeak" method).
+          sudo apt-get install -y -qq espeak-ng >/dev/null
           pip install sherpa-onnx==1.13.8
           python tools/calibrate_scoring.py models
