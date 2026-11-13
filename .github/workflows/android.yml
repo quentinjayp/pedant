@@ -73,7 +73,7 @@ jobs:
           while read -r line; do
             lang=$(echo "$line" | grep -oE 'Language\("[a-z]+", "[^"]+"' | cut -d'"' -f4)
             ok=""
-            for v in $(echo "$line" | grep -oE '"[a-z]{2}_[A-Z]{2}-[A-Za-z0-9_]+-(low|medium|high)"' | tr -d '"'); do
+            for v in $(echo "$line" | grep -oE '"[a-z]{2}_[A-Z]{2}-[A-Za-z0-9_]+-(x_low|low|medium|high)"' | tr -d '"'); do
               files=$(list "csukuangfj/vits-piper-$v" 2>/dev/null | jq -r '.[] | select(.type=="file") | .path' || true)
               if echo "$files" | grep -qx "$v.onnx" && echo "$files" | grep -qx tokens.txt && echo "$files" | grep -q '^espeak-ng-data/'; then
                 ok=$v; break
@@ -136,7 +136,7 @@ jobs:
           set -u
           mkdir -p voices && cd voices
           # Each language's voices, in the app's order; a missing one is skipped like the app does.
-          for v in $(grep -oE '"[a-z]{2}_[A-Z]{2}-[A-Za-z0-9_]+-(low|medium|high)"' ../app/src/main/java/com/pedant/app/Languages.kt | tr -d '"'); do
+          for v in $(grep -oE '"[a-z]{2}_[A-Z]{2}-[A-Za-z0-9_]+-(x_low|low|medium|high)"' ../app/src/main/java/com/pedant/app/Languages.kt | tr -d '"'); do
             curl -fsSL "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-$v.tar.bz2" | tar xj || echo "missing $v"
           done
       - name: Have each voice speak
