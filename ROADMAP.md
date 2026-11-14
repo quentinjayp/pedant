@@ -14,6 +14,12 @@ Three modes to choose from. Anything not mentioned here stays as it is today.
 - **Advanced.** Free conversation in the language, with no English first. The tutor makes no
   corrections or suggestions about what you said. This mode may use a different speech recognizer
   (undecided).
+  - **Reaching for a missing word.** Say a sentence in the language with the one word you don't
+    know in English, and get back just that word.
+  - **Answered correctly, without being stopped.** The tutor repeats what you meant in the right
+    form inside its reply and carries on, the way a listener does.
+  - **Asking about the language as you go.** Ask the tutor in English mid-conversation ("What does
+    that mean?", "How do I say…?", "Why this word and not that one?"), then carry on.
 
 ## Conversations
 
