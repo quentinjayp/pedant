@@ -1294,7 +1294,14 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
         Column(Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(16.dp)).padding(12.dp)) {
             SmallLabel("The phrase:", Pastel.InkSoft)
             Spacer(Modifier.height(4.dp))
-            TappableText(p.phrase, fontSize = 15.sp, color = Pastel.Ink, highlight = i, onWord = { _, _, at -> vm.practiceSelect(at) })
+            TappableText(
+                p.phrase,
+                fontSize = 15.sp,
+                color = Pastel.Ink,
+                highlight = i,
+                wrong = words.indices.filter { !words[it].passed }.toSet(),
+                onWord = { _, _, at -> vm.practiceSelect(at) },
+            )
         }
         // Practise: the picked word on its own, or the whole phrase again.
         Text(
@@ -1403,11 +1410,13 @@ private fun TappableText(
     color: Color = Color.Unspecified,
     /** The position (among the words) of a word to pick out, if any. */
     highlight: Int? = null,
+    /** The positions of words said wrong: written and underlined in red. */
+    wrong: Set<Int> = emptySet(),
     onWord: (word: String, sentence: String, position: Int) -> Unit,
 ) {
     val currentOnWord by rememberUpdatedState(onWord)
-    val (annotated, wordRanges) = remember(text, highlight) {
-        tappableAnnotated(text, highlight) { word, position -> currentOnWord(word, text, position) }
+    val (annotated, wordRanges) = remember(text, highlight, wrong) {
+        tappableAnnotated(text, highlight, wrong) { word, position -> currentOnWord(word, text, position) }
     }
     // A dotted underline under each tappable word, so it's clear they can be tapped.
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
@@ -1424,14 +1433,14 @@ private fun TappableText(
             if (l.layoutInput.text.text != annotated.text) return@drawBehind
             val stroke = with(density) { 2.dp.toPx() }
             val dots = PathEffect.dashPathEffect(floatArrayOf(stroke, stroke * 1.5f))
-            for (range in wordRanges) {
+            for ((position, range) in wordRanges.withIndex()) {
                 if (range.isEmpty()) continue
                 val line = l.getLineForOffset(range.first)
                 val left = l.getHorizontalPosition(range.first, usePrimaryDirection = true)
                 val right = l.getHorizontalPosition(range.last + 1, usePrimaryDirection = true)
                 val y = l.getLineBottom(line) - stroke
                 drawLine(
-                    color = Pastel.VioletDark,
+                    color = if (position in wrong) Pastel.Wrong else Pastel.VioletDark,
                     start = Offset(minOf(left, right), y),
                     end = Offset(maxOf(left, right), y),
                     strokeWidth = stroke,
@@ -1445,11 +1454,12 @@ private fun TappableText(
 /**
  * [text] with each word a link that calls [onWord] with the word and its position among the
  * words (the order of [wordsOf]), plus the range of each word. The word at [highlight] is
- * picked out.
+ * picked out, and the words at [wrong] are red.
  */
 private fun tappableAnnotated(
     text: String,
     highlight: Int?,
+    wrong: Set<Int>,
     onWord: (word: String, position: Int) -> Unit,
 ): Pair<AnnotatedString, List<IntRange>> {
     val linkStyle = TextLinkStyles(style = SpanStyle(textDecoration = TextDecoration.None))
@@ -1461,7 +1471,13 @@ private fun tappableAnnotated(
             append(text.substring(last, range.first))
             val position = wordRanges.size
             withLink(LinkAnnotation.Clickable(word, linkStyle) { onWord(word, position) }) {
-                if (position == highlight) withStyle(picked) { append(word) } else append(word)
+                val style = when {
+                    position == highlight && position in wrong -> picked.copy(color = Pastel.Wrong)
+                    position == highlight -> picked
+                    position in wrong -> SpanStyle(color = Pastel.Wrong)
+                    else -> null
+                }
+                if (style != null) withStyle(style) { append(word) } else append(word)
             }
             wordRanges += range
             last = range.last + 1

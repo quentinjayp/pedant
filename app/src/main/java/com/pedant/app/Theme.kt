@@ -41,6 +41,9 @@ object Pastel {
     val CtaDark = Color(0xFF7A4600)
     val CtaContainer = Color(0xFFFFF0D6)
     val CtaInk = Color(0xFF3D2200)
+
+    // Words said wrong.
+    val Wrong = Color(0xFFC62828)
 }
 
 /** The logo's own colours, brighter than the app's: orange, violet and cyan. */
