@@ -16,8 +16,9 @@ Three modes to choose from. Anything not mentioned here stays as it is today.
   (undecided).
   - **Reaching for a missing word.** Say a sentence in the language with the one word you don't
     know in English, and get back just that word.
-  - **Answered correctly, without being stopped.** The tutor repeats what you meant in the right
-    form inside its reply and carries on, the way a listener does.
+  - **Tutor's note.** After you say something, and before the tutor's reply, a correction or
+    clarification of what you said is shown, perhaps as its own card in the conversation called
+    "Tutor's note". The tutor then replies as normal.
   - **Asking about the language as you go.** Ask the tutor in English mid-conversation ("What does
     that mean?", "How do I say…?", "Why this word and not that one?"), then carry on.
 
