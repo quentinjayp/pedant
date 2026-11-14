@@ -504,6 +504,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             tts = TextToSpeech(store, voice, lang::espeakText, getApplication<Application>().cacheDir)
             ttsVoice = voice
             wordSoundsCache.clear()
+            synchronized(wordAudioKept) { wordAudioKept.clear() }
             diagnostics.log("Loaded the $voice voice")
         }
     }
@@ -710,9 +711,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** What ZIPA hears when Piper says [text]: the sounds the app expects for it. */
     private fun soundsOf(text: String): List<String> = checkNotNull(zipa).sounds(checkNotNull(tts).synthesize(text))
 
-    /** [soundsOf] for single words, remembered for the current voice (drills and lookups share them). */
+    /**
+     * Piper's audio of single words (at normal speed, or slow), for the current voice: the most
+     * recent [WORD_AUDIO_KEPT], so a word that has been said once plays at once the next time.
+     */
+    private val wordAudioKept = object : LinkedHashMap<Pair<String, Boolean>, Audio>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Pair<String, Boolean>, Audio>) = size > WORD_AUDIO_KEPT
+    }
+
+    private fun wordAudio(word: String, slow: Boolean = false): Audio =
+        synchronized(wordAudioKept) { wordAudioKept[word to slow] }
+            ?: checkNotNull(tts).synthesize(word, if (slow) SLOW_SPEED else 1.0f)
+                .also { synchronized(wordAudioKept) { wordAudioKept[word to slow] = it } }
+
+    /**
+     * [soundsOf] for single words, remembered for the current voice (drills and lookups share them).
+     * The audio made for it is kept too, so the word can be played without making it again.
+     */
     private val wordSoundsCache = ConcurrentHashMap<String, List<String>>()
-    private fun wordSounds(word: String): List<String> = wordSoundsCache.getOrPut(word) { soundsOf(word) }
+    private fun wordSounds(word: String): List<String> =
+        wordSoundsCache.getOrPut(word) { checkNotNull(zipa).sounds(wordAudio(word)) }
 
     // Word meanings are worked out in the background, a whole sentence at a time, as soon as a
     // phrase or reply appears. The background work only runs while the app is idle: it stops when
@@ -989,10 +1007,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun hearWord(word: String, slow: Boolean) {
         if (busy != Busy.Idle || word.isBlank()) return
         launchAction(Busy.Speaking) {
-            withContext(Dispatchers.Default) {
-                val voice = checkNotNull(tts)
-                voice.play(voice.synthesize(word, if (slow) SLOW_SPEED else 1.0f))
-            }
+            withContext(Dispatchers.Default) { checkNotNull(tts).play(wordAudio(word, slow)) }
         }
     }
 
@@ -1236,6 +1251,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         /** Speaking rate for "Slow": 40% of normal speed. */
         private const val SLOW_SPEED = 0.4f
+
+        /** At about 50 KB a word, around 10 MB. */
+        private const val WORD_AUDIO_KEPT = 200
 
         /** How long the loading bar takes to move to a new amount. */
         const val LOADING_BAR_FILL_MS = 500
