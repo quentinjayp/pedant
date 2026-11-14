@@ -42,7 +42,8 @@ object Pastel {
     val CtaContainer = Color(0xFFFFF0D6)
     val CtaInk = Color(0xFF3D2200)
 
-    // Words said wrong.
+    // Words said right, and wrong.
+    val Right = Color(0xFF2E7D32)
     val Wrong = Color(0xFFC62828)
 }
 

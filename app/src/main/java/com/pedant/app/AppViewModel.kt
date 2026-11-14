@@ -1288,21 +1288,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }?.third
 
     /** Opens the practice window for the attempt at [index], on its first wrong word. */
-    fun openPractice(index: Int) {
+    /**
+     * Opens the practice window for the try at [index], on the word at [position] (the first wrong
+     * word if none is given), and says that word at normal speed.
+     */
+    fun openPractice(index: Int, position: Int? = null) {
         val item = chat.getOrNull(index) as? ChatItem.Attempt ?: return
-        if (item.result.words.isEmpty()) return
-        val first = item.result.words.indexOfFirst { !it.passed }.coerceAtLeast(0)
-        val p = Practice(index, item.phrase, item.result, first, hasRecording = false)
+        val words = item.result.words
+        if (words.isEmpty()) return
+        val at = position?.takeIf { it in words.indices } ?: words.indexOfFirst { !it.passed }.coerceAtLeast(0)
+        val p = Practice(index, item.phrase, item.result, at, hasRecording = false)
         practice = p.copy(hasRecording = recordingFor(p) != null)
+        hearWord(words[at].word, slow = false)
     }
 
     fun closePractice() {
         practice = null
     }
 
+    /** Picks the word at [position] in the practice window (wrapping around) and says it at normal speed. */
     fun practiceSelect(position: Int) {
         val p = practice ?: return
-        practice = p.copy(position = Math.floorMod(position, p.result.words.size.coerceAtLeast(1)))
+        val at = Math.floorMod(position, p.result.words.size.coerceAtLeast(1))
+        practice = p.copy(position = at)
+        p.result.words.getOrNull(at)?.let { hearWord(it.word, slow = false) }
     }
 
     /** Plays back the learner's whole try. */

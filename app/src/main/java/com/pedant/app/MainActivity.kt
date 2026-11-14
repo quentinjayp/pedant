@@ -1008,7 +1008,7 @@ private fun ConversationScreen(vm: AppViewModel) {
                         Bubble(item.reply, mine = false, label = "Tutor", detail = item.english, onWord = vm::openWord)
                     }
                     is ChatItem.Say -> SayCard(item, vm.language?.englishName, onWord = vm::openWord)
-                    is ChatItem.Attempt -> AttemptCard(item, enabled = vm.busy == Busy.Idle, onOpen = { vm.openPractice(index) })
+                    is ChatItem.Attempt -> AttemptCard(item, enabled = vm.busy == Busy.Idle, onOpen = { at -> vm.openPractice(index, at) })
                     is ChatItem.Note -> Text(
                         item.text,
                         fontSize = 13.sp,
@@ -1171,7 +1171,7 @@ private fun SayCard(item: ChatItem.Say, language: String?, onWord: (word: String
 
 /** How one try at the phrase went; tapping it opens the practice window. */
 @Composable
-private fun AttemptCard(item: ChatItem.Attempt, enabled: Boolean, onOpen: () -> Unit) {
+private fun AttemptCard(item: ChatItem.Attempt, enabled: Boolean, onOpen: (position: Int?) -> Unit) {
     val r = item.result
     val accent = if (r.passed) Pastel.Primary else Pastel.Cta
     val ink = if (r.passed) Pastel.PrimaryInk else Pastel.CtaInk
@@ -1179,7 +1179,7 @@ private fun AttemptCard(item: ChatItem.Attempt, enabled: Boolean, onOpen: () -> 
         Modifier
             .fillMaxWidth()
             .card(if (r.passed) Pastel.PrimarySoft else Pastel.CtaContainer, accent, RoundedCornerShape(26.dp), borderWidth = if (r.passed) 2.dp else 1.dp)
-            .clickable(enabled = enabled, onClick = onOpen)
+            .clickable(enabled = enabled) { onOpen(null) }
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -1202,13 +1202,16 @@ private fun AttemptCard(item: ChatItem.Attempt, enabled: Boolean, onOpen: () -> 
             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Pastel.White.copy(alpha = 0.75f)).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                buildAnnotatedString {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("Heard: ") }
-                    append(item.heard.ifEmpty { "(nothing)" })
-                },
-                fontSize = 13.sp,
+            // The phrase, its right words green and its wrong words red; a word opens the practice
+            // window on it.
+            TappableText(
+                item.phrase,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
                 color = ink,
+                right = r.words.indices.filter { r.words[it].passed }.toSet(),
+                wrong = r.words.indices.filter { !r.words[it].passed }.toSet(),
+                onWord = { _, _, at -> if (enabled) onOpen(at) },
             )
             val expected = r.words.joinToString(" ") { it.expected.joinToString("").replace("▁", "") }
             Text("Expected: /$expected/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.PrimaryDark)
@@ -1410,13 +1413,21 @@ private fun TappableText(
     color: Color = Color.Unspecified,
     /** The position (among the words) of a word to pick out, if any. */
     highlight: Int? = null,
+    /** The positions of words said right: written and underlined in green. */
+    right: Set<Int> = emptySet(),
     /** The positions of words said wrong: written and underlined in red. */
     wrong: Set<Int> = emptySet(),
     onWord: (word: String, sentence: String, position: Int) -> Unit,
 ) {
     val currentOnWord by rememberUpdatedState(onWord)
-    val (annotated, wordRanges) = remember(text, highlight, wrong) {
-        tappableAnnotated(text, highlight, wrong) { word, position -> currentOnWord(word, text, position) }
+    // The colour that marks the word at a position as right or wrong, if it's marked.
+    fun mark(position: Int): Color? = when (position) {
+        in wrong -> Pastel.Wrong
+        in right -> Pastel.Right
+        else -> null
+    }
+    val (annotated, wordRanges) = remember(text, highlight, right, wrong) {
+        tappableAnnotated(text, highlight, ::mark) { word, position -> currentOnWord(word, text, position) }
     }
     // A dotted underline under each tappable word, so it's clear they can be tapped.
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
@@ -1440,7 +1451,7 @@ private fun TappableText(
                 val right = l.getHorizontalPosition(range.last + 1, usePrimaryDirection = true)
                 val y = l.getLineBottom(line) - stroke
                 drawLine(
-                    color = if (position in wrong) Pastel.Wrong else Pastel.VioletDark,
+                    color = mark(position) ?: Pastel.VioletDark,
                     start = Offset(minOf(left, right), y),
                     end = Offset(maxOf(left, right), y),
                     strokeWidth = stroke,
@@ -1454,12 +1465,12 @@ private fun TappableText(
 /**
  * [text] with each word a link that calls [onWord] with the word and its position among the
  * words (the order of [wordsOf]), plus the range of each word. The word at [highlight] is
- * picked out, and the words at [wrong] are red.
+ * picked out, and a word [mark] gives a colour for is written in it.
  */
 private fun tappableAnnotated(
     text: String,
     highlight: Int?,
-    wrong: Set<Int>,
+    mark: (position: Int) -> Color?,
     onWord: (word: String, position: Int) -> Unit,
 ): Pair<AnnotatedString, List<IntRange>> {
     val linkStyle = TextLinkStyles(style = SpanStyle(textDecoration = TextDecoration.None))
@@ -1471,10 +1482,10 @@ private fun tappableAnnotated(
             append(text.substring(last, range.first))
             val position = wordRanges.size
             withLink(LinkAnnotation.Clickable(word, linkStyle) { onWord(word, position) }) {
+                val colour = mark(position)
                 val style = when {
-                    position == highlight && position in wrong -> picked.copy(color = Pastel.Wrong)
-                    position == highlight -> picked
-                    position in wrong -> SpanStyle(color = Pastel.Wrong)
+                    position == highlight -> if (colour != null) picked.copy(color = colour) else picked
+                    colour != null -> SpanStyle(color = colour)
                     else -> null
                 }
                 if (style != null) withStyle(style) { append(word) } else append(word)
