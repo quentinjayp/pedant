@@ -2,7 +2,8 @@
 
 Learners are real people reading sentences, from Google's FLEURS dataset (CC-BY). Each recording
 is scored against its own sentence (should pass) and against wrong versions of it: one word
-swapped, one word added that the speaker skipped, and a different sentence (should fail). The scores use the same rules
+swapped, one word added that the speaker skipped, a different sentence, and the recording cut in
+half as if the speaker stopped early (should fail). The scores use the same rules
 as app/src/main/java/com/pedant/app/Matching.kt, which this file mirrors; keep the two in step.
 
 Usage: python calibrate_scoring.py <models dir>
@@ -220,19 +221,26 @@ def word_ratios(ref_words, heard):
 
 
 def check(target, transcript, ref_words, heard_sounds):
-    """Returns (word score, sound score, per-word: (heard by Omnilingual, sound error ratio))."""
+    """Returns (word score, sound score, per-word: (heard by Omnilingual, sound error ratio, whether
+    it comes after the last word Omnilingual heard anything for, whether before the first))."""
     tw = [normalize(w) for w in words(target)]
     hw = [normalize(w) for w in words(transcript)]
     word_steps = align(tw, hw, word_cost, lambda _: 1.0)
     word_score = score(word_steps, len(tw))
     word_ok = [False] * len(tw)
+    # The words Omnilingual heard something in place of, right or wrong.
+    placed = []
     for r, h, c in word_steps:
-        if r is not None and h is not None and c == 0:
-            word_ok[r] = True
+        if r is not None and h is not None:
+            placed.append(r)
+            if c == 0:
+                word_ok[r] = True
+    after = [not placed or i > max(placed) for i in range(len(tw))]
+    before = [not placed or i < min(placed) for i in range(len(tw))]
     ref = [s for _, ss in ref_words for s in ss]
     sound_steps = align(ref, heard_sounds, sound_cost, sound_indel)
     sound_score = score(sound_steps, sum(sound_indel(s) for s in ref))
-    return word_score, sound_score, list(zip(word_ok, ratios_from_steps(ref_words, sound_steps)))
+    return word_score, sound_score, list(zip(word_ok, ratios_from_steps(ref_words, sound_steps), after, before))
 
 
 IPA_DROP = set("/[].ˈˌ‿͜͡ -")
@@ -380,41 +388,56 @@ for lang, cfg in LANGS.items():
     print(f"== {lang}: {len(sentences)} FLEURS sentences", flush=True)
     for i, (text, path) in enumerate(sentences):
         clip = read_wav(path)
-        transcript = recognize(asr, clip).text
-        heard_sounds = sounds(clip)
-        alike_sounds = sounds(ref_tts.generate(transcript, sid=0, speed=1.0)) if transcript.strip() else None
+
+        def heard(audio):
+            """What each recognizer hears in [audio]: (Omnilingual's words, ZIPA's sounds, the sounds
+            of the reference voice saying those words, for the sound-alike check)."""
+            said = recognize(asr, audio).text
+            return said, sounds(audio), sounds(ref_tts.generate(said, sid=0, speed=1.0)) if said.strip() else None
+
+        whole = heard(clip)
+        # The speaker stops halfway: the first half of the recording, against the whole sentence.
+        half = heard(Clip(clip.samples[:len(clip.samples) // 2], clip.sample_rate))
         other = sentences[(i + 1) % len(sentences)][0]
-        # The recording is always the real sentence; the wrong cases score it against a wrong target.
-        cases = [("correct", text)] + list(variants(text, cfg["swap"][i % len(cfg["swap"])])) + [("different sentence", other)]
-        for kind, target in cases:
+        # Otherwise the recording is the real sentence; the wrong cases score it against a wrong target.
+        cases = [("correct", text, whole)] + [(kind, target, whole) for kind, target in variants(text, cfg["swap"][i % len(cfg["swap"])])]
+        cases += [("different sentence", other, whole), ("stopped halfway", text, half)]
+        for kind, target, (transcript, heard_sounds, alike_sounds) in cases:
             scored = {}
             for method, refs in references(target):
                 ws, ss, per_word = check(target, transcript, refs, heard_sounds)
                 # Sound-alike check: the reference voice says what Omnilingual heard.
                 alike = word_ratios(refs, alike_sounds) if alike_sounds else [1.0] * len(per_word)
-                # Per word: (Omnilingual heard it, ZIPA's sound error ratio, the sound-alike ratio).
-                per_word = [(heard, ratio, alike_ratio) for (heard, ratio), alike_ratio in zip(per_word, alike)]
+                # Per word: (Omnilingual heard it, ZIPA's sound error ratio, the sound-alike ratio,
+                # after the last word Omnilingual heard anything for, before the first).
+                per_word = [(ok, ratio, alike_ratio, after, before) for (ok, ratio, after, before), alike_ratio in zip(per_word, alike)]
                 rows.append((lang, kind, os.path.basename(path), ws, ss, per_word, method))
                 scored[method] = (ws, ss, per_word)
             # "either": espeak-ng's sounds are shown, and a word counts as right when what was said
             # is close to them or to ZIPA's hearing of Piper (current), whichever is closer.
             (ws, ss_c, cur), (_, ss_e, esp) = scored["current"], scored["espeak"]
-            either = [(h1 or h2, min(r1, r2), min(a1, a2)) for (h1, r1, a1), (h2, r2, a2) in zip(cur, esp)]
+            either = [(h1 or h2, min(r1, r2), min(a1, a2), t1, l1) for (h1, r1, a1, t1, l1), (h2, r2, a2, _, _) in zip(cur, esp)]
             rows.append((lang, kind, os.path.basename(path), ws, max(ss_c, ss_e), either, "either"))
-        print(f"{lang} heard: {transcript}", flush=True)
+        print(f"{lang} heard: {whole[0]}  |  stopped halfway: {half[0]}", flush=True)
 
 # The app's rule: a word is right if Omnilingual heard it, OR ZIPA's sounds for it are close
 # enough, OR what Omnilingual heard sounds like it (the sound-alike check). Each part alone and in
 # pairs shows how much each recognizer adds.
 LIMIT = 0.5
-KINDS = ["correct", "swap one word", "skip one word", "different sentence"]
+KINDS = ["correct", "swap one word", "skip one word", "different sentence", "stopped halfway"]
 RULES = {
-    "ZIPA alone": lambda heard, ratio, alike: ratio <= LIMIT,
-    "Omnilingual alone": lambda heard, ratio, alike: heard,
-    "Omnilingual + sound-alike": lambda heard, ratio, alike: heard or alike <= LIMIT,
-    "ZIPA + Omnilingual": lambda heard, ratio, alike: heard or ratio <= LIMIT,
-    "All three (the app)": lambda heard, ratio, alike: heard or ratio <= LIMIT or alike <= LIMIT,
+    "ZIPA alone": lambda heard, ratio, alike, after, before: ratio <= LIMIT,
+    "Omnilingual alone": lambda heard, ratio, alike, after, before: heard,
+    "Omnilingual + sound-alike": lambda heard, ratio, alike, after, before: heard or alike <= LIMIT,
+    "ZIPA + Omnilingual": lambda heard, ratio, alike, after, before: heard or ratio <= LIMIT,
+    "All three (the app)": lambda heard, ratio, alike, after, before: heard or ratio <= LIMIT or alike <= LIMIT,
+    # Candidates: the sounds can't make a word right where Omnilingual heard nothing at all, past
+    # the last word it heard anything for (the speaker stopped early), or also before the first.
+    "…not past what was heard": lambda heard, ratio, alike, after, before: heard or (not after and (ratio <= LIMIT or alike <= LIMIT)),
+    "…nor before it": lambda heard, ratio, alike, after, before: heard or (not after and not before and (ratio <= LIMIT or alike <= LIMIT)),
 }
+# The rules compared word by word, below the table.
+WORD_RULES = ["All three (the app)", "…not past what was heard", "…nor before it"]
 
 
 def bad_words(r, rule=RULES["All three (the app)"]):
@@ -438,6 +461,16 @@ for method in ["current", "espeak", "either"]:
         # Before its characters were graded one by one, Mandarin passed on the whole phrase's scores.
         print(f"{'Whole phrase (0.7 and 0.6)':28}" + "".join(
             f"{sum(r[3] >= 0.7 and r[4] >= 0.6 for r in by_kind[kind]) / max(1, len(by_kind[kind])):>20.0%}" for kind in KINDS))
+        # Word by word: in a recording cut in half, the last third of the words was never said;
+        # in a correct one, every word was.
+        def marked_right(kind, rule, last_third=False):
+            marks = [rule(*w) for r in by_kind[kind] for w in (r[5][-(len(r[5]) // 3):] if last_third else r[5])]
+            return f"{sum(marks) / max(1, len(marks)):.0%}"
+
+        print("Stopped halfway, words never said that are marked right: " + ", ".join(
+            f"{name} {marked_right('stopped halfway', RULES[name], last_third=True)}" for name in WORD_RULES))
+        print("Correct, words marked right: " + ", ".join(
+            f"{name} {marked_right('correct', RULES[name])}" for name in WORD_RULES))
         print("By language, correct attempts passing the app's rule: " + ", ".join(
             f"{lang} {sum(not bad_words(r) for r in by_kind['correct'] if r[0] == lang) / max(1, sum(1 for r in by_kind['correct'] if r[0] == lang)):.0%}"
             for lang in codes))
