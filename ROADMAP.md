@@ -2,11 +2,21 @@
 
 Ideas for later. Nothing here is being built yet.
 
+## Modes
+
+Three modes to choose from. Anything not mentioned here stays as it is today.
+
+- **Beginner.** You say what you want in English, as now. The app then takes you through the
+  phrase one word at a time in the bubble, and each word has to be said right. After two failed
+  tries at a word, Skip is offered. Once the words are done, you say the full phrase.
+- **Intermediate.** Today's behaviour: say it in English, then repeat the full phrase until it's
+  right.
+- **Advanced.** Free conversation in the language, with no English first. The tutor makes no
+  corrections or suggestions about what you said. This mode may use a different speech recognizer
+  (undecided).
+
 ## Conversations
 
-- **Free conversation toggle.** A switch in the conversation settings (the gear) to talk freely in
-  the language instead of saying it in English first, with mistakes explained in English. (A
-  separate Conversation mode existed before and was removed in favour of this.)
 - **Voice selector.** Choose the language's voice in the conversation settings (the gear).
 - **Your own scenarios.** Write a scenario (who Gemma plays and the setting) alongside the
   built-in ones. Their openings are written on the phone the first time and saved, since only the
