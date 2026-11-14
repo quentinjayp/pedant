@@ -866,8 +866,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val sounds = withContext(Dispatchers.Default) {
             words.filter { known[it]?.ipa == null }.associateWith { w -> wordIpa(lang, w) }
         }
-        val meanings = if (words.all { known[it] != null }) emptyMap() else try {
-            Tutor.parseSentenceLookup(checkNotNull(tutor).lookUpSentence(lang, sentence))
+        // Gemma explains only the words the dictionary lacks. When they're few it's asked about each
+        // one on its own, since for a whole sentence it writes a line for every word; when most are
+        // missing (as with no dictionary), the whole sentence at once is less work.
+        val missing = words.filter { known[it] == null }
+        val meanings: Map<String, String> = try {
+            when {
+                missing.isEmpty() -> emptyMap()
+                missing.size * 2 < words.size -> missing.mapNotNull { w ->
+                    val key = w.lowercase() to sentence
+                    // Kept as each one is done, so being paused part-way doesn't ask again.
+                    val meaning = lookupCache[key]?.meaning ?: try {
+                        Tutor.parseLookup(checkNotNull(tutor).lookUp(lang, w, sentence))
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Throwable) {
+                        null
+                    }
+                    triedAlone += key
+                    lookupCache[key] = WordLookup(w, sentence, meaning, sounds[w], loading = false)
+                    refreshOpenLookup()
+                    meaning?.let { w.lowercase() to it }
+                }.toMap()
+                else -> Tutor.parseSentenceLookup(checkNotNull(tutor).lookUpSentence(lang, sentence))
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
