@@ -12,7 +12,8 @@ Three modes to choose from. Anything not mentioned here stays as it is today.
 - **Intermediate.** Today's behaviour: say it in English, then repeat the full phrase until it's
   right.
 - **Advanced.** Free conversation in the language, with no English first. The tutor makes no
-  corrections or suggestions about what you said. This mode may use a different speech recognizer
+  corrections or suggestions about what you said, meaning it never makes you repeat a phrase until
+  it's right, as Beginner and Intermediate do. This mode may use a different speech recognizer
   (undecided).
   - **Reaching for a missing word.** Say a sentence in the language with the one word you don't
     know in English, and get back just that word.
