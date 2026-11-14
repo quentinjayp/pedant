@@ -129,6 +129,29 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val uiPrefs = app.getSharedPreferences("ui", Context.MODE_PRIVATE)
 
+    /** How the phrase to say is given: by voice, as text, or both. Remembered. */
+    var phraseGuide by mutableStateOf(
+        PhraseGuide.entries.firstOrNull { it.name == uiPrefs.getString("phraseGuide", null) } ?: PhraseGuide.VoiceAndText,
+    )
+        private set
+
+    fun choosePhraseGuide(guide: PhraseGuide) {
+        phraseGuide = guide
+        uiPrefs.edit().putString("phraseGuide", guide.name).apply()
+        // A phrase already hidden shows again; a change to Voice only starts with the next phrase.
+        if (guide != PhraseGuide.VoiceOnly) hiddenPhraseIndex = null
+    }
+
+    /**
+     * The chat index of the phrase whose text is hidden (Voice only): from when it's translated
+     * until the first try at it, or until it's skipped or dropped.
+     */
+    var hiddenPhraseIndex by mutableStateOf<Int?>(null)
+        private set
+
+    /** Whether the voice says the phrase: after it's translated, after a failed try, and on request. */
+    val phraseSpoken: Boolean get() = phraseGuide != PhraseGuide.TextOnly
+
     /** Whether the conversation's footer is folded away, leaving only Hold to talk. Remembered. */
     var dockCollapsed by mutableStateOf(uiPrefs.getBoolean("dockCollapsed", false))
         private set
@@ -1110,6 +1133,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         busy = Busy.Thinking
         val index = chat.size
         chat += ChatItem.Say(english, "")
+        hiddenPhraseIndex = index.takeIf { phraseGuide == PhraseGuide.VoiceOnly }
         diagnostics.step = "Translating with Gemma"
         val raw = checkNotNull(tutor).translate(checkNotNull(language), register, english) { partial ->
             chat[index] = ChatItem.Say(english, Tutor.parse(partial).say ?: "")
@@ -1118,6 +1142,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         chat[index] = ChatItem.Say(english, phrase)
         if (phrase.isBlank()) {
             chat[index] = ChatItem.Note("Couldn't translate that. Try saying it another way.")
+            hiddenPhraseIndex = null
             return
         }
         busy = Busy.Preparing
@@ -1128,8 +1153,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // it: the learner can start their try as soon as the voice stops, and the try waits for them.
         val expected = conversationScope.async(Dispatchers.Default) { expectedSounds(phrase, audio) }
         startDrill(Drill(phrase, audio, expected))
-        busy = Busy.Speaking
-        withContext(Dispatchers.Default) { voice.play(audio) }
+        if (phraseSpoken) {
+            busy = Busy.Speaking
+            withContext(Dispatchers.Default) { voice.play(audio) }
+        }
         queueLookups(phrase)
     }
 
@@ -1162,6 +1189,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun checkAttempt(d: Drill, audio: Audio) {
         val graded = grade(d.phrase, d.refWords.await(), audio)
+        // The first try has been made by ear; the phrase's text shows from here on.
+        hiddenPhraseIndex = null
         val result = graded.result
         val attempt = ChatItem.Attempt(graded.transcript, graded.heardText, result, d.phrase)
         // Only the latest try at a phrase is shown: it takes the place of the try before it, right
@@ -1172,14 +1201,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             phraseDone(d.phrase)
         } else {
             drillAttempts++
-            busy = Busy.Speaking
-            withContext(Dispatchers.Default) { tts?.play(d.audio) }
+            if (phraseSpoken) {
+                busy = Busy.Speaking
+                withContext(Dispatchers.Default) { tts?.play(d.audio) }
+            }
         }
     }
 
     private fun startDrill(d: Drill?) {
         // A phrase dropped while its expected sounds are still being worked out doesn't need them.
         drill?.refWords?.cancel()
+        if (d == null) hiddenPhraseIndex = null
         drill = d
         drillAttempts = 0
     }

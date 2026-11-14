@@ -7,6 +7,20 @@ enum class Register(val title: String) {
 }
 
 /**
+ * How the phrase to say is given to the learner: said by the voice and shown as text, or only one
+ * of the two. Never neither.
+ */
+enum class PhraseGuide(val title: String) {
+    VoiceAndText("Voice guide and translation"),
+
+    /** The text stays hidden until the first try, so the learner repeats what they heard. */
+    VoiceOnly("Voice only"),
+
+    /** The voice doesn't say the phrase, so the learner reads it. */
+    TextOnly("Translation only"),
+}
+
+/**
  * A setting for a conversation; [scene] is shown to the learner at the top of the conversation.
  * Who Gemma plays in it is in assets/instructions.json, under "roles".
  */

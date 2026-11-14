@@ -788,6 +788,10 @@ private fun ConversationSettings(vm: AppViewModel, onClose: () -> Unit) {
     PopupCard("Conversation settings", onClose) {
         SmallLabel("Style", Pastel.InkSoft)
         RegisterChoice(vm, unselected = Pastel.SurfaceLow)
+        SmallLabel("The phrase to say", Pastel.InkSoft)
+        PhraseGuide.entries.forEach { guide ->
+            ChoiceChip(guide.title, vm.phraseGuide == guide, { vm.choosePhraseGuide(guide) }, Modifier.fillMaxWidth(), Pastel.SurfaceLow)
+        }
     }
 }
 
@@ -1006,7 +1010,7 @@ private fun ConversationScreen(vm: AppViewModel) {
                     is ChatItem.Tutor -> if (item.reply.isNotEmpty()) {
                         Bubble(item.reply, mine = false, label = "Tutor", detail = item.english, onWord = vm::openWord)
                     }
-                    is ChatItem.Say -> SayCard(item, vm.language?.englishName, onWord = vm::openWord)
+                    is ChatItem.Say -> SayCard(item, vm.language?.englishName, hidden = index == vm.hiddenPhraseIndex, onWord = vm::openWord)
                     is ChatItem.Attempt -> AttemptCard(item, enabled = vm.busy == Busy.Idle, onOpen = { at -> vm.openPractice(index, at) })
                     is ChatItem.Note -> Text(
                         item.text,
@@ -1158,9 +1162,9 @@ private fun Bubble(
     }
 }
 
-/** The phrase to say. */
+/** The phrase to say; with [hidden], its text is kept back so it's repeated by ear. */
 @Composable
-private fun SayCard(item: ChatItem.Say, language: String?, onWord: (word: String, sentence: String) -> Unit) {
+private fun SayCard(item: ChatItem.Say, language: String?, hidden: Boolean, onWord: (word: String, sentence: String) -> Unit) {
     Column(
         Modifier
             .fillMaxWidth()
@@ -1174,6 +1178,8 @@ private fun SayCard(item: ChatItem.Say, language: String?, onWord: (word: String
         }
         if (item.phrase.isEmpty()) {
             Text("…", fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Pastel.PrimaryInk)
+        } else if (hidden) {
+            Text("Listen, then say what you heard.", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = Pastel.PrimaryInk)
         } else {
             TappableText(item.phrase, fontSize = 19.sp, fontWeight = FontWeight.Bold, color = Pastel.PrimaryInk, onWord = { w, sentence, _ -> onWord(w, sentence) })
         }
@@ -1784,7 +1790,8 @@ private fun LearningControls(vm: AppViewModel) {
     } else {
         // Skip sits outside the scrolling row so it's always on screen.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) { HearButtons("Hear it again:", vm::hearAgain) }
+            // With the voice turned off for the phrase, there's nothing to hear again.
+            Box(Modifier.weight(1f)) { if (vm.phraseSpoken) HearButtons("Hear it again:", vm::hearAgain) }
             if (vm.drillAttempts >= AppViewModel.SKIP_AFTER_FAILS) LinkButton("Skip", vm::skip)
         }
     }
