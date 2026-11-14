@@ -22,6 +22,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -1202,9 +1204,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Sends [message] to the tutor, shows the answer as it streams in and speaks the reply.
-     * Then, as its own step written while the reply plays, the English translation of the reply,
-     * which isn't kept in Gemma's conversation memory.
+     * Sends [message] to the tutor, shows the answer as it streams in and speaks the reply: each
+     * sentence as soon as Gemma has finished writing it, so the voice starts while the rest is
+     * still being written. Then, as its own step written while the reply plays, the English
+     * translation of the reply, which isn't kept in Gemma's conversation memory.
      * [saveOpening] (key, voice) saves the answer and its audio as the opening for those choices.
      */
     private suspend fun runTurn(
@@ -1220,16 +1223,50 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         try {
             val lang = checkNotNull(language)
             var reply = ""
-            diagnostics.step = "Generating a reply with Gemma"
-            checkNotNull(tutor).respond(message).collect { raw ->
-                reply = Tutor.parse(raw).reply
-                update { it.copy(reply = reply) }
-            }
-            diagnostics.step = "Speaking the reply with Piper"
             val voice = checkNotNull(tts)
-            val audio = withContext(Dispatchers.Default) { voice.synthesize(reply) }
+            val spoken = mutableListOf<Audio>()
             var english: String? = null
             coroutineScope {
+                // The voice makes each finished sentence's audio while Gemma writes the next...
+                val sentences = Channel<String>(Channel.UNLIMITED)
+                val clips = Channel<Audio>(Channel.UNLIMITED)
+                launch(Dispatchers.Default) {
+                    for (sentence in sentences) {
+                        ensureActive()
+                        clips.send(voice.synthesize(sentence.trim()))
+                    }
+                    clips.close()
+                }
+                // ...and says them in order.
+                val speaking = launch(Dispatchers.Default) {
+                    for (clip in clips) {
+                        ensureActive()
+                        busy = Busy.Speaking
+                        spoken += clip
+                        voice.play(clip)
+                    }
+                }
+                diagnostics.step = "Generating a reply with Gemma"
+                // How much of the reply has been handed to the voice.
+                var handed = 0
+                try {
+                    checkNotNull(tutor).respond(message).collect { raw ->
+                        reply = Tutor.parse(raw).reply
+                        update { it.copy(reply = reply) }
+                        val end = finishedSentencesEnd(reply, handed)
+                        if (end > handed) {
+                            sentences.trySend(reply.substring(handed, end))
+                            handed = end
+                        }
+                    }
+                    // Whatever is left once Gemma has finished.
+                    if (handed <= reply.length) {
+                        reply.substring(handed).takeIf { rest -> rest.any { it.isLetterOrDigit() } }?.let { sentences.trySend(it) }
+                    }
+                } finally {
+                    sentences.close()
+                }
+                diagnostics.step = "Speaking the reply with Piper"
                 val extra = async {
                     try {
                         if (reply.isNotBlank()) {
@@ -1244,14 +1281,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         diagnostics.log("Couldn't add the English: ${e.message}")
                     }
                 }
-                busy = Busy.Speaking
-                withContext(Dispatchers.Default) { voice.play(audio) }
+                speaking.join()
                 if (extra.isActive) busy = Busy.Translating
                 extra.await()
             }
-            if (saveOpening != null && reply.isNotBlank()) {
+            if (saveOpening != null && reply.isNotBlank() && spoken.isNotEmpty()) {
                 openings.save(saveOpening.first, Opening(reply, english))
-                openings.saveAudio(saveOpening.first, saveOpening.second, audio)
+                // The sentences' audio, joined into one.
+                val whole = FloatArray(spoken.sumOf { it.samples.size })
+                var at = 0
+                for (clip in spoken) {
+                    clip.samples.copyInto(whole, at)
+                    at += clip.samples.size
+                }
+                openings.saveAudio(saveOpening.first, saveOpening.second, Audio(whole, spoken.first().sampleRate))
             }
             queueLookups(reply)
         } catch (e: CancellationException) {
@@ -1264,7 +1307,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * Where the last finished sentence of [text] ends (the index after it), looking past [from]; or
+     * [from] if none has finished. A sentence has finished once something follows its full stop,
+     * question mark or exclamation mark; a piece shorter than [MIN_SPOKEN_CHARS] waits for the next
+     * sentence, so an abbreviation's full stop ("M. Dupont") rarely cuts one in two.
+     */
+    private fun finishedSentencesEnd(text: String, from: Int): Int {
+        for (i in text.length - 2 downTo from + MIN_SPOKEN_CHARS - 1) {
+            val mark = text[i]
+            // In writing without spaces between sentences (Chinese, Hindi's danda) the mark is enough.
+            if (mark in "。！？।" || (mark in ".!?…" && text[i + 1].isWhitespace())) return i + 1
+        }
+        return from
+    }
+
     companion object {
+        /** The shortest piece of a reply the voice is given on its own, in characters. */
+        private const val MIN_SPOKEN_CHARS = 20
+
         /** Failed tries at a phrase before Skip is offered. */
         const val SKIP_AFTER_FAILS = 2
 
