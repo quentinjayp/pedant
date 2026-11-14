@@ -12,7 +12,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -83,7 +86,7 @@ sealed interface ChatItem {
 }
 
 /** The phrase being practised, its audio and its expected sounds per word. */
-private class Drill(val phrase: String, val audio: Audio, val refWords: List<RefWord>) {
+private class Drill(val phrase: String, val audio: Audio, val refWords: Deferred<List<RefWord>>) {
     /** The phrase said slowly, made the first time it's asked for. */
     var slowAudio: Audio? = null
 }
@@ -339,6 +342,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Saves the conversation on screen, replacing the saved one. */
+    @OptIn(ExperimentalCoroutinesApi::class)
     private fun saveConversation() {
         val lang = language ?: return
         if (screen != Screen.Conversation) return
@@ -350,7 +354,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             chat = chat.toList(),
             history = tutor?.history.orEmpty(),
             drillPhrase = d?.phrase,
-            drillWords = d?.refWords.orEmpty(),
+            // Left out while they're still being worked out; they're worked out again on continuing.
+            drillWords = d?.refWords?.takeIf { it.isCompleted }?.let { runCatching { it.getCompleted() }.getOrNull() }.orEmpty(),
             drillAttempts = drillAttempts,
             editableIndex = editableIndex,
         )
@@ -430,10 +435,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                 start.saved.drillPhrase?.let { phrase ->
                                     drill = withContext(Dispatchers.Default) {
                                         val audio = checkNotNull(tts).synthesize(phrase)
-                                        // Words saved before they were split as they are now (Mandarin's,
-                                        // by character) are worked out again.
+                                        // Words that weren't saved, or were saved before they were split as
+                                        // they are now (Mandarin's, by character), are worked out again.
                                         val saved = start.saved.drillWords
-                                        Drill(phrase, audio, if (saved.map { it.word } == wordsOf(phrase)) saved else expectedSounds(phrase, audio))
+                                        val words = if (saved.map { it.word } == wordsOf(phrase)) saved else expectedSounds(phrase, audio)
+                                        Drill(phrase, audio, CompletableDeferred(words))
                                     }
                                     drillAttempts = start.saved.drillAttempts
                                 }
@@ -1102,15 +1108,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         diagnostics.step = "Preparing the phrase with Piper and ZIPA"
         val voice = checkNotNull(tts)
         val audio = withContext(Dispatchers.Default) { voice.synthesize(phrase) }
-        val refWords = coroutineScope {
-            // Worked out while the phrase plays.
-            val expected = async(Dispatchers.Default) { expectedSounds(phrase, audio) }
-            busy = Busy.Speaking
-            withContext(Dispatchers.Default) { voice.play(audio) }
-            busy = Busy.Preparing
-            expected.await()
-        }
-        startDrill(Drill(phrase, audio, refWords))
+        // The expected sounds are worked out while the phrase plays, and go on being worked out after
+        // it: the learner can start their try as soon as the voice stops, and the try waits for them.
+        val expected = conversationScope.async(Dispatchers.Default) { expectedSounds(phrase, audio) }
+        startDrill(Drill(phrase, audio, expected))
+        busy = Busy.Speaking
+        withContext(Dispatchers.Default) { voice.play(audio) }
         queueLookups(phrase)
     }
 
@@ -1142,7 +1145,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun checkAttempt(d: Drill, audio: Audio) {
-        val graded = grade(d.phrase, d.refWords, audio)
+        val graded = grade(d.phrase, d.refWords.await(), audio)
         val result = graded.result
         val attempt = ChatItem.Attempt(graded.transcript, graded.heardText, result, d.phrase)
         // Only the latest try at a phrase is shown: it takes the place of the try before it, right
@@ -1159,6 +1162,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun startDrill(d: Drill?) {
+        // A phrase dropped while its expected sounds are still being worked out doesn't need them.
+        drill?.refWords?.cancel()
         drill = d
         drillAttempts = 0
     }
