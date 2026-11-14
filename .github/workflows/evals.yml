@@ -1,0 +1,93 @@
+name: Evals
+
+# Compares models at the app's translation step (tools/evals.py): each model in evals/models.json
+# translates the same English sentences into the app's languages, told what the app tells Gemma,
+# and the results are scored against translations made by people. It reports only (a table in the
+# run's summary, and promptfoo's side-by-side report to download) and never blocks a build.
+# Runs on demand, or on a push whose commit message contains [evals].
+
+on:
+  push:
+    branches: [claude/offline-ai-language-app-v3widq, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  models:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[evals]')
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          python3 - >> "$GITHUB_OUTPUT" <<'PY'
+          import json
+          models = json.load(open("evals/models.json", encoding="utf-8"))["models"]
+          include = [{"name": m["name"], "repo": m["repo"], "file": m["file"],
+                      "options": "--fresh-engine" if m.get("freshEngine") else ""} for m in models]
+          print("matrix=" + json.dumps({"include": include}))
+          PY
+
+  translate:
+    needs: models
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.models.outputs.matrix) }}
+    name: translate (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the model engine (the app's version)
+        run: pip install --quiet litert-lm-api==0.19.1
+      - name: Download the model
+        run: curl -fsSL --retry 3 -o model.litertlm "https://huggingface.co/${{ matrix.repo }}/resolve/main/${{ matrix.file }}" && ls -l model.litertlm
+      - name: Translate
+        run: python3 tools/evals.py translate --model model.litertlm --name "${{ matrix.name }}" --out outputs/translations.json ${{ matrix.options }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: translations-${{ strategy.job-index }}
+          path: outputs/
+
+  report:
+    needs: [models, translate]
+    # Whatever models finished are reported, even if one failed.
+    if: always() && needs.models.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: translations-*
+          path: outputs
+      - run: pip install --quiet sacrebleu
+      - name: Scores by model and language
+        run: python3 tools/evals.py summary outputs | tee summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Side-by-side report (promptfoo)
+        env:
+          PROMPTFOO_DISABLE_TELEMETRY: "1"
+          PROMPTFOO_DISABLE_UPDATE: "1"
+          PROMPTFOO_PYTHON: python3
+        run: |
+          python3 tools/evals.py config outputs work
+          cd work
+          npx --yes promptfoo@0.125.1 eval -c promptfooconfig.json -o report.html -o results.json --no-progress-bar --no-cache --no-table
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evals-report
+          path: |
+            summary.md
+            work/report.html
+            outputs/

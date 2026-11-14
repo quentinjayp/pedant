@@ -1,0 +1,4 @@
+{
+  "_about": "Your own phrases for the evals, alongside evals/references.json. Each sentence has an id, its English (en) and translations you trust, by the app's language code; a language left out is skipped for that sentence. For example: {\"id\": \"own-1\", \"en\": \"Where is the train station?\", \"translations\": {\"fr\": \"Où est la gare ?\", \"de\": \"Wo ist der Bahnhof?\"}}",
+  "sentences": []
+}
