@@ -26,12 +26,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -993,7 +991,7 @@ private fun ConversationScreen(vm: AppViewModel) {
             itemsIndexed(vm.chat) { index, item ->
                 when (item) {
                     // The learner's lines are English, so they aren't tappable; the line being practised
-                    // can be long-pressed to edit it instead.
+                    // has a menu (the three dots) to edit or delete it instead.
                     is ChatItem.User -> {
                         val editable = index == vm.editableIndex && vm.busy == Busy.Idle
                         Bubble(
@@ -1093,7 +1091,16 @@ private fun MicIcon(color: Color, modifier: Modifier = Modifier) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+/** Three dots, one above another: the sign that there's a menu. Tapping them calls [onClick]. */
+@Composable
+private fun MenuDots(color: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier.size(36.dp).clip(CircleShape).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(16.dp)) {
+            for (dot in 0..2) drawCircle(color, size.width * 0.1f, Offset(size.width / 2, size.height * (0.2f + 0.3f * dot)))
+        }
+    }
+}
+
 @Composable
 private fun Bubble(
     text: String,
@@ -1101,7 +1108,7 @@ private fun Bubble(
     label: String,
     detail: String? = null,
     onWord: ((word: String, sentence: String) -> Unit)? = null,
-    /** Actions offered in a menu when the bubble is long-pressed. */
+    /** Actions offered in a menu, opened from three dots at the bubble's top right. */
     menu: List<Pair<String, () -> Unit>>? = null,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -1121,14 +1128,13 @@ private fun Bubble(
                         border = if (mine) Pastel.Violet else Pastel.OutlineSoft,
                         shape = shape,
                     )
-                    .then(
-                        if (menu != null) Modifier.combinedClickable(onClick = {}, onLongClick = { menuOpen = true })
-                        else Modifier,
-                    )
                     .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (mine) SmallLabel(label, Pastel.VioletDark) else Tag(label)
+                // The label leaves room for the menu's dots beside it.
+                Box(Modifier.padding(end = if (menu != null) 28.dp else 0.dp)) {
+                    if (mine) SmallLabel(label, Pastel.VioletDark) else Tag(label)
+                }
                 if (onWord != null) {
                     TappableText(text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = ink, onWord = { w, sentence, _ -> onWord(w, sentence) })
                 } else {
@@ -1139,9 +1145,14 @@ private fun Bubble(
                     Text(it, fontSize = 13.sp, color = if (mine) Pastel.VioletDark else Pastel.InkSoft)
                 }
             }
-            DropdownMenu(expanded = menuOpen && menu != null, onDismissRequest = { menuOpen = false }) {
-                menu?.forEach { (label, action) ->
-                    DropdownMenuItem(text = { Text(label) }, onClick = { menuOpen = false; action() })
+            if (menu != null) {
+                Box(Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp)) {
+                    MenuDots(ink, { menuOpen = true })
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        menu.forEach { (label, action) ->
+                            DropdownMenuItem(text = { Text(label) }, onClick = { menuOpen = false; action() })
+                        }
+                    }
                 }
             }
         }

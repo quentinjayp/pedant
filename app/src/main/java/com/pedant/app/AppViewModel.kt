@@ -148,7 +148,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val conversationScope = CoroutineScope(viewModelScope.coroutineContext + conversationJobs)
     /**
      * The chat index of the English line whose phrase is being practised. It can be
-     * edited (long press) until the phrase is said or skipped.
+     * edited (from its menu) until the phrase is said or skipped.
      */
     var editableIndex by mutableStateOf<Int?>(null)
         private set
