@@ -32,6 +32,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -129,6 +130,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
@@ -1241,6 +1243,8 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
         vm::closePractice,
         closeStyle = PillStyle.Outline,
         headerSpacing = 8.dp,
+        // Swiping moves between the words, as the arrows do.
+        onSwipe = if (words.size > 1) { onwards -> vm.practiceSelect(if (onwards) i + 1 else i - 1) } else null,
         header = {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 ScoreMeter("Words", p.result.wordScore, Pastel.PrimaryDark, Modifier.weight(1f))
@@ -1536,6 +1540,8 @@ private fun PopupCard(
     style: PopupStyle = PopupStyle(Pastel.Primary, Pastel.PrimaryContainer, Pastel.PrimaryDark),
     closeStyle: PillStyle = PillStyle.Cta,
     headerSpacing: Dp = 6.dp,
+    /** Called when the bubble is swiped sideways: true for a swipe to the left (onwards), false to the right (back). */
+    onSwipe: ((onwards: Boolean) -> Unit)? = null,
     header: @Composable ColumnScope.() -> Unit = {},
     body: @Composable ColumnScope.() -> Unit,
 ) {
@@ -1545,6 +1551,7 @@ private fun PopupCard(
                 .padding(16.dp)
                 .fillMaxWidth()
                 .card(Pastel.White, style.border, RoundedCornerShape(30.dp), borderWidth = 2.dp)
+                .sidewaysSwipe(onSwipe)
                 .verticalScroll(rememberScrollState()),
         ) {
             Column(
@@ -1568,8 +1575,28 @@ private fun PopupCard(
 }
 
 /**
+ * Calls [onSwipe] when a finger is dragged sideways across this and let go: true for a swipe to the
+ * left (onwards), false to the right (back). Does nothing without [onSwipe].
+ */
+@Composable
+private fun Modifier.sidewaysSwipe(onSwipe: ((onwards: Boolean) -> Unit)?): Modifier {
+    if (onSwipe == null) return this
+    val current by rememberUpdatedState(onSwipe)
+    val far = with(LocalDensity.current) { 56.dp.toPx() }
+    return pointerInput(Unit) {
+        var dragged = 0f
+        detectHorizontalDragGestures(
+            onDragStart = { dragged = 0f },
+            onDragEnd = { if (abs(dragged) >= far) current(dragged < 0) },
+            onDragCancel = { dragged = 0f },
+        ) { _, amount -> dragged += amount }
+    }
+}
+
+/**
  * The bubble for a tapped word: meaning, pronunciation guide and Normal/Slow playback. The other
- * words of the sentence can be tapped in it, or stepped through with the arrows (which wrap around).
+ * words of the sentence can be tapped in it, or stepped through with the arrows or by swiping
+ * sideways (both wrap around).
  */
 @Composable
 private fun WordBubble(
@@ -1594,6 +1621,8 @@ private fun WordBubble(
     PopupCard(
         "Word lookup",
         onClose,
+        // Swiping moves between the words, as the arrows do.
+        onSwipe = if (words.size > 1) { onwards -> show(if (onwards) position + 1 else position - 1) } else null,
         header = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
