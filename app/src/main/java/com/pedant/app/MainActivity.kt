@@ -172,7 +172,6 @@ class MainActivity : ComponentActivity() {
                     }
                     when (vm.screen) {
                         Screen.Setup -> SetupScreen(vm)
-                        Screen.Loading -> ModelLoadingScreen(vm)
                         Screen.Crashed -> CrashScreen(vm)
                         Screen.Home -> HomeScreen(vm)
                         Screen.PickLanguage -> LanguageScreen(vm)
@@ -493,26 +492,24 @@ private fun CrashScreen(vm: AppViewModel) {
     }
 }
 
-/** The loading screen: a rough progress bar and which model is loading. */
+/**
+ * Shown while the models load behind the page: which one is loading and a rough progress bar.
+ * Nothing waits on it; a conversation started meanwhile gets going once they're loaded.
+ */
 @Composable
-private fun ModelLoadingScreen(vm: AppViewModel) {
+private fun ModelLoadingNotice(vm: AppViewModel) {
+    val step = vm.loadingStep ?: return
     val progress by animateFloatAsState(
         vm.loadProgress,
         animationSpec = tween(AppViewModel.LOADING_BAR_FILL_MS),
         label = "loading",
     )
-    AppScreen(header = { HeaderTitle("Pedant", "Getting ready") }) {
-        Column(
-            Modifier.fillMaxSize().padding(32.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text("Loading the models…", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Spacer(Modifier.height(16.dp))
-            ProgressBar(progress)
-            Spacer(Modifier.height(8.dp))
-            Text(vm.loadingStep?.let { "Loading $it…" } ?: "", fontSize = 14.sp, color = Pastel.InkSoft)
-        }
+    Column(
+        Modifier.fillMaxWidth().card(Pastel.SurfaceContainer, shape = RoundedCornerShape(16.dp)).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text("Loading $step…", fontSize = 13.sp, color = Pastel.InkSoft)
+        ProgressBar(progress)
     }
 }
 
@@ -524,6 +521,7 @@ private fun HomeScreen(vm: AppViewModel) {
     AppScreen(header = { HeaderTitle("Pedant", "Ready to speak?") }) {
         Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             BatteryNotice()
+            ModelLoadingNotice(vm)
             HomeButton(
                 mark = "▶",
                 title = "Continue conversation",
@@ -572,6 +570,7 @@ private fun SettingsScreen(vm: AppViewModel) {
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+            ModelLoadingNotice(vm)
             SmallLabel("Tutor model", Pastel.InkSoft)
             Text("The Gemma model that talks with you, translates and explains.", fontSize = 13.sp, color = Pastel.InkSoft)
             Gemma.entries.forEach { GemmaRow(vm, it) }

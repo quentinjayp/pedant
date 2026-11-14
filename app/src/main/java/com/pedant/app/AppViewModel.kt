@@ -35,7 +35,6 @@ import java.util.concurrent.atomic.AtomicReference
 
 sealed interface Screen {
     data object Setup : Screen
-    data object Loading : Screen
     data object Crashed : Screen
     data object Home : Screen
     data object PickLanguage : Screen
@@ -267,13 +266,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Loads Gemma (on the CPU) and ZIPA, whichever aren't loaded, then opens [then]. The speech
-     * recognizer isn't loaded here: it loads each time the learner starts talking (see [SpeechToText]).
+     * Opens [then] straight away and loads Gemma (on the CPU) and ZIPA behind it, whichever aren't
+     * loaded; what needs them waits with [modelsLoaded]. The speech recognizer isn't loaded here: it
+     * loads each time the learner starts talking (see [SpeechToText]).
      */
     private fun loadModels(then: Screen = Screen.Home) {
         error = null
-        screen = Screen.Loading
-        viewModelScope.launch {
+        screen = then
+        val earlier = modelsLoading
+        modelsLoading = viewModelScope.launch {
+            earlier?.join()
             // Only a full load is a fair guide for next time; otherwise the files' size is.
             val loadingAll = tutor == null && zipa == null
             val growthKey = "loading-${store.gemma.name}"
@@ -309,16 +311,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 ticker.cancel()
                 (residentBytes() - startBytes).takeIf { loadingAll && it > 0 }?.let { loadPrefs.edit().putLong(growthKey, it).apply() }
                 loadProgress = 1f
-                // Let the bar fill to 100% before moving on.
-                delay(LOADING_BAR_FILL_MS + 100L)
-                screen = then
             } catch (e: Throwable) {
                 ticker.cancel()
                 diagnostics.step = null
+                loadingStep = null
                 error = "Could not load the models: ${e.message}"
                 screen = Screen.Setup
             }
         }
+    }
+
+    /** Gemma and ZIPA being loaded, if they are or have been. */
+    private var modelsLoading: Job? = null
+
+    /** Waits until Gemma and ZIPA are loaded. */
+    private suspend fun modelsLoaded() {
+        modelsLoading?.join()
+        check(tutor != null && zipa != null) { "the models couldn't be loaded" }
     }
 
     /** Starts a new conversation in [lang]; the saved one is replaced once this one is under way. */
@@ -417,6 +426,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     coroutineScope {
                         // Gemma reads its instructions while the voice loads and the opening plays.
                         val gemmaReady = async(Dispatchers.Default) {
+                            // Still loading, if the conversation was opened soon after the app.
+                            modelsLoaded()
                             val earlier = when (start) {
                                 is Start.Continue -> start.saved.history
                                 is Start.Opened -> listOf(
@@ -432,6 +443,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         when (start) {
                             is Start.Continue -> {
                                 // Back to the phrase being practised, with the tries made so far.
+                                modelsLoaded()
                                 start.saved.drillPhrase?.let { phrase ->
                                     drill = withContext(Dispatchers.Default) {
                                         val audio = checkNotNull(tts).synthesize(phrase)
@@ -551,6 +563,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (model == gemma || model !in downloadedGemmas) return
         viewModelScope.launch {
             stopConversationWork()
+            // A load still under way finishes before its model is swapped.
+            modelsLoading?.join()
             tutor?.close()
             tutor = null
             store.gemma = model
