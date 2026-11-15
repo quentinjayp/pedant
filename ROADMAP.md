@@ -17,6 +17,11 @@ Beginner and Intermediate are built. A third mode is planned.
   - **Asking about the language as you go.** Ask the tutor in English mid-conversation ("What does
     that mean?", "How do I say…?", "Why this word and not that one?"), then carry on.
 
+## Learning
+
+- **Sounds practice.** A learning section where you practise saying different IPA sounds and are
+  graded on them.
+
 ## Conversations
 
 - **Voice selector.** Choose the language's voice in the conversation settings (the gear).
