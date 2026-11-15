@@ -1138,7 +1138,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val raw = checkNotNull(tutor).translate(checkNotNull(language), register, english) { partial ->
             chat[index] = ChatItem.Say(english, Tutor.parse(partial).say ?: "")
         }
-        val phrase = Tutor.parse(raw).say ?: ""
+        val phrase = Tutor.parseSay(raw)
         chat[index] = ChatItem.Say(english, phrase)
         if (phrase.isBlank()) {
             chat[index] = ChatItem.Note("Couldn't translate that. Try saying it another way.")

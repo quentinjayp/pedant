@@ -24,11 +24,18 @@ def score(output, reference, code):
     return sacrebleu.sentence_chrf(output, [reference]).score
 
 
-def lenient(raw):
-    """The translation in an answer that left out the SAY: label or wrote it another way: the
-    answer without anything it wrote out first as reasoning, and without a short label at its start."""
+def labelled(raw):
+    """The text after SAY: in a model's answer, up to the next label; empty if it has no SAY: label."""
+    m = re.search(r"SAY:(.*?)(?=\n?(?:REPLY|ENGLISH|SAY):|\Z)", raw, re.S)
+    return m.group(1).strip() if m else ""
+
+
+def said(raw):
+    """The phrase in a model's answer, as the app reads it (Tutor.parseSay): the text after SAY:, or,
+    when the label is left out or written another way ("САЙ:"), the answer without a short label at
+    its start. Reasoning a model writes out first (<think>...</think>) isn't part of it."""
     raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.S).strip()
-    return re.sub(r"^\w{1,10}\s*:\s*", "", raw).strip()
+    return labelled(raw) or re.sub(r"^\w{1,10}\s*:\s*", "", raw).strip()
 
 
 def lookup(prompt, options, context):
@@ -39,7 +46,7 @@ def lookup(prompt, options, context):
     out = _outputs[cfg["outputs"]].get(cfg["model"], {}).get(context["vars"]["key"])
     if out is None:
         return {"output": "(not translated)"}
-    return {"output": out["say"] or f"(no phrase in the answer) {out['raw'][:300]}"}
+    return {"output": said(out["raw"]) or "(nothing)"}
 
 
 def chrf(output, context):

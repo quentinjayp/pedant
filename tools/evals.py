@@ -23,11 +23,10 @@ import argparse
 import glob
 import json
 import os
-import re
 import time
 
 from app_languages import languages
-from evals_promptfoo import lenient, score
+from evals_promptfoo import labelled, said, score
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 INSTRUCTIONS = f"{ROOT}/app/src/main/assets/instructions.json"
@@ -94,14 +93,6 @@ def text_of(message):
     if isinstance(content, list):
         return "".join(c.get("text", "") for c in content if isinstance(c, dict))
     return str(content)
-
-
-def said(raw):
-    """The phrase in a model's answer, as the app reads it (Tutor.parse): the text after SAY:, up
-    to the next label. Reasoning a model writes out first (<think>...</think>) isn't part of it."""
-    raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.S)
-    m = re.search(r"SAY:(.*?)(?=\n?(?:REPLY|ENGLISH|SAY):|\Z)", raw, re.S)
-    return m.group(1).strip() if m else ""
 
 
 def translate(args):
@@ -190,9 +181,7 @@ def summary(outputs_dir):
     if not names:
         print("No translations to score.")
         return
-    rows, totals, times, empty = [], {n: [] for n in names}, {n: [] for n in names}, {n: 0 for n in names}
-    # The same, taking an answer without its SAY: label as the translation anyway.
-    loose = {n: [] for n in names}
+    rows, totals, times, unlabelled = [], {n: [] for n in names}, {n: [] for n in names}, {n: 0 for n in names}
     for code, name in targets():
         cells = []
         for n in names:
@@ -201,10 +190,9 @@ def summary(outputs_dir):
                 out = outputs[n].get(f"{s['id']}|{code}")
                 if code not in s["translations"] or out is None:
                     continue
-                scores.append(score(out["say"], s["translations"][code], code))
-                loose[n].append(score(out["say"] or lenient(out["raw"]), s["translations"][code], code))
+                scores.append(score(said(out["raw"]), s["translations"][code], code))
                 times[n].append(out["seconds"])
-                empty[n] += not out["say"]
+                unlabelled[n] += not labelled(out["raw"])
             totals[n] += scores
             cells.append(f"{sum(scores) / len(scores):.1f}" if scores else "–")
         rows.append(f"| {name} | " + " | ".join(cells) + " |")
@@ -215,11 +203,9 @@ def summary(outputs_dir):
     print("| **All languages** | " + " | ".join(f"**{mean(totals[n])}**" for n in names) + " |")
     print("\n".join(rows))
     print("| Seconds per translation (on the CI machine) | " + " | ".join(mean(times[n]) for n in names) + " |")
-    print("| Answers the app couldn't read (no SAY: label) | " + " | ".join(str(empty[n]) for n in names) + " |")
-    print("| All languages, reading those answers anyway | " + " | ".join(mean(loose[n]) for n in names) + " |")
+    print("| Answers without the SAY: label (the app takes the whole answer as the phrase) | " + " | ".join(str(unlabelled[n]) for n in names) + " |")
     print(f"\n{len(totals[names[0]])} translations per model. A good translation worded differently from the reference "
-          "scores lower, so the scores compare the models with each other. An answer the app couldn't read scores 0, "
-          "as the app would show no phrase for it.")
+          "scores lower, so the scores compare the models with each other.")
 
 
 if __name__ == "__main__":

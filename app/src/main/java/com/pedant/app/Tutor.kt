@@ -216,6 +216,17 @@ class Tutor(context: Context, modelFile: File) {
 
         private val LABELS = listOf("REPLY:", "ENGLISH:", "SAY:")
 
+        /** A short label at the start of an answer, however it's written ("САЙ:", "Spre:"). */
+        private val LOOSE_LABEL = Regex("^[\\p{L}\\p{N}_]{1,10}\\s*:\\s*")
+
+        /**
+         * The phrase in a finished translation answer. Gemma sometimes writes the SAY: label another
+         * way (E2B writes "САЙ:" in Russian and Ukrainian) or leaves it out. The answer is then taken
+         * as the phrase, without a short label at its start. Only for finished answers: one still
+         * being written would show the label's first letters as the phrase.
+         */
+        fun parseSay(raw: String): String = parse(raw).say ?: raw.trim().replace(LOOSE_LABEL, "").trim()
+
         /** Splits the raw answer into its labelled parts. Works on partial (streaming) text too. */
         fun parse(raw: String): TutorTurn {
             val found = LABELS.mapNotNull { label -> raw.indexOf(label).takeIf { it >= 0 }?.let { label to it } }
