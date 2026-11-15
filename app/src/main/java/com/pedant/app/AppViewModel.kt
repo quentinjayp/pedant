@@ -129,6 +129,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val uiPrefs = app.getSharedPreferences("ui", Context.MODE_PRIVATE)
 
+    /** Beginner or Intermediate: how much help there is with each phrase. Remembered. */
+    var mode by mutableStateOf(Mode.entries.firstOrNull { it.name == uiPrefs.getString("mode", null) } ?: Mode.Intermediate)
+        private set
+
+    /** Changes the mode. A phrase already under way carries on as it was; the next one follows it. */
+    fun chooseMode(chosen: Mode) {
+        mode = chosen
+        uiPrefs.edit().putString("mode", chosen.name).apply()
+    }
+
+    /**
+     * Beginner's word-by-word step: the phrase's words, the one being said ([position]), how many
+     * tries at it have failed, the sounds heard in the last try and a line about what just happened.
+     */
+    data class WordWalk(
+        val phrase: String,
+        val words: List<RefWord>,
+        val position: Int,
+        val fails: Int = 0,
+        val heard: String = "",
+        val note: String? = null,
+    ) {
+        val word: RefWord get() = words[position]
+    }
+
+    /** The word-by-word step under way, shown as a bubble; null when there is none. */
+    var walk by mutableStateOf<WordWalk?>(null)
+        private set
+
+    /** Whether the talking now under way is a try at the word-by-word step's word. */
+    private var walkTalking = false
+
     /** How the phrase to say is given: by voice, as text, or both. Remembered. */
     var phraseGuide by mutableStateOf(
         PhraseGuide.entries.firstOrNull { it.name == uiPrefs.getString("phraseGuide", null) } ?: PhraseGuide.VoiceAndText,
@@ -670,6 +702,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun stopConversationWork() {
         practice = null
         practiceTarget = null
+        walk = null
+        walkTalking = false
         tutor?.cancelGeneration()
         tts?.stopPlayback()
         if (busy == Busy.Listening) {
@@ -731,8 +765,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val d = drill
                 val target = practiceTarget
                 practiceTarget = null
+                val walking = walkTalking
+                walkTalking = false
                 when {
                     target != null -> practiceTry(target, audio)
+                    walking -> walkTry(audio)
                     d == null -> {
                         // Waiting for English: only the words matter here.
                         val english = withContext(Dispatchers.Default) { checkNotNull(stt).transcribe(audio.samples) }
@@ -1147,7 +1184,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         busy = Busy.Thinking
         val index = chat.size
         chat += ChatItem.Say(english, "")
-        hiddenPhraseIndex = index.takeIf { phraseGuide == PhraseGuide.VoiceOnly }
+        // In Beginner the words are gone through one by one, so they aren't hidden.
+        hiddenPhraseIndex = index.takeIf { phraseGuide == PhraseGuide.VoiceOnly && mode != Mode.Beginner }
         diagnostics.step = "Translating with Gemma"
         val raw = checkNotNull(tutor).translate(checkNotNull(language), register, english) { partial ->
             chat[index] = ChatItem.Say(english, Tutor.parse(partial).say ?: "")
@@ -1172,6 +1210,79 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.Default) { voice.play(audio) }
         }
         queueLookups(phrase)
+        if (mode == Mode.Beginner) {
+            // Word by word first: it needs each word's expected sounds, so it waits for them.
+            busy = Busy.Preparing
+            val words = expected.await()
+            if (words.isNotEmpty()) {
+                walk = WordWalk(phrase, words, position = 0)
+                sayWalkWord()
+            }
+        }
+    }
+
+    /** Says the word-by-word step's word, unless the voice is turned off for the phrase. */
+    private suspend fun sayWalkWord() {
+        val word = walk?.word?.word ?: return
+        if (!phraseSpoken) return
+        busy = Busy.Speaking
+        withContext(Dispatchers.Default) { checkNotNull(tts).play(wordAudio(word)) }
+    }
+
+    /** Starts recording a try at the word-by-word step's word. */
+    fun startWalkTalking() {
+        if (walk == null || busy != Busy.Idle) return
+        walkTalking = true
+        startTalking()
+    }
+
+    /** Grades a try at the word-by-word step's word: on to the next word if it's right. */
+    private suspend fun walkTry(audio: Audio) {
+        val w = walk ?: return
+        val (transcript, sounds) = hear(audio)
+        val result = Matching.checkWordAlone(w.word, transcript, sounds)
+        if (result.passed) {
+            walkOn(w, "“${w.word.word}” was right.")
+        } else {
+            walk = w.copy(
+                fails = w.fails + 1,
+                heard = result.heard,
+                note = "Not quite (sounds ${(result.score * 100).roundToInt()}%). Listen and try again.",
+            )
+            sayWalkWord()
+        }
+    }
+
+    /** Moves the word-by-word step to its next word; after the last, it's the whole phrase's turn. */
+    private suspend fun walkOn(w: WordWalk, note: String) {
+        if (w.position + 1 < w.words.size) {
+            walk = w.copy(position = w.position + 1, fails = 0, heard = "", note = note)
+            sayWalkWord()
+        } else {
+            walk = null
+            val d = drill
+            if (d != null && phraseSpoken) {
+                busy = Busy.Speaking
+                withContext(Dispatchers.Default) { tts?.play(d.audio) }
+            }
+        }
+    }
+
+    /** Moves on without getting the word right (offered after [SKIP_AFTER_FAILS] failed tries). */
+    fun skipWalkWord() {
+        val w = walk ?: return
+        if (busy != Busy.Idle) return
+        launchAction(Busy.Speaking) { walkOn(w, "Skipped “${w.word.word}”.") }
+    }
+
+    /** Says the word-by-word step's word again. */
+    fun hearWalkWord() {
+        walk?.let { hearWord(it.word.word, slow = false) }
+    }
+
+    /** Ends the word-by-word step early; the whole phrase is still there to say. */
+    fun closeWalk() {
+        walk = null
     }
 
     /**
@@ -1226,6 +1337,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // A phrase dropped while its expected sounds are still being worked out doesn't need them.
         drill?.refWords?.cancel()
         if (d == null) hiddenPhraseIndex = null
+        walk = null
         drill = d
         drillAttempts = 0
     }

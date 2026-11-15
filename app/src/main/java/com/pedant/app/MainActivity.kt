@@ -787,18 +787,25 @@ private fun ChoiceChip(
     )
 }
 
-/** Formal or casual: one control on a [track], its chosen half filled in violet. */
+/** A choice among a few [options]: one control on a [track], the chosen part filled in violet. */
 @Composable
-private fun RegisterChoice(vm: AppViewModel, modifier: Modifier = Modifier, track: Color = Pastel.White.copy(alpha = 0.85f)) {
+private fun <T> SegmentedChoice(
+    options: List<T>,
+    chosen: T,
+    title: (T) -> String,
+    onChoose: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    track: Color = Pastel.White.copy(alpha = 0.85f),
+) {
     Row(
         modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(track).padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Register.entries.forEach { r ->
-            val selected = vm.register == r
+        options.forEach { option ->
+            val selected = option == chosen
             val fill by animateColorAsState(if (selected) Pastel.Violet else Color.Transparent, tween(150), label = "segment")
             Text(
-                r.title,
+                title(option),
                 fontSize = 13.sp,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                 color = if (selected) Pastel.VioletInk else Pastel.Ink,
@@ -807,12 +814,22 @@ private fun RegisterChoice(vm: AppViewModel, modifier: Modifier = Modifier, trac
                     .weight(1f)
                     .clip(RoundedCornerShape(14.dp))
                     .background(fill)
-                    .clickable { vm.register = r }
+                    .clickable { onChoose(option) }
                     .padding(vertical = 9.dp),
             )
         }
     }
 }
+
+/** Beginner or Intermediate. */
+@Composable
+private fun ModeChoice(vm: AppViewModel, modifier: Modifier = Modifier, track: Color = Pastel.White.copy(alpha = 0.85f)) =
+    SegmentedChoice(Mode.entries, vm.mode, { it.title }, vm::chooseMode, modifier, track)
+
+/** Formal or casual. */
+@Composable
+private fun RegisterChoice(vm: AppViewModel, modifier: Modifier = Modifier, track: Color = Pastel.White.copy(alpha = 0.85f)) =
+    SegmentedChoice(Register.entries, vm.register, { it.title }, { vm.register = it }, modifier, track)
 
 /** Fades this away at its right edge while there is [more] to scroll to, to show that there is. */
 private fun Modifier.fadeAtEnd(more: Boolean): Modifier = if (!more) this else this
@@ -832,6 +849,9 @@ private fun Modifier.fadeAtEnd(more: Boolean): Modifier = if (!more) this else t
 @Composable
 private fun ConversationSettings(vm: AppViewModel, onClose: () -> Unit) {
     PopupCard("Conversation settings", onClose) {
+        SmallLabel("Mode", Pastel.InkSoft)
+        ModeChoice(vm, track = Pastel.SurfaceContainer)
+        Text(vm.mode.about, fontSize = 12.sp, color = Pastel.InkSoft)
         SmallLabel("Style", Pastel.InkSoft)
         RegisterChoice(vm, track = Pastel.SurfaceContainer)
         SmallLabel("The phrase to say", Pastel.InkSoft)
@@ -860,7 +880,7 @@ private fun LanguageScreen(vm: AppViewModel) {
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                "Say what you want in English, then repeat it back in the language until you get it right.",
+                vm.mode.about,
                 fontSize = 13.sp,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -871,6 +891,10 @@ private fun LanguageScreen(vm: AppViewModel) {
         },
     ) {
         Column(Modifier.fillMaxSize().padding(top = 14.dp)) {
+            SmallLabel("Mode", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
+            Spacer(Modifier.height(6.dp))
+            ModeChoice(vm, Modifier.padding(horizontal = 16.dp))
+            Spacer(Modifier.height(12.dp))
             SmallLabel("Style", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(6.dp))
             RegisterChoice(vm, Modifier.padding(horizontal = 16.dp))
@@ -966,6 +990,7 @@ private fun ConversationScreen(vm: AppViewModel) {
 
     BackHandler(onBack = vm::goHome)
     vm.practice?.let { PracticeWindow(vm, it) }
+    vm.walk?.let { WordWalkWindow(vm, it) }
     vm.lookup?.let {
         WordBubble(it, appBusy = vm.busy != Busy.Idle, onLookUp = vm::lookUp, onHear = vm::hearWord, onClose = vm::closeLookup)
     }
@@ -1428,6 +1453,63 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
     }
 }
 
+/**
+ * Beginner's word-by-word step: the phrase with the word to say picked out, that word's expected
+ * sounds to hear, and a button to hold and say it. Each word said right moves on to the next;
+ * after the last, the bubble closes and the whole phrase is said. Closing it early goes straight
+ * to the whole phrase.
+ */
+@Composable
+private fun WordWalkWindow(vm: AppViewModel, w: AppViewModel.WordWalk) {
+    val idle = vm.busy == Busy.Idle
+    val word = w.word
+    PopupCard(
+        "Word by word · ${w.position + 1} of ${w.words.size}",
+        vm::closeWalk,
+        closeStyle = PillStyle.Outline,
+        // A stray tap beside the bubble shouldn't end the step; Close and Back do.
+        closeOnTapOutside = false,
+        header = {
+            // The phrase: the words done in green, the one to say picked out.
+            TappableText(
+                w.phrase,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Pastel.PrimaryInk,
+                highlight = w.position,
+                right = (0 until w.position).toSet(),
+                onWord = { _, _, _ -> },
+            )
+        },
+    ) {
+        w.note?.let { Text(it, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Pastel.InkSoft) }
+        Text(word.word, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = Pastel.PrimaryInk)
+        // The word's expected sounds, and what was heard in the last try; tapping either says it.
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SoundBox(
+                "Expected", word.shown.joinToString("").replace("▁", ""), Pastel.PrimaryContainer, Pastel.PrimaryDark,
+                Modifier.weight(1f).fillMaxHeight(), enabled = idle, onPlay = vm::hearWalkWord,
+            )
+            if (w.heard.isNotEmpty()) {
+                SoundBox(
+                    "Heard", w.heard, Pastel.VioletContainer, Pastel.VioletDark,
+                    Modifier.weight(1f).fillMaxHeight(), enabled = idle, onPlay = { vm.saySounds(w.heard) },
+                )
+            }
+        }
+        Text(
+            if (idle) "Hold the button and say the word" else vm.busy.label,
+            fontSize = 12.sp,
+            color = Pastel.InkSoft,
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+        )
+        HoldToTalk("Say “${word.word}”", Pastel.Cta, Pastel.CtaInk, vm, Modifier.fillMaxWidth(), onStart = vm::startWalkTalking)
+        if (w.fails >= AppViewModel.SKIP_AFTER_FAILS) {
+            Box(Modifier.align(Alignment.CenterHorizontally)) { LinkButton("Skip this word", vm::skipWalkWord) }
+        }
+    }
+}
+
 /** A hold-to-talk button for the practice window: speaks while held, then [vm] grades it. */
 @Composable
 private fun HoldToTalk(label: String, fill: Color, ink: Color, vm: AppViewModel, modifier: Modifier, onStart: () -> Unit) {
@@ -1660,10 +1742,15 @@ private fun PopupCard(
     headerSpacing: Dp = 6.dp,
     /** Called when the bubble is swiped sideways: true for a swipe to the left (onwards), false to the right (back). */
     onSwipe: ((onwards: Boolean) -> Unit)? = null,
+    /** Whether a tap outside the bubble closes it. */
+    closeOnTapOutside: Boolean = true,
     header: @Composable ColumnScope.() -> Unit = {},
     body: @Composable ColumnScope.() -> Unit,
 ) {
-    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(
+        onDismissRequest = onClose,
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = closeOnTapOutside),
+    ) {
         Column(
             Modifier
                 .padding(16.dp)

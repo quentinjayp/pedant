@@ -132,6 +132,26 @@ object Matching {
     }
 
     /**
+     * One word said on its own, for Beginner's word-by-word step. It's right if Omnilingual heard
+     * the word, or ZIPA heard its sounds within [WORD_SOUND_LIMIT]: the two ways a word is right in
+     * a phrase. (Not calibrated for single words.)
+     */
+    fun checkWordAlone(ref: RefWord, transcript: String, heardSounds: List<String>): WordResult {
+        val ws = compareBoth(listOf(ref), heardSounds.filter { it != "▁" }).words.first()
+        val heardWords = wordsOf(transcript)
+        val heardIt = heardWords.any { wordCost(normalize(ref.word), normalize(it)) == 0.0 }
+        return WordResult(
+            word = ref.word,
+            expected = ref.shown,
+            reference = ref.sounds,
+            heard = ws.heard.replace("▁", ""),
+            score = (1.0 - ws.ratio).coerceIn(0.0, 1.0),
+            heardWord = heardWords.joinToString(" ").ifEmpty { null },
+            passed = heardIt || ws.ratio <= WORD_SOUND_LIMIT,
+        )
+    }
+
+    /**
      * Splits the sounds ZIPA heard in the whole phrase ([phraseSounds], the reference) into words.
      * Each word said on its own ([isolated]) is only a guide to where the word boundaries fall,
      * because single words are sometimes mispronounced when said out of context.

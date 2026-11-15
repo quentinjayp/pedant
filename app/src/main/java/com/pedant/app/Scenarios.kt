@@ -7,6 +7,15 @@ enum class Register(val title: String) {
 }
 
 /**
+ * How much help the learner gets with a phrase. In [Beginner] they're taken through it one word at a
+ * time before saying it whole; in [Intermediate] they say it whole straight away.
+ */
+enum class Mode(val title: String, val about: String) {
+    Beginner("Beginner", "Say what you want in English, then say it one word at a time before the whole phrase."),
+    Intermediate("Intermediate", "Say what you want in English, then repeat it back in the language until you get it right."),
+}
+
+/**
  * How the phrase to say is given to the learner: said by the voice and shown as text, or only one
  * of the two. Never neither.
  */

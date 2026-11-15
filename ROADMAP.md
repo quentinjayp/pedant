@@ -4,13 +4,8 @@ Ideas for later. Nothing here is being built yet.
 
 ## Modes
 
-Three modes to choose from. Anything not mentioned here stays as it is today.
+Beginner and Intermediate are built. A third mode is planned.
 
-- **Beginner.** You say what you want in English, as now. The app then takes you through the
-  phrase one word at a time in the bubble, and each word has to be said right. After two failed
-  tries at a word, Skip is offered. Once the words are done, you say the full phrase.
-- **Intermediate.** Today's behaviour: say it in English, then repeat the full phrase until it's
-  right.
 - **Advanced.** Free conversation in the language, with no English first. The tutor never makes
   you repeat a phrase until it's right, as Beginner and Intermediate do. This mode may use a
   different speech recognizer (undecided).
