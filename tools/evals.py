@@ -27,6 +27,7 @@ import re
 import time
 
 from app_languages import languages
+from evals_promptfoo import lenient, score
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 INSTRUCTIONS = f"{ROOT}/app/src/main/assets/instructions.json"
@@ -184,14 +185,14 @@ def config(outputs_dir, work):
 
 def summary(outputs_dir):
     """Prints, as Markdown, each model's average score by language, and how long it took."""
-    import sacrebleu
-
     outputs = load_outputs(outputs_dir)
     names = [m["name"] for m in json.load(open(MODELS, encoding="utf-8"))["models"] if m["name"] in outputs]
     if not names:
         print("No translations to score.")
         return
     rows, totals, times, empty = [], {n: [] for n in names}, {n: [] for n in names}, {n: 0 for n in names}
+    # The same, taking an answer without its SAY: label as the translation anyway.
+    loose = {n: [] for n in names}
     for code, name in targets():
         cells = []
         for n in names:
@@ -200,7 +201,8 @@ def summary(outputs_dir):
                 out = outputs[n].get(f"{s['id']}|{code}")
                 if code not in s["translations"] or out is None:
                     continue
-                scores.append(sacrebleu.sentence_chrf(out["say"], [s["translations"][code]]).score)
+                scores.append(score(out["say"], s["translations"][code], code))
+                loose[n].append(score(out["say"] or lenient(out["raw"]), s["translations"][code], code))
                 times[n].append(out["seconds"])
                 empty[n] += not out["say"]
             totals[n] += scores
@@ -213,9 +215,11 @@ def summary(outputs_dir):
     print("| **All languages** | " + " | ".join(f"**{mean(totals[n])}**" for n in names) + " |")
     print("\n".join(rows))
     print("| Seconds per translation (on the CI machine) | " + " | ".join(mean(times[n]) for n in names) + " |")
-    print("| Translations with no phrase in the answer | " + " | ".join(str(empty[n]) for n in names) + " |")
+    print("| Answers the app couldn't read (no SAY: label) | " + " | ".join(str(empty[n]) for n in names) + " |")
+    print("| All languages, reading those answers anyway | " + " | ".join(mean(loose[n]) for n in names) + " |")
     print(f"\n{len(totals[names[0]])} translations per model. A good translation worded differently from the reference "
-          "scores lower, so the scores compare the models with each other.")
+          "scores lower, so the scores compare the models with each other. An answer the app couldn't read scores 0, "
+          "as the app would show no phrase for it.")
 
 
 if __name__ == "__main__":
