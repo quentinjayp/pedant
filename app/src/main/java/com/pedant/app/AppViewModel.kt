@@ -358,16 +358,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Starts a new conversation in [lang]; the saved one is replaced once this one is under way. */
     fun pickLanguage(lang: Language) = startSession(lang, resume = null)
 
-    /** Whether there is a saved conversation to continue. */
-    var canContinue by mutableStateOf(SavedConversation.load(app.filesDir) != null)
+    /**
+     * What the saved conversation is, for the home page ("French · Coffee with a friend · Casual"),
+     * or null if there's none to continue.
+     */
+    var continueSummary by mutableStateOf(
+        SavedConversation.load(app.filesDir)?.let { saved ->
+            summary(LANGUAGES.firstOrNull { it.code == saved.languageCode }, saved.scenario, saved.register)
+        },
+    )
         private set
+
+    /** Whether there is a saved conversation to continue. */
+    val canContinue: Boolean get() = continueSummary != null
+
+    private fun summary(lang: Language?, scenario: Scenario, register: Register): String? = lang?.let {
+        listOfNotNull(it.englishName, scenario.title.takeIf { scenario != Scenario.Default }, register.title).joinToString(" · ")
+    }
 
     /** Continues the saved conversation exactly where it was left. */
     fun continueConversation() {
         val saved = SavedConversation.load(getApplication<Application>().filesDir)
         val lang = saved?.let { s -> LANGUAGES.firstOrNull { it.code == s.languageCode } }
         if (saved == null || lang == null) {
-            canContinue = false
+            continueSummary = null
             return
         }
         scenario = saved.scenario
@@ -397,7 +411,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { saved.save(dir) }.onFailure { diagnostics.log("Couldn't save the conversation: ${it.message}") }
         }
-        canContinue = true
+        continueSummary = summary(lang, scenario, register)
     }
 
     /** From the home page: choose the scenario and language for a new conversation. */

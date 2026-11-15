@@ -540,7 +540,7 @@ private fun HomeScreen(vm: AppViewModel) {
             HomeButton(
                 mark = "▶",
                 title = "Continue conversation",
-                subtitle = if (vm.canContinue) "Pick up where you left off" else "No conversation yet",
+                subtitle = vm.continueSummary ?: "No conversation yet",
                 color = Pastel.Cta,
                 ink = Pastel.CtaInk,
                 enabled = vm.canContinue,
