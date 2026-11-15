@@ -4,15 +4,22 @@ name: Evals
 # translates the same English sentences into the app's languages, told what the app tells Gemma,
 # and the results are scored against translations made by people. It reports only (a table in the
 # run's summary, and promptfoo's side-by-side report to download) and never blocks a build.
-# Runs on demand, or on a push whose commit message contains [evals].
+# Runs on demand, or on a push whose commit message contains [evals]. Run on demand with an earlier
+# run's number, it makes the report again from that run's translations without translating again.
 
 on:
   push:
     branches: [claude/offline-ai-language-app-v3widq, main]
   workflow_dispatch:
+    inputs:
+      translations_from:
+        description: "Report again from an earlier Evals run's translations: that run's number, from its web address"
+        required: false
+        default: ""
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   models:
@@ -34,6 +41,7 @@ jobs:
 
   translate:
     needs: models
+    if: ${{ !inputs.translations_from }}
     runs-on: ubuntu-latest
     timeout-minutes: 300
     strategy:
@@ -71,9 +79,11 @@ jobs:
         with:
           pattern: translations-*
           path: outputs
+          run-id: ${{ inputs.translations_from || github.run_id }}
+          github-token: ${{ github.token }}
       - run: pip install --quiet sacrebleu
       - name: Scores by model and language
-        run: python3 tools/evals.py summary outputs | tee summary.md >> "$GITHUB_STEP_SUMMARY"
+        run: python3 tools/evals.py summary outputs | tee summary.md | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Side-by-side report (promptfoo)
         env:
           PROMPTFOO_DISABLE_TELEMETRY: "1"

@@ -160,7 +160,8 @@ def config(outputs_dir, work):
     sentence and language, each scored against the reference."""
     here = os.path.dirname(os.path.abspath(__file__))
     names = [m["name"] for m in json.load(open(MODELS, encoding="utf-8"))["models"]]
-    merged = os.path.join(work, "outputs.json")
+    # A full path: promptfoo is run from inside the work folder.
+    merged = os.path.abspath(os.path.join(work, "outputs.json"))
     os.makedirs(work, exist_ok=True)
     json.dump(load_outputs(outputs_dir), open(merged, "w", encoding="utf-8"), ensure_ascii=False)
     tests = [
