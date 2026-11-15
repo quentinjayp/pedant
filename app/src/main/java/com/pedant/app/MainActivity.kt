@@ -238,7 +238,7 @@ private fun AppScreen(
                             .clip(DockShape)
                             .background(Pastel.SurfaceContainer)
                             .windowInsetsPadding(WindowInsets.safeDrawing.only(sides + WindowInsetsSides.Bottom))
-                            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp),
+                            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         content = dock,
                     )
@@ -966,18 +966,20 @@ private fun ConversationScreen(vm: AppViewModel) {
         },
         dockVisible = dockShown,
         dock = {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+            // The controls and the chevron that folds the footer away share a row, to keep it short.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { LearningControls(vm) }
+                Spacer(Modifier.width(8.dp))
                 ChevronButton(Chevron.Down, vm::toggleDock, Modifier.size(28.dp))
             }
-            LearningControls(vm)
-            Text(vm.hint, fontSize = 12.sp, color = Pastel.InkSoft, modifier = Modifier.padding(vertical = 8.dp))
+            Text(vm.hint, fontSize = 12.sp, color = Pastel.InkSoft, modifier = Modifier.padding(top = 6.dp, bottom = 4.dp))
             MicButton(vm)
         },
         overlay = {
             // Folded away: Hold to talk alone, where it sits in the footer, and a chevron to unfold it.
             AnimatedVisibility(
                 floatingShown,
-                Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+                Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
                 enter = fadeIn(tween(FOOTER_FADE_MS)),
                 exit = fadeOut(tween(FOOTER_FADE_MS)),
             ) {
@@ -985,7 +987,7 @@ private fun ConversationScreen(vm: AppViewModel) {
             }
             AnimatedVisibility(
                 floatingShown,
-                Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 16.dp),
+                Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 12.dp),
                 enter = fadeIn(tween(FOOTER_FADE_MS)),
                 exit = fadeOut(tween(FOOTER_FADE_MS)),
             ) {
@@ -1854,7 +1856,7 @@ private fun LearningControls(vm: AppViewModel) {
         // Skip sits outside the scrolling row so it's always on screen.
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             // With the voice turned off for the phrase, there's nothing to hear again.
-            Box(Modifier.weight(1f)) { if (vm.phraseSpoken) HearButtons("Hear it again:", vm::hearAgain) }
+            Box(Modifier.weight(1f)) { if (vm.phraseSpoken) HearButtons("Hear it:", vm::hearAgain) }
             if (vm.drillAttempts >= AppViewModel.SKIP_AFTER_FAILS) LinkButton("Skip", vm::skip)
         }
     }
