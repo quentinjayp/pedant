@@ -21,7 +21,7 @@
     {"code": "ru", "englishName": "Russian", "nativeName": "Русский", "piperVoice": "ru_RU-irina-medium", "espeakVoice": "ru"},
     {"code": "sk", "englishName": "Slovak", "nativeName": "Slovenčina", "piperVoice": "sk_SK-lili-medium", "espeakVoice": "sk"},
     {"code": "sl", "englishName": "Slovenian", "nativeName": "Slovenščina", "piperVoice": "sl_SI-artur-medium", "espeakVoice": "sl"},
-    {"code": "sr", "englishName": "Serbian", "nativeName": "Српски", "piperVoice": "sr_RS-serbski_institut-medium", "espeakVoice": "sr"},
+    {"code": "sr", "englishName": "Serbian", "nativeName": "Srpski", "piperVoice": "sr_RS-serbski_institut-medium", "espeakVoice": "sr"},
     {"code": "sv", "englishName": "Swedish", "nativeName": "Svenska", "piperVoice": "sv_SE-nst-medium", "espeakVoice": "sv"},
     {"code": "sw", "englishName": "Swahili", "nativeName": "Kiswahili", "piperVoice": "sw_CD-lanfrica-medium", "espeakVoice": "sw"},
     {"code": "tr", "englishName": "Turkish", "nativeName": "Türkçe", "piperVoice": "tr_TR-dfki-medium", "espeakVoice": "tr"},

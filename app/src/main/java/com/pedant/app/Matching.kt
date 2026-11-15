@@ -93,10 +93,15 @@ object Matching {
         // word only counts as wrong when neither heard it right, and what Omnilingual heard
         // doesn't sound like it either.
         val soundAlike = transcriptSounds?.let { compareBoth(refWords, it) }
+        // The sounds are lined up with the whole phrase, so when the learner stops early a few of
+        // them land on words never said (a stray /e/ on "et"). Past the last word Omnilingual heard
+        // anything for, the sounds don't count. In tools/calibrate_scoring.py this halved the
+        // never-said words marked right (11% to 6%) and correct speech passed as often (97%).
+        val lastHeard = heardFor.indexOfLast { it != null }
         val wrong = targetWords.indices.filter { i ->
             val soundRatio = sounds.words.getOrNull(i)?.ratio ?: 1.0
             val alikeRatio = soundAlike?.words?.getOrNull(i)?.ratio ?: 1.0
-            wordWrong[i] && soundRatio > WORD_SOUND_LIMIT && alikeRatio > WORD_SOUND_LIMIT
+            wordWrong[i] && (i > lastHeard || (soundRatio > WORD_SOUND_LIMIT && alikeRatio > WORD_SOUND_LIMIT))
         }
         return AttemptResult(
             wordScore = wordScore,

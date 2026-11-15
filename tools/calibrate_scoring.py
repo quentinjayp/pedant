@@ -222,7 +222,7 @@ def word_ratios(ref_words, heard):
 
 def check(target, transcript, ref_words, heard_sounds):
     """Returns (word score, sound score, per-word: (heard by Omnilingual, sound error ratio, whether
-    it comes after the last word Omnilingual heard anything for, whether before the first))."""
+    it comes after the last word Omnilingual heard anything for))."""
     tw = [normalize(w) for w in words(target)]
     hw = [normalize(w) for w in words(transcript)]
     word_steps = align(tw, hw, word_cost, lambda _: 1.0)
@@ -236,11 +236,10 @@ def check(target, transcript, ref_words, heard_sounds):
             if c == 0:
                 word_ok[r] = True
     after = [not placed or i > max(placed) for i in range(len(tw))]
-    before = [not placed or i < min(placed) for i in range(len(tw))]
     ref = [s for _, ss in ref_words for s in ss]
     sound_steps = align(ref, heard_sounds, sound_cost, sound_indel)
     sound_score = score(sound_steps, sum(sound_indel(s) for s in ref))
-    return word_score, sound_score, list(zip(word_ok, ratios_from_steps(ref_words, sound_steps), after, before))
+    return word_score, sound_score, list(zip(word_ok, ratios_from_steps(ref_words, sound_steps), after))
 
 
 IPA_DROP = set("/[].ˈˌ‿͜͡ -")
@@ -409,38 +408,37 @@ for lang, cfg in LANGS.items():
                 # Sound-alike check: the reference voice says what Omnilingual heard.
                 alike = word_ratios(refs, alike_sounds) if alike_sounds else [1.0] * len(per_word)
                 # Per word: (Omnilingual heard it, ZIPA's sound error ratio, the sound-alike ratio,
-                # after the last word Omnilingual heard anything for, before the first).
-                per_word = [(ok, ratio, alike_ratio, after, before) for (ok, ratio, after, before), alike_ratio in zip(per_word, alike)]
+                # after the last word Omnilingual heard anything for).
+                per_word = [(ok, ratio, alike_ratio, after) for (ok, ratio, after), alike_ratio in zip(per_word, alike)]
                 rows.append((lang, kind, os.path.basename(path), ws, ss, per_word, method))
                 scored[method] = (ws, ss, per_word)
             # "either": espeak-ng's sounds are shown, and a word counts as right when what was said
             # is close to them or to ZIPA's hearing of Piper (current), whichever is closer.
             (ws, ss_c, cur), (_, ss_e, esp) = scored["current"], scored["espeak"]
-            either = [(h1 or h2, min(r1, r2), min(a1, a2), t1, l1) for (h1, r1, a1, t1, l1), (h2, r2, a2, _, _) in zip(cur, esp)]
+            either = [(h1 or h2, min(r1, r2), min(a1, a2), t1) for (h1, r1, a1, t1), (h2, r2, a2, _) in zip(cur, esp)]
             rows.append((lang, kind, os.path.basename(path), ws, max(ss_c, ss_e), either, "either"))
         print(f"{lang} heard: {whole[0]}  |  stopped halfway: {half[0]}", flush=True)
 
 # The app's rule: a word is right if Omnilingual heard it, OR ZIPA's sounds for it are close
-# enough, OR what Omnilingual heard sounds like it (the sound-alike check). Each part alone and in
-# pairs shows how much each recognizer adds.
+# enough, OR what Omnilingual heard sounds like it (the sound-alike check); except that past the
+# last word Omnilingual heard anything for, the sounds don't count (the speaker stopped early, and
+# stray sounds land on words never said). Each part alone and in pairs shows how much each adds.
 LIMIT = 0.5
 KINDS = ["correct", "swap one word", "skip one word", "different sentence", "stopped halfway"]
+APP = "All three, not past what was heard (the app)"
 RULES = {
-    "ZIPA alone": lambda heard, ratio, alike, after, before: ratio <= LIMIT,
-    "Omnilingual alone": lambda heard, ratio, alike, after, before: heard,
-    "Omnilingual + sound-alike": lambda heard, ratio, alike, after, before: heard or alike <= LIMIT,
-    "ZIPA + Omnilingual": lambda heard, ratio, alike, after, before: heard or ratio <= LIMIT,
-    "All three (the app)": lambda heard, ratio, alike, after, before: heard or ratio <= LIMIT or alike <= LIMIT,
-    # Candidates: the sounds can't make a word right where Omnilingual heard nothing at all, past
-    # the last word it heard anything for (the speaker stopped early), or also before the first.
-    "…not past what was heard": lambda heard, ratio, alike, after, before: heard or (not after and (ratio <= LIMIT or alike <= LIMIT)),
-    "…nor before it": lambda heard, ratio, alike, after, before: heard or (not after and not before and (ratio <= LIMIT or alike <= LIMIT)),
+    "ZIPA alone": lambda heard, ratio, alike, after: ratio <= LIMIT,
+    "Omnilingual alone": lambda heard, ratio, alike, after: heard,
+    "Omnilingual + sound-alike": lambda heard, ratio, alike, after: heard or alike <= LIMIT,
+    "ZIPA + Omnilingual": lambda heard, ratio, alike, after: heard or ratio <= LIMIT,
+    "All three": lambda heard, ratio, alike, after: heard or ratio <= LIMIT or alike <= LIMIT,
+    APP: lambda heard, ratio, alike, after: heard or (not after and (ratio <= LIMIT or alike <= LIMIT)),
 }
 # The rules compared word by word, below the table.
-WORD_RULES = ["All three (the app)", "…not past what was heard", "…nor before it"]
+WORD_RULES = ["All three", APP]
 
 
-def bad_words(r, rule=RULES["All three (the app)"]):
+def bad_words(r, rule=RULES[APP]):
     return [i for i, w in enumerate(r[5]) if not rule(*w)]
 
 
@@ -453,13 +451,13 @@ for method in ["current", "espeak", "either"]:
             for metric, idx in [("words", 3), ("sounds", 4)]:
                 vals = [r[idx] for r in group_rows if r[1] == kind]
                 print(f"{kind:18} {metric:6} min {min(vals):.2f} mean {sum(vals) / len(vals):.2f} max {max(vals):.2f}")
-        print(f"{'rule':28}" + "".join(f"{k:>20}" for k in KINDS))
+        print(f"{'rule':46}" + "".join(f"{k:>20}" for k in KINDS))
         by_kind = {kind: [r for r in group_rows if r[1] == kind] for kind in KINDS}
         for name, rule in RULES.items():
-            print(f"{name:28}" + "".join(
+            print(f"{name:46}" + "".join(
                 f"{sum(not bad_words(r, rule) for r in by_kind[kind]) / max(1, len(by_kind[kind])):>20.0%}" for kind in KINDS))
         # Before its characters were graded one by one, Mandarin passed on the whole phrase's scores.
-        print(f"{'Whole phrase (0.7 and 0.6)':28}" + "".join(
+        print(f"{'Whole phrase (0.7 and 0.6)':46}" + "".join(
             f"{sum(r[3] >= 0.7 and r[4] >= 0.6 for r in by_kind[kind]) / max(1, len(by_kind[kind])):>20.0%}" for kind in KINDS))
         # Word by word: in a recording cut in half, the last third of the words was never said;
         # in a correct one, every word was.
