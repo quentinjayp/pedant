@@ -38,11 +38,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -324,11 +326,19 @@ private fun SmallLabel(text: String, color: Color = Pastel.PrimaryDark, modifier
 
 /** A small rounded tag, e.g. "Tutor" on a tutor's line. */
 @Composable
-private fun Tag(text: String, background: Color = Pastel.PrimaryContainer, color: Color = Pastel.PrimaryDark) {
+private fun Tag(
+    text: String,
+    background: Color = Pastel.PrimaryContainer,
+    color: Color = Pastel.PrimaryDark,
+    /** Makes the tag a small button. */
+    onClick: (() -> Unit)? = null,
+) {
     SmallLabel(
         text,
         color,
-        Modifier.clip(CircleShape).background(background).padding(horizontal = 8.dp, vertical = 2.dp),
+        Modifier.clip(CircleShape).background(background)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 8.dp, vertical = if (onClick != null) 6.dp else 2.dp),
     )
 }
 
@@ -1291,18 +1301,23 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
             when {
                 w.passed -> Tag("right", Pastel.PrimaryContainer, Pastel.PrimaryDark)
                 heardWord == null -> Tag("not heard", Pastel.SurfaceContainer, Pastel.InkSoft)
-                heardOther -> Tag("heard “$heardWord”", Pastel.CtaContainer, Pastel.CtaDark)
+                // Tapping it says the word that was heard.
+                heardOther -> Tag("▶ heard “$heardWord”", Pastel.CtaContainer, Pastel.CtaDark) {
+                    if (idle && heardWord != null) vm.hearWord(heardWord, false)
+                }
                 else -> Tag("word right, sounds off", Pastel.CtaContainer, Pastel.CtaDark)
             }
         }
-        SoundChip("Expected /${w.expected.joinToString("").replace("▁", "")}/", Pastel.PrimaryContainer, null, Pastel.PrimaryDark)
-        SoundChip("Heard /${w.heard.ifEmpty { "—" }}/", Pastel.VioletContainer, null, Pastel.VioletDark)
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            PillButton("▶ Correct", { vm.hearWord(w.word, false) }, PillStyle.Primary, idle)
-            if (w.heard.isNotEmpty()) PillButton("▶ Heard sounds", { vm.saySounds(w.heard) }, PillStyle.Secondary, idle)
-            if (heardWord != null && heardOther) {
-                PillButton("▶ Heard word", { vm.hearWord(heardWord, false) }, PillStyle.Secondary, idle)
-            }
+        // The expected sounds beside the heard ones; tapping either says it.
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SoundBox(
+                "Expected", w.expected.joinToString("").replace("▁", ""), Pastel.PrimaryContainer, Pastel.PrimaryDark,
+                Modifier.weight(1f).fillMaxHeight(), enabled = idle, onPlay = { vm.hearWord(w.word, false) },
+            )
+            SoundBox(
+                "Heard", w.heard, Pastel.VioletContainer, Pastel.VioletDark,
+                Modifier.weight(1f).fillMaxHeight(), enabled = idle, onPlay = if (w.heard.isEmpty()) null else ({ vm.saySounds(w.heard) }),
+            )
         }
         p.wordTries[i]?.let { t ->
             Column(
@@ -1409,16 +1424,34 @@ private fun ScoreMeter(label: String, score: Double, color: Color, modifier: Mod
     }
 }
 
-/** A small box of sounds (IPA), in the fixed-width face. */
+/**
+ * A box of sounds (IPA) under a [label], in the fixed-width face. With [onPlay] it's a button that
+ * says them, marked with a play triangle.
+ */
 @Composable
-private fun SoundChip(text: String, background: Color, border: Color?, color: Color) {
-    Text(
-        text,
-        fontSize = 12.sp,
-        fontFamily = FontFamily.Monospace,
-        color = color,
-        modifier = Modifier.card(background, border, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 3.dp),
-    )
+private fun SoundBox(
+    label: String,
+    sounds: String,
+    background: Color,
+    ink: Color,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onPlay: (() -> Unit)?,
+) {
+    Column(
+        modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(background)
+            .then(if (onPlay != null) Modifier.clickable(enabled = enabled, onClick = onPlay) else Modifier)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SmallLabel(label, ink, Modifier.weight(1f))
+            if (onPlay != null) Text("▶", fontSize = 13.sp, color = ink.copy(alpha = if (enabled) 1f else 0.4f))
+        }
+        Text("/${sounds.ifEmpty { "—" }}/", fontSize = 15.sp, fontFamily = FontFamily.Monospace, color = ink)
+    }
 }
 
 /**
