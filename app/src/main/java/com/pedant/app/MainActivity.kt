@@ -18,6 +18,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -91,18 +92,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -782,22 +787,53 @@ private fun ChoiceChip(
     )
 }
 
-/** Formal or casual, side by side. */
+/** Formal or casual: one control on a [track], its chosen half filled in violet. */
 @Composable
-private fun RegisterChoice(vm: AppViewModel, modifier: Modifier = Modifier, unselected: Color = Pastel.White.copy(alpha = 0.85f)) {
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun RegisterChoice(vm: AppViewModel, modifier: Modifier = Modifier, track: Color = Pastel.White.copy(alpha = 0.85f)) {
+    Row(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(track).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Register.entries.forEach { r ->
-            ChoiceChip(r.title, vm.register == r, { vm.register = r }, Modifier.weight(1f), unselected)
+            val selected = vm.register == r
+            val fill by animateColorAsState(if (selected) Pastel.Violet else Color.Transparent, tween(150), label = "segment")
+            Text(
+                r.title,
+                fontSize = 13.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (selected) Pastel.VioletInk else Pastel.Ink,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(fill)
+                    .clickable { vm.register = r }
+                    .padding(vertical = 9.dp),
+            )
         }
     }
 }
+
+/** Fades this away at its right edge while there is [more] to scroll to, to show that there is. */
+private fun Modifier.fadeAtEnd(more: Boolean): Modifier = if (!more) this else this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val width = 40.dp.toPx()
+        drawRect(
+            brush = Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = size.width - width, endX = size.width),
+            topLeft = Offset(size.width - width, 0f),
+            size = Size(width, size.height),
+            blendMode = BlendMode.DstIn,
+        )
+    }
 
 /** The conversation's settings, from the gear in its header. */
 @Composable
 private fun ConversationSettings(vm: AppViewModel, onClose: () -> Unit) {
     PopupCard("Conversation settings", onClose) {
         SmallLabel("Style", Pastel.InkSoft)
-        RegisterChoice(vm, unselected = Pastel.SurfaceLow)
+        RegisterChoice(vm, track = Pastel.SurfaceContainer)
         SmallLabel("The phrase to say", Pastel.InkSoft)
         PhraseGuide.entries.forEach { guide ->
             ChoiceChip(guide.title, vm.phraseGuide == guide, { vm.choosePhraseGuide(guide) }, Modifier.fillMaxWidth(), Pastel.SurfaceLow)
@@ -841,8 +877,9 @@ private fun LanguageScreen(vm: AppViewModel) {
             Spacer(Modifier.height(12.dp))
             SmallLabel("Scenario", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(6.dp))
+            val scenarios = rememberScrollState()
             Row(
-                Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                Modifier.fadeAtEnd(scenarios.canScrollForward).horizontalScroll(scenarios).padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Scenario.entries.forEach { sc -> ChoiceChip(sc.title, vm.scenario == sc, { vm.scenario = sc }) }
