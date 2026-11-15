@@ -1197,6 +1197,9 @@ private fun SayCard(item: ChatItem.Say, language: String?, hidden: Boolean, onWo
     }
 }
 
+/** How many runs of missed words a try's card spells out. */
+private const val MISSED_RUNS_SHOWN = 3
+
 /** How one try at the phrase went; tapping it opens the practice window. */
 @Composable
 private fun AttemptCard(item: ChatItem.Attempt, enabled: Boolean, onOpen: (position: Int?) -> Unit) {
@@ -1241,9 +1244,36 @@ private fun AttemptCard(item: ChatItem.Attempt, enabled: Boolean, onOpen: (posit
                 wrong = r.words.indices.filter { !r.words[it].passed }.toSet(),
                 onWord = { _, _, at -> if (enabled) onOpen(at) },
             )
-            val expected = r.words.joinToString(" ") { it.expected.joinToString("").replace("▁", "") }
-            Text("Expected: /$expected/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.PrimaryDark)
-            Text("Heard: /${item.sounds}/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.VioletDark)
+            // The sounds only for the words missed: each run of neighbouring wrong words, with what
+            // was expected and what was heard. The rest is in the practice window.
+            val missed = buildList {
+                var from = 0
+                while (from < r.words.size) {
+                    var to = from
+                    while (to < r.words.size && !r.words[to].passed) to++
+                    if (to > from) add(r.words.subList(from, to))
+                    from = to + 1
+                }
+            }
+            missed.take(MISSED_RUNS_SHOWN).forEach { run ->
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(color = Pastel.Wrong, fontWeight = FontWeight.Bold)) { append(run.joinToString(" ") { it.word }) }
+                        withStyle(SpanStyle(fontFamily = FontFamily.Monospace, fontSize = 12.sp)) {
+                            withStyle(SpanStyle(color = Pastel.PrimaryDark)) {
+                                append("  expected /${run.joinToString(" ") { it.expected.joinToString("").replace("▁", "") }}/")
+                            }
+                            withStyle(SpanStyle(color = Pastel.VioletDark)) {
+                                append("  heard /${run.joinToString(" ") { it.heard }.trim().ifEmpty { "—" }}/")
+                            }
+                        }
+                    },
+                    fontSize = 13.sp,
+                )
+            }
+            if (missed.size > MISSED_RUNS_SHOWN) {
+                Text("and ${missed.size - MISSED_RUNS_SHOWN} more", fontSize = 12.sp, color = Pastel.InkSoft)
+            }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ScoreMeter("Words", r.wordScore, Pastel.PrimaryDark, Modifier.weight(1f))
