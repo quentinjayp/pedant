@@ -4,7 +4,8 @@ name: Evals
 # translates the same English sentences into the app's languages, told what the app tells Gemma,
 # and the results are scored against translations made by people. It reports only (a table in the
 # run's summary, and promptfoo's side-by-side report to download) and never blocks a build.
-# Runs on demand, or on a push whose commit message contains [evals]. Run on demand with an earlier
+# Runs on demand, or on a push whose commit message contains [evals]. A job that fails never
+# marks the run as failed. Run on demand with an earlier
 # run's number, it makes the report again from that run's translations without translating again.
 
 on:
@@ -23,6 +24,7 @@ permissions:
 
 jobs:
   models:
+    continue-on-error: true
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[evals]')
     runs-on: ubuntu-latest
     outputs:
@@ -40,6 +42,7 @@ jobs:
           PY
 
   translate:
+    continue-on-error: true
     needs: models
     if: ${{ !inputs.translations_from }}
     runs-on: ubuntu-latest
@@ -66,6 +69,7 @@ jobs:
           path: outputs/
 
   report:
+    continue-on-error: true
     needs: [models, translate]
     # Whatever models finished are reported, even if one failed.
     if: always() && needs.models.result == 'success'

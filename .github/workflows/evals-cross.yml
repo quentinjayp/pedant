@@ -7,8 +7,9 @@ name: Evals (other own languages)
 # tells Gemma with the own language in English's place. The results are scored against
 # translations made by people. It reports only (tables in the run's summary, and promptfoo's
 # side-by-side report to download) and never blocks a build. Runs on demand, or on a push whose
-# commit message contains [evals-cross]. Run on demand with an earlier run's number, it makes the
-# report again from that run's translations without translating again.
+# commit message contains [evals-cross]. A job that fails never marks the run as failed. Run on
+# demand with an earlier run's number, it makes the report again from that run's translations
+# without translating again.
 
 on:
   push:
@@ -26,6 +27,7 @@ permissions:
 
 jobs:
   runs:
+    continue-on-error: true
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[evals-cross]')
     runs-on: ubuntu-latest
     outputs:
@@ -45,6 +47,7 @@ jobs:
           PY
 
   translate:
+    continue-on-error: true
     needs: runs
     if: ${{ !inputs.translations_from }}
     runs-on: ubuntu-latest
@@ -71,6 +74,7 @@ jobs:
           path: outputs/
 
   report:
+    continue-on-error: true
     needs: [runs, translate]
     # Whatever runs finished are reported, even if one failed.
     if: always() && needs.runs.result == 'success'
