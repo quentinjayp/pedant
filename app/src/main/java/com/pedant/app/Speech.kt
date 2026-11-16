@@ -27,6 +27,41 @@ const val SAMPLE_RATE = 16_000
 /** Audio as floats in [-1, 1] at [sampleRate]. */
 class Audio(val samples: FloatArray, val sampleRate: Int)
 
+/**
+ * [audio] (a recording of the learner) without the quiet or noise before and after the speech, so
+ * a breath or the microphone starting up isn't graded as a sound. The speech is where the loudness
+ * stays well above the recording's own background for at least [SPEECH_FRAMES] frames of 20 ms
+ * running, so a single click doesn't count; [EDGE_MARGIN_MS] is kept either side, for soft sounds
+ * at the edges. Left as it is when nothing in it stands out from the background.
+ * tools/calibrate_scoring.py trims recordings the same way.
+ */
+fun trimEdges(audio: Audio): Audio {
+    val frame = audio.sampleRate / 50
+    val frames = audio.samples.size / frame
+    if (frames < SPEECH_FRAMES * 2) return audio
+    val loudness = FloatArray(frames) { f ->
+        var sum = 0f
+        for (i in f * frame until (f + 1) * frame) sum += audio.samples[i] * audio.samples[i]
+        kotlin.math.sqrt(sum / frame)
+    }
+    val sorted = loudness.sorted()
+    val background = sorted[frames / 10]
+    val peak = sorted.last()
+    if (peak < 0.01f || peak < background * 4) return audio
+    val threshold = background + (peak - background) * 0.08f
+    val loud = BooleanArray(frames) { loudness[it] > threshold }
+    fun running(at: Int) = (at until at + SPEECH_FRAMES).all { it in loud.indices && loud[it] }
+    val first = (0 until frames).firstOrNull(::running) ?: return audio
+    val last = (frames - 1 downTo 0).first { running(it - SPEECH_FRAMES + 1) }
+    val margin = audio.sampleRate * EDGE_MARGIN_MS / 1000
+    val start = (first * frame - margin).coerceAtLeast(0)
+    val end = ((last + 1) * frame + margin).coerceAtMost(audio.samples.size)
+    return Audio(audio.samples.copyOfRange(start, end), audio.sampleRate)
+}
+
+private const val SPEECH_FRAMES = 3
+private const val EDGE_MARGIN_MS = 150
+
 /** Records 16 kHz mono audio from the microphone while the talk button is held. */
 class MicRecorder {
     @Volatile private var recording = false

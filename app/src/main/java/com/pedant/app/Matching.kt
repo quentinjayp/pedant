@@ -57,6 +57,12 @@ object Matching {
      */
     const val WORD_SOUND_LIMIT = 0.5
 
+    /**
+     * Words of this many sounds or fewer (but more than one), said on their own, aren't charged for
+     * one extra sound: in "du" (/dy/), a stray hiss heard as /tɕy/ was half its sounds wrong.
+     */
+    private const val SHORT_WORD = 3
+
     /** A word counts as right if its spelling is at least this close (e.g. "toa" for "toi"). */
     private const val CLOSE_WORD = 0.66
 
@@ -134,10 +140,12 @@ object Matching {
     /**
      * One word said on its own, for Beginner's word-by-word step. It's right if Omnilingual heard
      * the word, or ZIPA heard its sounds within [WORD_SOUND_LIMIT]: the two ways a word is right in
-     * a phrase. (Not calibrated for single words.)
+     * a phrase, except that a short word isn't charged for one extra sound ([SHORT_WORD]). (Not
+     * calibrated for single words.)
      */
     fun checkWordAlone(ref: RefWord, transcript: String, heardSounds: List<String>): WordResult {
-        val ws = compareBoth(listOf(ref), heardSounds.filter { it != "▁" }).words.first()
+        // A short word said on its own has few sounds, so one stray sound would sink it.
+        val ws = compareBoth(listOf(ref), heardSounds.filter { it != "▁" }, forgiveExtra = true).words.first()
         val heardWords = wordsOf(transcript)
         val heardIt = heardWords.any { wordCost(normalize(ref.word), normalize(it)) == 0.0 }
         return WordResult(
@@ -190,10 +198,10 @@ object Matching {
      * Tested in tools/calibrate_scoring.py ("either"): it passes correct speech as often as ZIPA's
      * hearing of Piper alone, and judges each word's sounds right more often.
      */
-    private fun compareBoth(refWords: List<RefWord>, heardSounds: List<String>): SoundComparison {
-        val heard = compareSounds(refWords, heardSounds)
+    private fun compareBoth(refWords: List<RefWord>, heardSounds: List<String>, forgiveExtra: Boolean = false): SoundComparison {
+        val heard = compareSounds(refWords, heardSounds, forgiveExtra)
         if (refWords.all { it.shown == it.sounds }) return heard
-        val shown = compareSounds(refWords.map { RefWord(it.word, it.shown) }, heardSounds)
+        val shown = compareSounds(refWords.map { RefWord(it.word, it.shown) }, heardSounds, forgiveExtra)
         return SoundComparison(
             maxOf(heard.score, shown.score),
             refWords.indices.map { w ->
@@ -202,8 +210,11 @@ object Matching {
         )
     }
 
-    /** Overall sound score, and for each word its heard sounds and error ratio. */
-    private fun compareSounds(refWords: List<RefWord>, heardSounds: List<String>): SoundComparison {
+    /**
+     * Overall sound score, and for each word its heard sounds and error ratio. With [forgiveExtra],
+     * a short word ([SHORT_WORD] sounds or fewer) isn't charged for one extra sound heard in it.
+     */
+    private fun compareSounds(refWords: List<RefWord>, heardSounds: List<String>, forgiveExtra: Boolean = false): SoundComparison {
         val refPhones = refWords.flatMap { it.sounds }
         val refWordOf = refWords.flatMapIndexed { w, word -> List(word.sounds.size) { w } }
         if (refPhones.isEmpty()) return SoundComparison(0.0, refWords.map { WordSounds("", 1.0) })
@@ -214,11 +225,17 @@ object Matching {
         // Extra sounds count against the word before them.
         val heard = Array(refWords.size) { StringBuilder() }
         val wordCost = DoubleArray(refWords.size)
+        // The costliest extra sound in each word (heard where nothing was expected).
+        val extra = DoubleArray(refWords.size)
         var lastWord = 0
         for (step in steps) {
             step.ref?.let { lastWord = refWordOf[it] }
             step.hyp?.let { heard[lastWord].append(heardSounds[it]) }
             wordCost[lastWord] += step.cost
+            if (step.ref == null) extra[lastWord] = maxOf(extra[lastWord], step.cost)
+        }
+        if (forgiveExtra) {
+            refWords.indices.filter { refWords[it].sounds.size in 2..SHORT_WORD }.forEach { wordCost[it] -= extra[it] }
         }
         return SoundComparison(
             score,

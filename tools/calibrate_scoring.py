@@ -17,6 +17,7 @@ The models dir holds the reference vits-piper-* voices, the Omnilingual ASR mode
 """
 from array import array
 import glob
+import math
 import os
 import re
 import json
@@ -309,6 +310,31 @@ class Clip:
         self.samples, self.sample_rate = samples, sample_rate
 
 
+def trim_edges(clip):
+    """[clip] without the quiet or noise before and after the speech, as the app trims a learner's
+    recording before grading it (trimEdges in Speech.kt): the speech is where the loudness stays
+    well above the recording's background for three 20 ms frames running, with 150 ms kept either side."""
+    frame = clip.sample_rate // 50
+    frames = len(clip.samples) // frame
+    if frames < 6:
+        return clip
+    loudness = [math.sqrt(sum(x * x for x in clip.samples[f * frame:(f + 1) * frame]) / frame) for f in range(frames)]
+    ordered = sorted(loudness)
+    background, peak = ordered[frames // 10], ordered[-1]
+    if peak < 0.01 or peak < background * 4:
+        return clip
+    threshold = background + (peak - background) * 0.08
+    loud = [v > threshold for v in loudness]
+    running = lambda at: 0 <= at and at + 3 <= frames and all(loud[at:at + 3])
+    first = next((f for f in range(frames) if running(f)), None)
+    if first is None:
+        return clip
+    last = next(f for f in range(frames - 1, -1, -1) if running(f - 2))
+    margin = clip.sample_rate * 150 // 1000
+    start, end = max(0, first * frame - margin), min(len(clip.samples), (last + 1) * frame + margin)
+    return Clip(clip.samples[start:end], clip.sample_rate)
+
+
 def read_wav(path):
     """A WAV file's first channel as floats: 16-bit PCM or 32-bit float (as FLEURS uses)."""
     data = open(path, "rb").read()
@@ -393,9 +419,9 @@ for lang, cfg in LANGS.items():
             said = recognize(asr, audio).text
             return said, sounds(audio), sounds(ref_tts.generate(said, sid=0, speed=1.0)) if said.strip() else None
 
-        whole = heard(clip)
+        whole = heard(trim_edges(clip))
         # The speaker stops halfway: the first half of the recording, against the whole sentence.
-        half = heard(Clip(clip.samples[:len(clip.samples) // 2], clip.sample_rate))
+        half = heard(trim_edges(Clip(clip.samples[:len(clip.samples) // 2], clip.sample_rate)))
         other = sentences[(i + 1) % len(sentences)][0]
         # Otherwise the recording is the real sentence; the wrong cases score it against a wrong target.
         cases = [("correct", text, whole)] + [(kind, target, whole) for kind, target in variants(text, cfg["swap"][i % len(cfg["swap"])])]
