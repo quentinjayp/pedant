@@ -137,9 +137,24 @@ class Tutor(context: Context, modelFile: File) {
     /** The one-off conversation in progress (a lookup or translation), so it can be stopped. */
     @Volatile private var lookupConversation: Conversation? = null
 
-    /** Looks up one [word] as used in [sentence]. Returns the raw answer; see [parseLookup]. */
-    suspend fun lookUp(language: Language, word: String, sentence: String): String =
+    /**
+     * Looks up one [word] as used in [sentence], explained in [own] (the conversation's own language
+     * unless given). Returns the raw answer; see [parseLookup].
+     */
+    suspend fun lookUp(language: Language, word: String, sentence: String, own: Language = this.own): String =
         ask(Instructions.lookup(language, own), "Word: $word\nSentence: $sentence")
+
+    /** For the quiz: a word of [sentence] and wrong forms of it. Returns the raw answer; see [QuizMaker.parseForms]. */
+    suspend fun quizForms(language: Language, own: Language, sentence: String): String =
+        ask(Instructions.quizForms(language, own), sentence)
+
+    /** For the quiz: words that look or sound like [word]. Returns the raw answer; see [QuizMaker.parseAlike]. */
+    suspend fun quizAlike(language: Language, own: Language, word: String): String =
+        ask(Instructions.quizAlike(language, own), word)
+
+    /** For the quiz: the nouns of [sentence] and their articles. Returns the raw answer; see [QuizMaker.parseArticles]. */
+    suspend fun quizArticles(language: Language, own: Language, sentence: String): String =
+        ask(Instructions.quizArticles(language, own), sentence)
 
     /** Looks for a common expression in [phrase]. Returns the raw answer; see [parseExpression]. */
     suspend fun expression(language: Language, phrase: String): String =

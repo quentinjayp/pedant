@@ -40,4 +40,8 @@ object Instructions {
     fun lookup(language: Language, own: Language) = text("lookup", language, own)
     fun expression(language: Language, own: Language) = text("expression", language, own)
     fun sentenceLookup(language: Language, own: Language) = text("sentenceLookup", language, own)
+    fun quizForms(language: Language, own: Language) = text("quizForms", language, own)
+    fun quizAlike(language: Language, own: Language) = text("quizAlike", language, own)
+    fun quizArticles(language: Language, own: Language) =
+        text("quizArticles", language, own).replace("{articles}", articleTitle(language.articles).dropLast(1).lowercase())
 }

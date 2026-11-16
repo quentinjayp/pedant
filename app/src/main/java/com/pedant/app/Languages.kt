@@ -15,6 +15,8 @@ data class Language(
     val ttsRewrites: List<Pair<Regex, String>> = emptyList(),
     /** The espeak-ng voice the Piper voice reads text with (its .onnx.json's espeak.voice). */
     val espeakVoice: String,
+    /** The articles a singular noun takes, one per gender ("le", "la"), for the quiz; empty if they don't show it. */
+    val articles: List<String> = emptyList(),
 ) {
     /** The language's English name after "a" or "an", as Gemma's instructions put it ("an English", "a French"). */
     val withArticle: String get() = (if (englishName.first() in "AEIO") "an " else "a ") + englishName
@@ -51,6 +53,7 @@ fun loadLanguages(context: Context) {
                 rewrites!!.getJSONObject(r).let { Regex(it.getString("pattern")) to it.getString("replacement") }
             },
             espeakVoice = o.getString("espeakVoice"),
+            articles = o.optJSONArray("articles")?.let { a -> List(a.length()) { a.getString(it) } }.orEmpty(),
         )
     }
 }

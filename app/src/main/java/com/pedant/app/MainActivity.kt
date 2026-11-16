@@ -33,6 +33,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -186,7 +196,9 @@ class MainActivity : ComponentActivity() {
                         // Beginner's word-by-word step is a page of its own, in the conversation's place.
                         Screen.Conversation -> vm.walk?.let { WordWalkScreen(vm, it) } ?: ConversationScreen(vm)
                         Screen.Settings -> SettingsScreen(vm)
+                        Screen.Quiz -> vm.quiz?.let { QuizScreen(vm, it) }
                     }
+                    vm.quizOffer?.let { QuizOfferDialog(vm, it) }
                 }
             }
         }
@@ -388,9 +400,10 @@ private fun PillButton(
 
 /** The main action on a page: a wide apricot button. */
 @Composable
-private fun CtaButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun CtaButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Pastel.Cta, contentColor = Pastel.CtaInk),
@@ -2195,5 +2208,431 @@ private fun HearButtons(label: String, onHear: (slow: Boolean) -> Unit) {
         Spacer(Modifier.width(2.dp))
         PillButton("▶ Normal", { onHear(false) })
         PillButton("Slow", { onHear(true) }, PillStyle.Secondary)
+    }
+}
+
+// ---- The quiz on the last conversation --------------------------------------------------------
+
+/** Offers the quiz on the last conversation before a new one: Quiz or Skip. */
+@Composable
+private fun QuizOfferDialog(vm: AppViewModel, offer: AppViewModel.QuizOffer) {
+    Dialog(onDismissRequest = vm::dismissQuizOffer) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .card(Pastel.White, Pastel.Violet, RoundedCornerShape(30.dp), borderWidth = 2.dp)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("✦", fontSize = 14.sp, color = Pastel.VioletDark)
+                SmallLabel("Quiz", Pastel.VioletDark)
+            }
+            Text("Quiz on your last conversation?", fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, color = Pastel.Ink)
+            val questions = if (offer.questions == 1) "1 question" else "${offer.questions} questions"
+            Text(
+                listOfNotNull(offer.summary, "$questions on the phrases you said.").joinToString(": "),
+                fontSize = 13.sp,
+                color = Pastel.InkSoft,
+            )
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                PillButton("Skip", vm::skipQuiz, PillStyle.Outline)
+                PillButton("Quiz", vm::takeQuiz, PillStyle.Cta)
+            }
+        }
+    }
+}
+
+/** The quiz: a page of its own, a question at a time. Back leaves it, and continuing comes back to it. */
+@Composable
+private fun QuizScreen(vm: AppViewModel, q: Quiz) {
+    BackHandler(onBack = vm::goHome)
+    val idle = vm.busy == Busy.Idle
+    val question = q.current
+    val answer = vm.quizAnswer
+    val language = vm.language
+    AppScreen(
+        header = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(Pastel.VioletDark))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Quiz" + (language?.let { " · ${it.englishName}" } ?: ""),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.weight(1f),
+                )
+                if (!q.finished) {
+                    Text("${q.position + 1} of ${q.plan.size}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Pastel.InkSoft)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            ProgressBar(if (q.plan.isEmpty()) 1f else q.position.toFloat() / q.plan.size)
+        },
+        dock = {
+            when {
+                q.finished -> CtaButton("Start a new conversation", vm::finishQuiz, Modifier.padding(vertical = 4.dp))
+                question == null -> Text(
+                    if (idle) "Preparing the question…" else vm.busy.label,
+                    fontSize = 12.sp,
+                    color = Pastel.InkSoft,
+                    modifier = Modifier.padding(vertical = 12.dp),
+                )
+                answer != null -> CtaButton(
+                    if (q.position + 1 >= q.plan.size) "Done" else "Next",
+                    vm::nextQuizQuestion,
+                    Modifier.padding(vertical = 4.dp),
+                    enabled = idle,
+                )
+                question is SpeakQuestion -> {
+                    Text(
+                        if (idle) "Hold the button and say it" else vm.busy.label,
+                        fontSize = 12.sp,
+                        color = Pastel.InkSoft,
+                        modifier = Modifier.padding(top = 6.dp, bottom = 6.dp),
+                    )
+                    MicButton(vm, onStart = vm::startQuizTalking)
+                }
+                else -> Text(
+                    when (question) {
+                        is OrderQuestion -> "Drag the words into order, then check"
+                        is MatchQuestion -> "Tap a word, then its meaning"
+                        is MistakeQuestion -> "Tap the word that's wrong"
+                        else -> if (idle) "Pick an answer" else vm.busy.label
+                    },
+                    fontSize = 12.sp,
+                    color = Pastel.InkSoft,
+                    modifier = Modifier.padding(vertical = 12.dp),
+                )
+            }
+        },
+    ) {
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            vm.quizError?.let { PeachNotice(it) }
+            when {
+                q.finished -> Text(
+                    "That's the end of the quiz.",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Pastel.Ink,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                )
+                question != null -> {
+                    SmallLabel(
+                        if (question.kind == QuizKind.Article && language != null) articleTitle(language.articles) else question.kind.title,
+                        Pastel.VioletDark,
+                    )
+                    when (question) {
+                        is ChoiceQuestion -> ChoiceBody(vm, question, answer as? QuizAnswer.Chosen, idle)
+                        is OrderQuestion -> DragToOrder(question, (answer as? QuizAnswer.Ordered)?.order) { vm.answerQuiz(QuizAnswer.Ordered(it)) }
+                        is MatchQuestion -> MatchBody(question, answered = answer != null) { vm.answerQuiz(QuizAnswer.Matched) }
+                        is SpeakQuestion -> SpeakBody(vm, question, answer as? QuizAnswer.Spoken, idle)
+                        is MistakeQuestion -> MistakeBody(question, answer as? QuizAnswer.Tapped) { vm.answerQuiz(QuizAnswer.Tapped(it)) }
+                    }
+                    if (answer != null) QuizVerdict(isRight(question, answer))
+                }
+            }
+        }
+    }
+}
+
+/** Right or not, once a question is answered. */
+@Composable
+private fun QuizVerdict(right: Boolean) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            Modifier.size(26.dp).clip(CircleShape).background(if (right) Pastel.Right else Pastel.Wrong),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(if (right) "✓" else "✗", color = Pastel.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+        }
+        Text(if (right) "Right" else "Not quite", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = if (right) Pastel.Right else Pastel.Wrong)
+    }
+}
+
+/** A tile's colours: right (green), wrong (red), picked (violet) or as it starts. */
+private enum class TileState { Plain, Picked, Right, Wrong }
+
+private fun Modifier.quizTile(state: TileState, shape: Shape = RoundedCornerShape(18.dp)): Modifier = when (state) {
+    TileState.Plain -> card(Pastel.White, Pastel.OutlineSoft, shape)
+    TileState.Picked -> card(Pastel.VioletContainer, Pastel.Violet, shape, borderWidth = 2.dp)
+    TileState.Right -> card(Pastel.RightContainer, Pastel.Right, shape, borderWidth = 2.dp)
+    TileState.Wrong -> card(Pastel.WrongContainer, Pastel.Wrong, shape, borderWidth = 2.dp)
+}
+
+private fun TileState.ink(): Color = when (this) {
+    TileState.Right -> Pastel.Right
+    TileState.Wrong -> Pastel.Wrong
+    TileState.Picked -> Pastel.VioletDark
+    TileState.Plain -> Pastel.Ink
+}
+
+/** A multiple-choice question: what's asked (shown, or said by the voice) and its options. */
+@Composable
+private fun ChoiceBody(vm: AppViewModel, question: ChoiceQuestion, answer: QuizAnswer.Chosen?, idle: Boolean) {
+    val spoken = question.spoken
+    if (spoken != null) {
+        HearButtons("Hear it:", onHear = { slow -> vm.hearWord(spoken, slow) })
+    } else {
+        Text(
+            question.shown,
+            fontSize = if (wordsOf(question.shown).size > 1) 22.sp else 36.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Pastel.PrimaryInk,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        )
+    }
+    question.hint?.let { Text("“$it”", fontSize = 13.sp, color = Pastel.PrimaryDark, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) }
+    question.options.forEachIndexed { i, option ->
+        val state = when {
+            answer == null -> TileState.Plain
+            i == question.answer -> TileState.Right
+            i == answer.option -> TileState.Wrong
+            else -> TileState.Plain
+        }
+        Text(
+            option,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = state.ink(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .quizTile(state)
+                .clickable(enabled = answer == null && idle) { vm.answerQuiz(QuizAnswer.Chosen(i)) }
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+        )
+    }
+}
+
+/**
+ * Put a sentence's words in order by dragging them: a word dropped onto another takes its place.
+ * Once [answered] (the order checked), each word is green if it's in its place and red if not, and
+ * the sentence is shown as it should be.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DragToOrder(question: OrderQuestion, answered: List<Int>?, onCheck: (List<Int>) -> Unit) {
+    val order = remember(question) { mutableStateListOf<Int>().apply { addAll(question.start) } }
+    // Where each word's tile is, in the row's coordinates.
+    val bounds = remember(question) { mutableStateMapOf<Int, Rect>() }
+    var dragging by remember(question) { mutableStateOf<Int?>(null) }
+    var pointer by remember(question) { mutableStateOf(Offset.Zero) }
+    var grab by remember(question) { mutableStateOf(Offset.Zero) }
+    // The word last swapped with: it's passed over until the finger leaves it, so the two don't
+    // swap back and forth while the row lays itself out again.
+    var lastSwap by remember(question) { mutableStateOf<Int?>(null) }
+    val shown = answered ?: order
+    question.hint?.let { Text("“$it”", fontSize = 14.sp, color = Pastel.PrimaryDark) }
+    FlowRow(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = 120.dp)
+            .card(Pastel.SurfaceLow, shape = RoundedCornerShape(18.dp))
+            .padding(12.dp)
+            .pointerInput(question, answered == null) {
+                if (answered != null) return@pointerInput
+                detectDragGestures(
+                    onDragStart = { at ->
+                        val id = bounds.entries.firstOrNull { it.value.contains(at) }?.key
+                        if (id != null) {
+                            dragging = id
+                            pointer = at
+                            grab = at - bounds.getValue(id).topLeft
+                            lastSwap = null
+                        }
+                    },
+                    onDrag = { change, amount ->
+                        val id = dragging ?: return@detectDragGestures
+                        change.consume()
+                        pointer += amount
+                        val over = bounds.entries.firstOrNull { it.key != id && it.value.contains(pointer) }?.key
+                        if (over == null) {
+                            lastSwap = null
+                        } else if (over != lastSwap) {
+                            val to = order.indexOf(over)
+                            order.remove(id)
+                            order.add(to, id)
+                            lastSwap = over
+                        }
+                    },
+                    onDragEnd = { dragging = null },
+                    onDragCancel = { dragging = null },
+                )
+            },
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        shown.forEachIndexed { at, id ->
+            key(id) {
+                val state = when {
+                    answered == null -> if (id == dragging) TileState.Picked else TileState.Plain
+                    question.words[id] == question.words[at] -> TileState.Right
+                    else -> TileState.Wrong
+                }
+                Text(
+                    question.words[id],
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (state == TileState.Plain) Pastel.PrimaryInk else state.ink(),
+                    modifier = Modifier
+                        .onGloballyPositioned { bounds[id] = it.boundsInParent() }
+                        .zIndex(if (id == dragging) 1f else 0f)
+                        .graphicsLayer {
+                            // The dragged word follows the finger.
+                            val b = bounds[id]
+                            if (id == dragging && b != null) {
+                                translationX = pointer.x - grab.x - b.left
+                                translationY = pointer.y - grab.y - b.top
+                            }
+                        }
+                        .quizTile(state, RoundedCornerShape(14.dp))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                )
+            }
+        }
+    }
+    if (answered == null) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            PillButton("Check", { onCheck(order.toList()) }, PillStyle.Cta)
+        }
+    } else if (answered.map { question.words[it] } != question.words) {
+        Text(question.words.joinToString(" "), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Pastel.Right)
+    }
+}
+
+/** Match each word to its meaning: tap a word, then a meaning. A wrong pair flashes red. */
+@Composable
+private fun MatchBody(question: MatchQuestion, answered: Boolean, onDone: () -> Unit) {
+    var word by remember(question) { mutableStateOf<Int?>(null) }
+    var meaning by remember(question) { mutableStateOf<Int?>(null) }
+    val matched = remember(question) { mutableStateListOf<Int>() }
+    var wrong by remember(question) { mutableStateOf<Pair<Int, Int>?>(null) }
+    LaunchedEffect(wrong) {
+        if (wrong != null) {
+            delay(MATCH_WRONG_MS)
+            wrong = null
+        }
+    }
+    fun pair(w: Int, m: Int) {
+        word = null
+        meaning = null
+        if (w == m) {
+            matched += w
+            if (matched.size == question.words.size) onDone()
+        } else {
+            wrong = w to m
+        }
+    }
+    fun state(index: Int, picked: Int?, inWrong: Int?): TileState = when {
+        answered || index in matched -> TileState.Right
+        index == inWrong -> TileState.Wrong
+        index == picked -> TileState.Picked
+        else -> TileState.Plain
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.weight(0.8f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            question.words.forEachIndexed { i, w ->
+                val s = state(i, word, wrong?.first)
+                Text(
+                    w,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (s == TileState.Plain) Pastel.PrimaryInk else s.ink(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .quizTile(s, RoundedCornerShape(14.dp))
+                        .clickable(enabled = !answered && i !in matched) {
+                            word = i
+                            meaning?.let { pair(i, it) }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                )
+            }
+        }
+        Column(Modifier.weight(1.2f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            question.shuffled.forEach { m ->
+                val s = state(m, meaning, wrong?.second)
+                Text(
+                    question.meanings[m],
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = s.ink(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .quizTile(s, RoundedCornerShape(14.dp))
+                        .clickable(enabled = !answered && m !in matched) {
+                            meaning = m
+                            word?.let { pair(it, m) }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                )
+            }
+        }
+    }
+}
+
+/** How long a wrong pair stays red in a match-the-pairs question. */
+private const val MATCH_WRONG_MS = 600L
+
+/** Say a phrase from memory, given the learner's own line for it; once said, the phrase with its words marked. */
+@Composable
+private fun SpeakBody(vm: AppViewModel, question: SpeakQuestion, answer: QuizAnswer.Spoken?, idle: Boolean) {
+    SmallLabel(vm.language?.let { "Say in ${it.englishName}:" } ?: "Say:", Pastel.InkSoft)
+    Text("“${question.english}”", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Pastel.PrimaryInk)
+    if (answer != null) {
+        val r = answer.result
+        Column(
+            Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(18.dp)).padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            // A word says itself when tapped.
+            TappableText(
+                question.phrase,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                color = Pastel.PrimaryInk,
+                right = r.words.indices.filter { r.words[it].passed }.toSet(),
+                wrong = r.words.indices.filter { !r.words[it].passed }.toSet(),
+                onWord = { w, _, _ -> if (idle) vm.hearWord(w, slow = false) },
+            )
+            HearButtons("Hear it:", onHear = { slow -> vm.hearWord(question.phrase, slow) })
+        }
+    }
+}
+
+/** Tap the word in the wrong form; once tapped, it's marked red and what it should be is shown. */
+@Composable
+private fun MistakeBody(question: MistakeQuestion, answer: QuizAnswer.Tapped?, onTap: (Int) -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(18.dp)).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        TappableText(
+            question.sentence,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = Pastel.PrimaryInk,
+            highlight = answer?.position?.takeIf { it != question.wrong },
+            wrong = if (answer != null) setOf(question.wrong) else emptySet(),
+            onWord = { _, _, at -> if (answer == null) onTap(at) },
+        )
+        question.hint?.let { Text("“$it”", fontSize = 13.sp, color = Pastel.PrimaryDark) }
+    }
+    if (answer != null) {
+        val wrongWord = wordsOf(question.sentence).getOrNull(question.wrong) ?: ""
+        Text(
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = Pastel.Wrong, fontWeight = FontWeight.Bold)) { append(wrongWord) }
+                append(" should be ")
+                withStyle(SpanStyle(color = Pastel.Right, fontWeight = FontWeight.Bold)) { append(question.right) }
+            },
+            fontSize = 16.sp,
+            color = Pastel.Ink,
+        )
     }
 }

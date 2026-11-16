@@ -26,6 +26,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -42,6 +43,8 @@ sealed interface Screen {
     data object PickLanguage : Screen
     data object Conversation : Screen
     data object Settings : Screen
+    /** The quiz on the last conversation, a page of its own. */
+    data object Quiz : Screen
 }
 
 enum class Busy(val label: String) {
@@ -420,11 +423,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * What the saved conversation is, for the home page ("French · Coffee with a friend · Casual"),
      * or null if there's none to continue.
      */
-    var continueSummary by mutableStateOf(
-        SavedConversation.load(app.filesDir)?.let { saved ->
-            summary(LANGUAGES.firstOrNull { it.code == saved.languageCode }, saved.scenario, saved.register)
-        },
-    )
+    var continueSummary by mutableStateOf(SavedConversation.load(app.filesDir)?.let(::summary))
         private set
 
     /** Whether there is a saved conversation to continue. */
@@ -434,6 +433,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         listOfNotNull(it.englishName, scenario.title.takeIf { scenario != Scenario.Default }, register.title).joinToString(" · ")
     }
 
+    /** [saved]'s summary; "Quiz: …" while its quiz is under way, since continuing goes back to the quiz. */
+    private fun summary(saved: SavedConversation): String? =
+        summary(LANGUAGES.firstOrNull { it.code == saved.languageCode }, saved.scenario, saved.register)
+            ?.let { if (saved.quiz?.finished == false) "Quiz: $it" else it }
+
     /** Continues the saved conversation exactly where it was left. */
     fun continueConversation() {
         val saved = SavedConversation.load(getApplication<Application>().filesDir)
@@ -442,18 +446,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             continueSummary = null
             return
         }
+        // A quiz left part way is picked up where it was left.
+        if (saved.quiz?.finished == false) {
+            openQuiz(saved)
+            return
+        }
         scenario = saved.scenario
         register = saved.register
         startSession(lang, resume = saved)
     }
 
     /** Saves the conversation on screen, replacing the saved one. */
-    @OptIn(ExperimentalCoroutinesApi::class)
     private fun saveConversation() {
-        val lang = language ?: return
         if (screen != Screen.Conversation) return
+        currentConversation()?.let(::writeSaved)
+    }
+
+    /** One write at a time, in order, so a later save never lands before an earlier one. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val savingDispatcher = Dispatchers.IO.limitedParallelism(1)
+
+    /** Writes [saved] in place of the saved conversation. */
+    private fun writeSaved(saved: SavedConversation) {
+        val dir = getApplication<Application>().filesDir
+        viewModelScope.launch(savingDispatcher) {
+            runCatching { saved.save(dir) }.onFailure { diagnostics.log("Couldn't save the conversation: ${it.message}") }
+        }
+        continueSummary = summary(saved)
+    }
+
+    /** The conversation on screen as it would be saved, or null if there's none. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun currentConversation(): SavedConversation? {
+        val lang = language ?: return null
         val d = drill
-        val saved = SavedConversation(
+        return SavedConversation(
             languageCode = lang.code,
             scenario = scenario,
             register = register,
@@ -467,16 +494,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             walkPosition = walk?.position,
             walkFails = walk?.fails ?: 0,
             ownCode = own.code,
+            quizOfferedAt = quizOfferedAt,
         )
-        val dir = getApplication<Application>().filesDir
-        viewModelScope.launch(Dispatchers.IO) {
-            runCatching { saved.save(dir) }.onFailure { diagnostics.log("Couldn't save the conversation: ${it.message}") }
-        }
-        continueSummary = summary(lang, scenario, register)
     }
 
-    /** From the home page: choose the scenario and language for a new conversation. */
+    /**
+     * From the home page: choose the scenario and language for a new conversation. If the saved
+     * conversation has a quiz due, it's offered first.
+     */
     fun startNewConversation() {
+        val saved = SavedConversation.load(getApplication<Application>().filesDir)
+        if (saved != null && quizDue(saved)) {
+            quizOffer = QuizOffer(saved, fromConversation = false)
+            return
+        }
         register = Register.Formal
         screen = Screen.PickLanguage
     }
@@ -515,6 +546,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val voice = voiceFor(lang) ?: return@launch
                 // A continued conversation keeps the own language it started with; a new one takes the setting.
                 own = resume?.let { r -> LANGUAGES.firstOrNull { it.code == r.ownCode } } ?: ownSetting
+                quizOfferedAt = resume?.quizOfferedAt ?: 0
                 val start = when {
                     resume != null -> Start.Continue(resume)
                     else -> {
@@ -720,10 +752,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { stopConversationWork() }
     }
 
-    /** Goes back to the language list at any time, stopping whatever the conversation is doing. */
+    /**
+     * Goes back to the language list at any time, stopping whatever the conversation is doing. If
+     * the conversation has a quiz due, it's offered first.
+     */
     fun newConversation() {
+        val saved = currentConversation()
+        if (saved != null && quizDue(saved)) {
+            quizOffer = QuizOffer(saved, fromConversation = true)
+            return
+        }
+        leaveForNewConversation()
+    }
+
+    /** Leaves the conversation on screen, saved, for the language list. */
+    private fun leaveForNewConversation() {
         viewModelScope.launch {
             stopConversationWork()
+            currentConversation()?.let(::writeSaved)
             startDrill(null)
             editableIndex = null
             lookup = null
@@ -741,7 +787,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         practiceTarget = null
         // The word-by-word step stays, so leaving the conversation saves the word reached.
         walkTalking = false
+        quizTalking = false
         tutor?.cancelGeneration()
+        // A question for the quiz may be being made.
+        tutor?.cancelLookup()
         tts?.stopPlayback()
         if (busy == Busy.Listening) {
             withContext(Dispatchers.Default) {
@@ -787,7 +836,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                chat += ChatItem.Note("Something went wrong: ${e.message}")
+                val message = "Something went wrong: ${e.message}"
+                if (screen == Screen.Quiz) quizError = message else chat += ChatItem.Note(message)
             } finally {
                 diagnostics.step = null
                 busy = Busy.Idle
@@ -805,8 +855,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 practiceTarget = null
                 val walking = walkTalking
                 walkTalking = false
+                val quizzing = quizTalking
+                quizTalking = false
                 when {
                     target != null -> practiceTry(target, audio)
+                    quizzing -> quizTry(audio)
                     walking -> walkTry(audio)
                     d == null -> {
                         // Waiting for English: only the words matter here.
@@ -1629,6 +1682,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
         /** How long the loading bar takes to move to a new amount. */
         const val LOADING_BAR_FILL_MS = 500
+
+        /** How many words a match-the-pairs question has. */
+        private const val MATCH_PAIRS = 4
+
+        /** How many words without a meaning the quiz passes over when looking for meanings. */
+        private const val MEANING_MISSES = 4
     }
 
     // ---- Practice window: an attempt word by word, with retries ---------------------------------
@@ -1794,6 +1853,341 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 practice = p.copy(wordTries = p.wordTries + (p.position to WordTry(percent, maxOf(percent, before?.best ?: 0), heard)))
             }
         }
+    }
+
+    // ---- The quiz on the last conversation -------------------------------------------------------
+
+    /** The quiz offered before a new conversation: on [saved], from the conversation page or the home page. */
+    class QuizOffer(val saved: SavedConversation, val fromConversation: Boolean) {
+        /** How many questions it has (left, for one under way). */
+        val questions: Int = saved.quiz?.let { it.plan.size - it.position } ?: Quiz.length(saved.chat)
+        val summary: String? = LANGUAGES.firstOrNull { it.code == saved.languageCode }?.let { lang ->
+            listOfNotNull(lang.englishName, saved.scenario.title.takeIf { saved.scenario != Scenario.Default }).joinToString(" · ")
+        }
+    }
+
+    /** The quiz being offered, waiting for Quiz or Skip. */
+    var quizOffer by mutableStateOf<QuizOffer?>(null)
+        private set
+
+    /** The quiz on screen. */
+    var quiz by mutableStateOf<Quiz?>(null)
+        private set
+
+    /** How the question on screen was answered; null until it is. */
+    var quizAnswer by mutableStateOf<QuizAnswer?>(null)
+        private set
+
+    /** Something that went wrong in the quiz, shown at its top. */
+    var quizError by mutableStateOf<String?>(null)
+        private set
+
+    /** The saved conversation the quiz is on, kept up to date with the quiz as it goes. */
+    private var quizBase: SavedConversation? = null
+
+    /** How many phrases had been said when the quiz on the conversation on screen was last offered and taken or skipped. */
+    private var quizOfferedAt = 0
+
+    /** Whether the talking now under way is an answer to a say-it-from-memory question. */
+    private var quizTalking = false
+
+    /** The expected sounds of the say-it-from-memory question's phrase, worked out as it's shown. */
+    private var quizRefWords: Pair<String, List<RefWord>>? = null
+
+    /** Meanings found for the quiz, by word (its dictionary key); null for a word with none. */
+    private val quizMeanings = mutableMapOf<String, String?>()
+
+    /** Whether [saved] has a quiz to offer: one left part way, or one on phrases said since it was last offered. */
+    private fun quizDue(saved: SavedConversation): Boolean =
+        saved.quiz?.finished == false ||
+            (Quiz.length(saved.chat) > 0 && Quiz.phrases(saved.chat).size > saved.quizOfferedAt)
+
+    fun takeQuiz() {
+        val offer = quizOffer ?: return
+        quizOffer = null
+        // From the conversation page it's the conversation as it is once its work has stopped.
+        openQuiz(if (offer.fromConversation) null else offer.saved)
+    }
+
+    /** Skips the quiz (it isn't offered again for these phrases) and goes on to the new conversation. */
+    fun skipQuiz() {
+        val offer = quizOffer ?: return
+        quizOffer = null
+        val said = Quiz.phrases(offer.saved.chat).size
+        if (offer.fromConversation) {
+            quizOfferedAt = said
+            leaveForNewConversation()
+        } else {
+            writeSaved(offer.saved.copy(quiz = null, quizOfferedAt = said))
+            register = Register.Formal
+            screen = Screen.PickLanguage
+        }
+    }
+
+    /** Neither Quiz nor Skip: stays where it was. */
+    fun dismissQuizOffer() {
+        quizOffer = null
+    }
+
+    /**
+     * Opens the quiz on [given] (the conversation on screen if null): the one left part way, or a new
+     * one. The page opens straight away; the questions are made one at a time behind it, the first
+     * from what's at hand so it's ready at once, the rest while the learner answers.
+     */
+    private fun openQuiz(given: SavedConversation?) {
+        error = null
+        quizError = null
+        viewModelScope.launch {
+            stopConversationWork()
+            val saved = given ?: currentConversation() ?: return@launch
+            val lang = LANGUAGES.firstOrNull { it.code == saved.languageCode } ?: return@launch
+            quizBase = saved
+            quiz = saved.quiz ?: Quiz.start(saved.chat, mode)
+            quizAnswer = null
+            quizRefWords = null
+            quizMeanings.clear()
+            own = LANGUAGES.firstOrNull { it.code == saved.ownCode } ?: ownSetting
+            scenario = saved.scenario
+            register = saved.register
+            if (language != lang) {
+                openDictionary(lang)
+                language = lang
+            }
+            lookup = null
+            screen = Screen.Quiz
+            saveQuiz()
+            conversationScope.launch {
+                busy = Busy.Starting
+                try {
+                    val voice = voiceFor(lang) ?: run {
+                        quizError = error
+                        return@launch
+                    }
+                    modelsLoaded()
+                    loadVoice(lang, voice)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    quizError = "Couldn't start the quiz: ${e.message}"
+                    return@launch
+                } finally {
+                    busy = Busy.Idle
+                }
+                showQuizQuestion()
+                makeQuizQuestions()
+            }
+        }
+    }
+
+    /** Saves the quiz with its conversation; a question answered counts as done, so it's not asked again. */
+    private fun saveQuiz() {
+        val base = quizBase ?: return
+        val q = quiz ?: return
+        writeSaved(base.copy(quiz = q.copy(position = if (quizAnswer != null) q.position + 1 else q.position)))
+    }
+
+    /** Makes the quiz's questions that aren't made yet, in order. */
+    private suspend fun makeQuizQuestions() {
+        while (true) {
+            val q = quiz ?: return
+            val at = q.questions.size
+            if (at >= q.plan.size) return
+            // Not while the learner is talking or their answer is being heard: that needs the phone.
+            snapshotFlow { busy }.first { it != Busy.Listening && it != Busy.Transcribing }
+            val question = makeQuizQuestion(q, q.phrases[q.plan[at]])
+            val now = quiz ?: return
+            // A question that can't be made is dropped.
+            quiz = if (question != null) now.copy(questions = now.questions + question)
+            else now.copy(plan = now.plan.filterIndexed { i, _ -> i != at })
+            saveQuiz()
+            if (question != null && now.position == at) showQuizQuestion()
+        }
+    }
+
+    /**
+     * A question on [source], of the kind asked least so far (at random among those), or the next
+     * least if that can't be made of it; null if none can.
+     */
+    private suspend fun makeQuizQuestion(q: Quiz, source: QuizSource): QuizQuestion? {
+        val lang = language ?: return null
+        val asked = q.questions.groupingBy { it.kind }.eachCount()
+        val kinds = QuizKind.entries
+            .filter { it != QuizKind.Mistake || q.mode == Mode.Intermediate }
+            .filter { it != QuizKind.Article || lang.articles.isNotEmpty() }
+            .filter { it != QuizKind.Match || asked[it] == null }
+            .shuffled()
+            .sortedBy { asked[it] ?: 0 }
+            // The first question is one that needs no Gemma, so the quiz starts straight away.
+            .let { kinds -> if (q.questions.isEmpty()) kinds.sortedBy { it.needsGemma } else kinds }
+        for (kind in kinds) {
+            val question = try {
+                makeQuestion(kind, q, source, lang)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                diagnostics.log("Quiz: couldn't make a ${kind.name} question (${e.message})")
+                null
+            }
+            if (question != null) return question
+        }
+        return null
+    }
+
+    /** A [kind] question on [source], or null if one can't be made of it. */
+    private suspend fun makeQuestion(kind: QuizKind, q: Quiz, source: QuizSource, lang: Language): QuizQuestion? {
+        val gemma = checkNotNull(tutor)
+        val phrase = source.phrase
+        return when (kind) {
+            QuizKind.Order -> QuizMaker.order(source, q.wordLimit)
+            QuizKind.Speak -> QuizMaker.speak(source, q.wordLimit)
+            QuizKind.PhraseMeaning -> QuizMaker.phraseMeaning(source, q.phrases)
+            QuizKind.FillGap, QuizKind.Mistake -> {
+                if (wordsOf(phrase).size < 3) return null
+                val (position, wrong) = QuizMaker.parseForms(gemma.quizForms(lang, own, phrase), phrase) ?: return null
+                val right = wordsOf(phrase)[position]
+                when {
+                    kind == QuizKind.Mistake -> MistakeQuestion(QuizMaker.replaceWord(phrase, position, wrong.first()), position, right, source.english)
+                    wrong.size < 2 -> null
+                    else -> QuizMaker.choice(kind, QuizMaker.replaceWord(phrase, position, "___"), source.english, null, right, wrong.take(2))
+                }
+            }
+            QuizKind.Article -> {
+                val asked = q.questions.filter { it.kind == QuizKind.Article }.map { (it as ChoiceQuestion).shown }
+                val (noun, article) = QuizMaker.parseArticles(gemma.quizArticles(lang, own, phrase), lang.articles)
+                    .filter { (noun, _) -> asked.none { QuizMaker.same(it, noun) } && isWord(noun) }
+                    .randomOrNull() ?: return null
+                ChoiceQuestion(kind, noun, null, null, lang.articles, lang.articles.indexOf(article))
+            }
+            QuizKind.Heard -> {
+                val word = quizWords(phrase).randomOrNull() ?: return null
+                val alike = QuizMaker.parseAlike(gemma.quizAlike(lang, own, word), word).filter { isWord(it) }
+                if (alike.size < 2) null else QuizMaker.choice(kind, "", null, word, word, alike.take(2))
+            }
+            QuizKind.WordMeaning -> {
+                val (word, meaning) = meaningsFrom(lang, listOf(source), 1).firstOrNull() ?: return null
+                val others = meaningsFrom(lang, q.phrases.shuffled(), 2, except = word to meaning).map { it.second }
+                if (others.size < 2) null else QuizMaker.choice(kind, word, null, null, meaning, others)
+            }
+            QuizKind.Match -> {
+                val pairs = meaningsFrom(lang, listOf(source) + q.phrases.filter { it != source }.shuffled(), MATCH_PAIRS)
+                if (pairs.size < MATCH_PAIRS) return null
+                val order = (1..20).map { pairs.indices.shuffled() }.firstOrNull { it != pairs.indices.toList() } ?: return null
+                MatchQuestion(pairs.map { it.first }, pairs.map { it.second }, order)
+            }
+        }
+    }
+
+    /** Whether [word] is a real word: in the dictionary, if there is one (Gemma sometimes makes words up). */
+    private suspend fun isWord(word: String): Boolean =
+        dictionary == null || withContext(Dispatchers.IO) { fromDictionary(word) } != null
+
+    /** The words of [phrase] worth asking about: those of three letters or more, or else all of them. */
+    private fun quizWords(phrase: String): List<String> {
+        val words = wordsOf(phrase).distinctBy(Dictionary::key)
+        return words.filter { w -> w.count { it.isLetter() } >= 3 }.ifEmpty { words }
+    }
+
+    /**
+     * Up to [count] words from [sources] (in that order) with their meanings, each word and meaning
+     * different from the others and from [except]. A few words without a meaning are passed over.
+     */
+    private suspend fun meaningsFrom(
+        lang: Language, sources: List<QuizSource>, count: Int, except: Pair<String, String>? = null,
+    ): List<Pair<String, String>> {
+        val out = mutableListOf<Pair<String, String>>()
+        var tries = 0
+        for ((word, sentence) in sources.flatMap { s -> quizWords(s.phrase).shuffled().map { it to s.phrase } }) {
+            if (out.size >= count || tries >= count + MEANING_MISSES) break
+            val taken = out + listOfNotNull(except)
+            if (taken.any { QuizMaker.same(it.first, word) }) continue
+            tries++
+            val meaning = quizMeaning(lang, word, sentence) ?: continue
+            if (taken.any { it.second.equals(meaning, ignoreCase = true) }) continue
+            out += word to meaning
+        }
+        return out
+    }
+
+    /** [word]'s meaning for the quiz, kept short: the dictionary's first, else Gemma's in [sentence]. */
+    private suspend fun quizMeaning(lang: Language, word: String, sentence: String): String? {
+        val key = Dictionary.key(word)
+        if (key in quizMeanings) return quizMeanings[key]
+        val meaning = withContext(Dispatchers.IO) { fromDictionary(word) }?.groups?.firstOrNull { it.meanings.isNotEmpty() }?.meanings?.first()
+            ?: lookupCache[word.lowercase() to sentence]?.meaning
+            ?: Tutor.parseLookup(checkNotNull(tutor).lookUp(lang, word, sentence, own))
+        return meaning?.let(QuizMaker::shortMeaning)?.ifEmpty { null }.also { quizMeanings[key] = it }
+    }
+
+    /** Gets the question on screen ready: says what's to be heard, or works out the sounds of the phrase to say. */
+    private fun showQuizQuestion() {
+        val question = quiz?.current ?: return
+        if (busy != Busy.Idle || quizAnswer != null) return
+        when (question) {
+            is ChoiceQuestion -> question.spoken?.let { text ->
+                launchAction(Busy.Speaking) { withContext(Dispatchers.Default) { checkNotNull(tts).play(wordAudio(text)) } }
+            }
+            is SpeakQuestion -> launchAction(Busy.Preparing) {
+                val words = withContext(Dispatchers.Default) { expectedSounds(question.phrase, wordAudio(question.phrase)) }
+                quizRefWords = question.phrase to words
+            }
+            else -> Unit
+        }
+    }
+
+    /** Answers the question on screen; it can't be answered again. */
+    fun answerQuiz(answer: QuizAnswer) {
+        if (quiz?.current == null || quizAnswer != null) return
+        quizAnswer = answer
+        saveQuiz()
+    }
+
+    /** On to the next question; after the last, the quiz is done. */
+    fun nextQuizQuestion() {
+        val q = quiz ?: return
+        if (busy != Busy.Idle) return
+        val next = q.copy(position = q.position + 1)
+        quizAnswer = null
+        quizRefWords = null
+        quizError = null
+        if (next.finished) {
+            finishQuiz()
+            return
+        }
+        quiz = next
+        saveQuiz()
+        showQuizQuestion()
+    }
+
+    /** Ends the quiz (it isn't offered again for these phrases) and goes on to the new conversation. */
+    fun finishQuiz() {
+        val base = quizBase
+        val q = quiz
+        viewModelScope.launch {
+            stopConversationWork()
+            if (base != null && q != null) writeSaved(base.copy(quiz = null, quizOfferedAt = q.phrases.size))
+            quizOfferedAt = q?.phrases?.size ?: quizOfferedAt
+            quiz = null
+            quizBase = null
+            quizAnswer = null
+            register = Register.Formal
+            screen = Screen.PickLanguage
+        }
+    }
+
+    /** Starts recording the answer to a say-it-from-memory question. */
+    fun startQuizTalking() {
+        if (quiz?.current !is SpeakQuestion || quizAnswer != null || busy != Busy.Idle) return
+        quizTalking = true
+        startTalking()
+    }
+
+    /** Grades the answer to a say-it-from-memory question, as a try at a phrase is graded. */
+    private suspend fun quizTry(audio: Audio) {
+        val question = quiz?.current as? SpeakQuestion ?: return
+        val refWords = quizRefWords?.takeIf { it.first == question.phrase }?.second
+            ?: withContext(Dispatchers.Default) { expectedSounds(question.phrase, wordAudio(question.phrase)) }
+        val graded = grade(question.phrase, refWords, audio)
+        if (quiz?.current == question) answerQuiz(QuizAnswer.Spoken(graded.result))
     }
 
     // Startup comes last, after every field: viewModelScope runs coroutines straight away, so
