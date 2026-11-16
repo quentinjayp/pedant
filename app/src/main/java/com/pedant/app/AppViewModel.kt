@@ -799,8 +799,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (busy != Busy.Listening) return
         launchAction(Busy.Transcribing) {
             try {
-                // Only the speech is graded (and kept to play back), without the quiet or noise around it.
-                val audio = withContext(Dispatchers.Default) { trimEdges(Audio(recorder.stop(), SAMPLE_RATE)) }
+                val audio = withContext(Dispatchers.Default) { Audio(recorder.stop(), SAMPLE_RATE) }
                 val d = drill
                 val target = practiceTarget
                 practiceTarget = null
