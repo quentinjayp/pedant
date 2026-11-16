@@ -25,6 +25,13 @@ data class SavedConversation(
     val walkFails: Int = 0,
     /** The learner's own language in this conversation; English for one saved before it could be chosen. */
     val ownCode: String = DEFAULT_OWN,
+    /** The quiz on this conversation, if one was started and left part way. */
+    val quiz: Quiz? = null,
+    /**
+     * How many phrases had been said when the quiz was last offered and taken or skipped: it's
+     * offered again only once more have been said.
+     */
+    val quizOfferedAt: Int = 0,
 ) {
     companion object {
         fun file(dir: File) = File(dir, "conversation.json")
@@ -57,6 +64,8 @@ data class SavedConversation(
             walkPosition = if (o.has("walkPosition")) o.getInt("walkPosition") else null,
             walkFails = o.optInt("walkFails"),
             ownCode = o.optString("own", DEFAULT_OWN),
+            quiz = o.optJSONObject("quiz")?.let { q -> runCatching { Quiz.fromJson(q) }.getOrNull() },
+            quizOfferedAt = o.optInt("quizOfferedAt"),
         )
 
         private fun chatItem(o: JSONObject): ChatItem = when (o.getString("type")) {
@@ -112,6 +121,8 @@ data class SavedConversation(
             .put("walkPosition", walkPosition)
             .put("walkFails", walkFails)
             .put("own", ownCode)
+            .put("quiz", quiz?.toJson())
+            .put("quizOfferedAt", quizOfferedAt)
         val tmp = File(dir, "conversation.json.tmp")
         tmp.writeText(o.toString())
         tmp.renameTo(file(dir))

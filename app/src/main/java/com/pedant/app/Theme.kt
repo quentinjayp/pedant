@@ -45,6 +45,8 @@ object Pastel {
     // Words said right, and wrong.
     val Right = Color(0xFF2E7D32)
     val Wrong = Color(0xFFC62828)
+    val RightContainer = Color(0xFFE3F3E4)
+    val WrongContainer = Color(0xFFFCE4E4)
 }
 
 /** The logo's own colours, brighter than the app's: orange, violet and cyan. */
