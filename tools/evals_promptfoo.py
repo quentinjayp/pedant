@@ -38,19 +38,42 @@ def said(raw):
     return labelled(raw) or re.sub(r"^\w{1,10}\s*:\s*", "", raw).strip()
 
 
+def replied(raw):
+    """The translation in an answer about the tutor's reply, as the app reads it (Tutor.parse): the
+    text after ENGLISH:, up to the next label; empty if it has no ENGLISH: label. The label is
+    ENGLISH: whatever the learner's own language is, as the app's instruction says."""
+    raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.S)
+    m = re.search(r"ENGLISH:(.*?)(?=\n?(?:REPLY|ENGLISH|SAY):|\Z)", raw, re.S)
+    return m.group(1).strip() if m else ""
+
+
+def answer(kind, raw):
+    """What the app would take from an answer: the phrase to say ("line": the learner's own line
+    translated) or the translation of the tutor's reply ("reply")."""
+    return said(raw) if kind == "line" else replied(raw)
+
+
+def parts(key):
+    """A translation's key, "<sentence id>|<kind>|<from>><to>", as (sentence id, kind, from, to)."""
+    sentence, kind, pair = key.split("|")
+    source, target = pair.split(">")
+    return sentence, kind, source, target
+
+
 def lookup(prompt, options, context):
-    """A model's translation for this test's sentence and language."""
+    """A model's translation for this test's sentence and pair of languages."""
     cfg = options["config"]
     if cfg["outputs"] not in _outputs:
         _outputs[cfg["outputs"]] = json.load(open(cfg["outputs"], encoding="utf-8"))
-    out = _outputs[cfg["outputs"]].get(cfg["model"], {}).get(context["vars"]["key"])
+    key = context["vars"]["key"]
+    out = _outputs[cfg["outputs"]].get(cfg["model"], {}).get(key)
     if out is None:
         return {"output": "(not translated)"}
-    return {"output": said(out["raw"]) or "(nothing)"}
+    return {"output": answer(parts(key)[1], out["raw"]) or "(nothing)"}
 
 
 def chrf(output, context):
     """chrF against the reference, as a score from 0 to 1. Never a failure: the evals only report."""
     reference = context["vars"]["reference"]
-    points = score(output, reference, context["vars"]["key"].rsplit("|", 1)[1])
+    points = score(output, reference, parts(context["vars"]["key"])[3])
     return {"pass": True, "score": points / 100, "reason": f"chrF {points:.1f} against: {reference}"}

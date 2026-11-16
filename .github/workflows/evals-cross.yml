@@ -1,0 +1,108 @@
+name: Evals (other own languages)
+
+# Prepares for learners whose own language isn't English (tools/evals.py --own). For each own
+# language in evals/cross.json and each model there, the model translates the same sentences both
+# ways the app would: the learner's line from the own language into each other app language, and
+# the tutor's reply from each other app language back into the own language, told what the app
+# tells Gemma with the own language in English's place. The results are scored against
+# translations made by people. It reports only (tables in the run's summary, and promptfoo's
+# side-by-side report to download) and never blocks a build. Runs on demand, or on a push whose
+# commit message contains [evals-cross]. Run on demand with an earlier run's number, it makes the
+# report again from that run's translations without translating again.
+
+on:
+  push:
+    branches: [claude/offline-ai-language-app-v3widq, main]
+  workflow_dispatch:
+    inputs:
+      translations_from:
+        description: "Report again from an earlier run's translations: that run's number, from its web address"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  runs:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[evals-cross]')
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          python3 - >> "$GITHUB_OUTPUT" <<'PY'
+          import json
+          cross = json.load(open("evals/cross.json", encoding="utf-8"))
+          models = {m["name"]: m for m in json.load(open("evals/models.json", encoding="utf-8"))["models"]}
+          include = [{"name": name, "repo": models[name]["repo"], "file": models[name]["file"], "own": own,
+                      "options": "--fresh-engine" if models[name].get("freshEngine") else ""}
+                     for name in cross["models"] for own in cross["ownLanguages"]]
+          print("matrix=" + json.dumps({"include": include}))
+          PY
+
+  translate:
+    needs: runs
+    if: ${{ !inputs.translations_from }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.runs.outputs.matrix) }}
+    name: translate (${{ matrix.name }}, own ${{ matrix.own }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the model engine (the app's version)
+        run: pip install --quiet litert-lm-api==0.19.1
+      - name: Download the model
+        run: curl -fsSL --retry 3 -o model.litertlm "https://huggingface.co/${{ matrix.repo }}/resolve/main/${{ matrix.file }}" && ls -l model.litertlm
+      - name: Translate
+        run: python3 tools/evals.py translate --model model.litertlm --name "${{ matrix.name }}" --own ${{ matrix.own }} --out outputs/translations.json ${{ matrix.options }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: translations-${{ strategy.job-index }}
+          path: outputs/
+
+  report:
+    needs: [runs, translate]
+    # Whatever runs finished are reported, even if one failed.
+    if: always() && needs.runs.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: translations-*
+          path: outputs
+          run-id: ${{ inputs.translations_from || github.run_id }}
+          github-token: ${{ github.token }}
+      - run: pip install --quiet sacrebleu
+      - name: Scores by own language, model and direction
+        run: python3 tools/evals.py summary outputs | tee summary.md | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Side-by-side report (promptfoo)
+        env:
+          PROMPTFOO_DISABLE_TELEMETRY: "1"
+          PROMPTFOO_DISABLE_UPDATE: "1"
+          PROMPTFOO_PYTHON: python3
+        run: |
+          python3 tools/evals.py config outputs work
+          cd work
+          npx --yes promptfoo@0.125.1 eval -c promptfooconfig.json -o report.html -o results.json --no-progress-bar --no-cache --no-table
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evals-report
+          path: |
+            summary.md
+            work/report.html
+            outputs/

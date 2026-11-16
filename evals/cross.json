@@ -1,0 +1,5 @@
+{
+  "_about": "The Evals (other own languages) workflow: the learner's own languages it tries, as app language codes, and the models it compares, by their names in evals/models.json. Each own language is a run of its own for each model: the learner's line from it into each other app language, and the tutor's reply from each other app language back into it.",
+  "ownLanguages": ["fr", "es", "de", "ru", "zh"],
+  "models": ["Gemma 4 E4B", "Gemma 4 E2B"]
+}

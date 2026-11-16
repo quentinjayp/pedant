@@ -1,12 +1,23 @@
 """
-Compares models at the app's translation step: each model translates the same English sentences
-into the app's languages, told exactly what the app tells Gemma (assets/instructions.json), and
-the results are scored against translations made by people.
+Compares models at the app's translation steps: each model translates the same sentences, told
+exactly what the app tells Gemma (assets/instructions.json), and the results are scored against
+translations made by people.
+
+Two kinds of run:
+- English, the learner's own language today: the learner's line translated from English into each
+  of the app's languages (the Evals workflow).
+- Other own languages (--own), for when the learner's own language can be another: the learner's
+  line translated from it into each other language, and the tutor's reply translated from each
+  other language back into it (the Evals (other own languages) workflow). The app's instructions
+  are used with "English" put in the own language's place, as the app would.
 
     python3 tools/evals.py references <fleurs dir>            # writes evals/references.json
-    python3 tools/evals.py translate --model m.litertlm --name NAME --out outputs/NAME.json
+    python3 tools/evals.py translate --model m.litertlm --name NAME [--own fr] --out outputs/NAME.json
     python3 tools/evals.py config <outputs dir> <work dir>     # writes promptfoo's config and tests
-    python3 tools/evals.py summary <outputs dir>               # a table of scores, as Markdown
+    python3 tools/evals.py summary <outputs dir>               # tables of scores, as Markdown
+
+Each translation is keyed "<sentence id>|<kind>|<from>><to>", where kind is "line" (the learner's
+own line into the language learned) or "reply" (the tutor's reply back into the learner's own).
 
 The sentences are in evals/references.json (from FLEURS, Google's read-aloud recordings of the
 FLORES sentences, CC-BY 4.0: the text people translated and read) and evals/own_phrases.json
@@ -26,7 +37,7 @@ import os
 import time
 
 from app_languages import languages
-from evals_promptfoo import labelled, said, score
+from evals_promptfoo import answer, labelled, parts, score
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 INSTRUCTIONS = f"{ROOT}/app/src/main/assets/instructions.json"
@@ -57,6 +68,44 @@ def sentences():
 def targets():
     """The app's languages to translate into (English is what's translated from): [(code, name)]."""
     return [(lang.code, lang.name) for lang in languages() if lang.code != "en"]
+
+
+def names():
+    """Every app language's English name, by code."""
+    return {lang.code: lang.name for lang in languages()}
+
+
+def text_in(sentence, code):
+    """[sentence] in the language [code], as people wrote it, or None if it isn't in that language."""
+    return sentence["en"] if code == "en" else sentence["translations"].get(code)
+
+
+def jobs(own):
+    """The translations of a run for a learner whose own language is [own]: (key, sentence, kind,
+    from code, to code). English: the learner's line into each other language. Another language:
+    the line into each other language, and each other language's reply back into [own]."""
+    out = []
+    for s in sentences():
+        for other in names():
+            if other == own or text_in(s, own) is None or text_in(s, other) is None:
+                continue
+            out.append((f"{s['id']}|line|{own}>{other}", s, "line", own, other))
+            if own != "en":
+                out.append((f"{s['id']}|reply|{other}>{own}", s, "reply", other, own))
+    return out
+
+
+def instruction(ins, kind, source, target):
+    """What the app tells Gemma for a translation from [source] into [target] (codes): its own
+    instruction, with the learner's own language in English's place when it isn't English."""
+    n = names()
+    own = source if kind == "line" else target
+    learned = target if kind == "line" else source
+    text = ins["translate"] if kind == "line" else ins["replyTranslate"]
+    if own != "en":
+        article = "an" if n[own][0] in "AEIOU" else "a"
+        text = text.replace("an English speaker", f"{article} {n[own]} speaker").replace("English", n[own])
+    return text.replace("{language}", n[learned]).replace("{register}", "formal")
 
 
 def references(fleurs):
@@ -99,11 +148,10 @@ def translate(args):
     import litert_lm
 
     ins = json.load(open(INSTRUCTIONS, encoding="utf-8"))
-    jobs = [(s, code, name) for s in sentences() for code, name in targets() if code in s["translations"]]
-    jobs = [j for i, j in enumerate(jobs) if i % args.shards == args.shard]
+    todo = [j for i, j in enumerate(jobs(args.own)) if i % args.shards == args.shard]
     if args.limit:
-        jobs = jobs[:args.limit]
-    print(f"{args.name}: {len(jobs)} translations", flush=True)
+        todo = todo[:args.limit]
+    print(f"{args.name}, own language {args.own}: {len(todo)} translations", flush=True)
     # The app's settings for a translation: CPU, and always the likeliest next word.
     exact = litert_lm.SamplerConfig(top_k=1, top_p=1.0, temperature=0.0)
     outputs = {}
@@ -116,20 +164,21 @@ def translate(args):
     # isn't counted in its time.
     engine = None if args.fresh_engine else load()
     try:
-        for s, code, name in jobs:
-            system = ins["translate"].replace("{language}", name).replace("{register}", "formal")
+        for key, s, kind, source, target in todo:
+            system = instruction(ins, kind, source, target)
             one = load() if args.fresh_engine else engine
             started = time.time()
             try:
                 with one.create_conversation(system_message=system, sampler_config=exact) as conv:
-                    raw = text_of(conv.send_message(s["en"]))
+                    raw = text_of(conv.send_message(text_in(s, source)))
             except Exception as e:  # one failure shouldn't lose the run
                 raw = f"(failed: {e})"
             seconds = round(time.time() - started, 1)
             if args.fresh_engine:
                 one.__exit__(None, None, None)
-            outputs[f"{s['id']}|{code}"] = {"raw": raw, "say": said(raw), "seconds": seconds}
-            print(f"{code} {s['id']} ({seconds} s): {said(raw)!r}" + ("" if said(raw) else f"  RAW {raw[:200]!r}"), flush=True)
+            got = answer(kind, raw)
+            outputs[key] = {"raw": raw, "seconds": seconds}
+            print(f"{kind} {source}>{target} {s['id']} ({seconds} s): {got!r}" + ("" if got else f"  RAW {raw[:200]!r}"), flush=True)
     finally:
         if engine is not None:
             engine.__exit__(None, None, None)
@@ -138,12 +187,14 @@ def translate(args):
 
 
 def load_outputs(folder):
-    """{model name: {"id|code": output}} from every outputs file (and shard) in [folder]."""
+    """{model name: {key: output}} from every outputs file (and shard) in [folder]. Keys from runs
+    before there were other own languages ("<id>|<code>") are read as English lines."""
     found = {}
     for path in sorted(glob.glob(os.path.join(folder, "**", "*.json"), recursive=True)):
         data = json.load(open(path, encoding="utf-8"))
         if isinstance(data, dict) and "outputs" in data:
-            found.setdefault(data["model"], {}).update(data["outputs"])
+            outputs = {(k if k.count("|") == 2 else k.replace("|", "|line|en>")): v for k, v in data["outputs"].items()}
+            found.setdefault(data["model"], {}).update(outputs)
     return found
 
 
@@ -151,61 +202,118 @@ def config(outputs_dir, work):
     """Writes promptfoo's config: a column per model (its translations, looked up), a row per
     sentence and language, each scored against the reference."""
     here = os.path.dirname(os.path.abspath(__file__))
-    names = [m["name"] for m in json.load(open(MODELS, encoding="utf-8"))["models"]]
     # A full path: promptfoo is run from inside the work folder.
     merged = os.path.abspath(os.path.join(work, "outputs.json"))
     os.makedirs(work, exist_ok=True)
-    json.dump(load_outputs(outputs_dir), open(merged, "w", encoding="utf-8"), ensure_ascii=False)
-    tests = [
-        {"description": f"{name}: {s['en']}",
-         "vars": {"key": f"{s['id']}|{code}", "language": name, "english": s["en"], "reference": s["translations"][code]}}
-        for code, name in targets() for s in sentences() if code in s["translations"]
-    ]
+    outputs = load_outputs(outputs_dir)
+    # A column for each model that translated something in this run.
+    models = [m["name"] for m in json.load(open(MODELS, encoding="utf-8"))["models"] if m["name"] in outputs]
+    json.dump(outputs, open(merged, "w", encoding="utf-8"), ensure_ascii=False)
+    n, by_id = names(), {s["id"]: s for s in sentences()}
+    keys = sorted({k for found in outputs.values() for k in found})
+    tests = []
+    for key in keys:
+        sentence, kind, source, target = parts(key)
+        s = by_id.get(sentence)
+        if s is None or text_in(s, target) is None:
+            continue
+        what = "Your line" if kind == "line" else "Tutor's reply"
+        tests.append({
+            "description": f"{what}, {n[source]} to {n[target]}: {text_in(s, source)}",
+            "vars": {"key": key, "source": n[source], "target": n[target], "text": text_in(s, source),
+                     "reference": text_in(s, target)},
+        })
     cfg = {
-        "description": "Pedant: translations into the app's languages, scored against people's translations",
-        "prompts": ["Translate into {{language}}: {{english}}"],
+        "description": "Pedant: translations between the app's languages, scored against people's translations",
+        "prompts": ["Translate from {{source}} into {{target}}: {{text}}"],
         "providers": [
-            {"id": f"file://{here}/evals_promptfoo.py:lookup", "label": n, "config": {"outputs": merged, "model": n}} for n in names
+            {"id": f"file://{here}/evals_promptfoo.py:lookup", "label": m, "config": {"outputs": merged, "model": m}} for m in models
         ],
         "defaultTest": {"assert": [{"type": "python", "value": f"file://{here}/evals_promptfoo.py:chrf"}]},
         "tests": tests,
     }
     json.dump(cfg, open(os.path.join(work, "promptfooconfig.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    print(f"{len(tests)} tests, {len(names)} models")
+    print(f"{len(tests)} tests, {len(models)} models")
+
+
+def scored(outputs):
+    """Every translation's score: [(model, kind, from, to, chrF, seconds, whether it had its label)]."""
+    by_id = {s["id"]: s for s in sentences()}
+    rows = []
+    for model, found in outputs.items():
+        for key, out in found.items():
+            sentence, kind, source, target = parts(key)
+            s = by_id.get(sentence)
+            reference = text_in(s, target) if s else None
+            if reference is None:
+                continue
+            had_label = bool(labelled(out["raw"])) if kind == "line" else bool(answer(kind, out["raw"]))
+            rows.append((model, kind, source, target, score(answer(kind, out["raw"]), reference, target), out["seconds"], had_label))
+    return rows
+
+
+def mean(xs):
+    return f"{sum(xs) / len(xs):.1f}" if xs else "–"
 
 
 def summary(outputs_dir):
-    """Prints, as Markdown, each model's average score by language, and how long it took."""
+    """Prints, as Markdown, each model's average scores: for English, by language learned; for the
+    other own languages, by own language and kind, then by pair of languages."""
     outputs = load_outputs(outputs_dir)
-    names = [m["name"] for m in json.load(open(MODELS, encoding="utf-8"))["models"] if m["name"] in outputs]
-    if not names:
+    models = [m["name"] for m in json.load(open(MODELS, encoding="utf-8"))["models"] if m["name"] in outputs]
+    if not models:
         print("No translations to score.")
         return
-    rows, totals, times, unlabelled = [], {n: [] for n in names}, {n: [] for n in names}, {n: 0 for n in names}
-    for code, name in targets():
-        cells = []
-        for n in names:
-            scores = []
-            for s in sentences():
-                out = outputs[n].get(f"{s['id']}|{code}")
-                if code not in s["translations"] or out is None:
-                    continue
-                scores.append(score(said(out["raw"]), s["translations"][code], code))
-                times[n].append(out["seconds"])
-                unlabelled[n] += not labelled(out["raw"])
-            totals[n] += scores
-            cells.append(f"{sum(scores) / len(scores):.1f}" if scores else "–")
-        rows.append(f"| {name} | " + " | ".join(cells) + " |")
-    mean = lambda xs: f"{sum(xs) / len(xs):.1f}" if xs else "–"
-    print("## Translation scores (chrF, 0 to 100; higher is closer to people's translations)\n")
-    print("| Language | " + " | ".join(names) + " |")
-    print("|---|" + "---:|" * len(names))
-    print("| **All languages** | " + " | ".join(f"**{mean(totals[n])}**" for n in names) + " |")
-    print("\n".join(rows))
-    print("| Seconds per translation (on the CI machine) | " + " | ".join(mean(times[n]) for n in names) + " |")
-    print("| Answers without the SAY: label (the app takes the whole answer as the phrase) | " + " | ".join(str(unlabelled[n]) for n in names) + " |")
-    print(f"\n{len(totals[names[0]])} translations per model. A good translation worded differently from the reference "
-          "scores lower, so the scores compare the models with each other.")
+    n = names()
+    rows = scored({m: outputs[m] for m in models})
+    print("# Translation scores (chrF, 0 to 100; higher is closer to people's translations)\n")
+    print("A good translation worded differently from the reference scores lower, so the scores compare the models "
+          "with each other.\n")
+
+    english = [r for r in rows if r[1] == "line" and r[2] == "en"]
+    if english:
+        print("## Own language English: your line into each language\n")
+        print("| Language | " + " | ".join(models) + " |")
+        print("|---|" + "---:|" * len(models))
+        print("| **All languages** | " + " | ".join(f"**{mean([r[4] for r in english if r[0] == m])}**" for m in models) + " |")
+        for code, name in targets():
+            print(f"| {name} | " + " | ".join(mean([r[4] for r in english if r[0] == m and r[3] == code]) for m in models) + " |")
+        print("| Seconds per translation (on the CI machine) | " + " | ".join(mean([r[5] for r in english if r[0] == m]) for m in models) + " |")
+        print("| Answers without the SAY: label (the app takes the whole answer as the phrase) | "
+              + " | ".join(str(sum(1 for r in english if r[0] == m and not r[6])) for m in models) + " |")
+        print()
+
+    others = [r for r in rows if not (r[1] == "line" and r[2] == "en")]
+    owns = sorted({r[2] if r[1] == "line" else r[3] for r in others}, key=lambda c: n[c])
+    if not owns:
+        return
+    own_of = lambda r: r[2] if r[1] == "line" else r[3]
+    print("## Other own languages\n")
+    print("**Your line**: what you say in your own language, translated into the language you're learning. "
+          "**Tutor's reply**: the tutor's reply, translated from the language you're learning into your own.\n")
+    head = [f"{m}: {what}" for m in models for what in ("your line", "tutor's reply")]
+    print("| Own language | " + " | ".join(head) + " |")
+    print("|---|" + "---:|" * len(head))
+    for own in owns:
+        cells = [mean([r[4] for r in others if r[0] == m and r[1] == k and own_of(r) == own]) for m in models for k in ("line", "reply")]
+        print(f"| {n[own]} | " + " | ".join(cells) + " |")
+    print("| **All** | " + " | ".join(f"**{mean([r[4] for r in others if r[0] == m and r[1] == k])}**" for m in models for k in ("line", "reply")) + " |")
+    print("| Seconds per translation (on the CI machine) | "
+          + " | ".join(mean([r[5] for r in others if r[0] == m and r[1] == k]) for m in models for k in ("line", "reply")) + " |")
+    print("| Answers the app couldn't read (no SAY: or ENGLISH: label) | "
+          + " | ".join(str(sum(1 for r in others if r[0] == m and r[1] == k and not r[6])) for m in models for k in ("line", "reply")) + " |")
+    print()
+    for m in models:
+        for kind, title in (("line", "your line, from your own language into the one learned"),
+                            ("reply", "the tutor's reply, from the language learned into your own")):
+            print(f"### {m}: {title}\n")
+            print("| Language learned | " + " | ".join(f"own {n[o]}" for o in owns) + " |")
+            print("|---|" + "---:|" * len(owns))
+            learned_of = lambda r: r[3] if r[1] == "line" else r[2]
+            for code in sorted({learned_of(r) for r in others}, key=lambda c: n[c]):
+                cells = [mean([r[4] for r in others if r[0] == m and r[1] == kind and own_of(r) == o and learned_of(r) == code]) for o in owns]
+                print(f"| {n[code]} | " + " | ".join(cells) + " |")
+            print()
 
 
 if __name__ == "__main__":
@@ -221,6 +329,7 @@ if __name__ == "__main__":
     t.add_argument("--shards", type=int, default=1)
     t.add_argument("--limit", type=int, default=0, help="only the first N translations, to try a model out")
     t.add_argument("--fresh-engine", action="store_true", help="load the model again for each translation")
+    t.add_argument("--own", default="en", help="the learner's own language: en (as today), or another app language's code")
     c = sub.add_parser("config")
     c.add_argument("outputs")
     c.add_argument("work")
