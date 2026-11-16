@@ -3,7 +3,9 @@
 Learners are real people reading sentences, from Google's FLEURS dataset (CC-BY). Each recording
 is scored against its own sentence (should pass) and against wrong versions of it: one word
 swapped, one word added that the speaker skipped, a different sentence, and the recording cut in
-half as if the speaker stopped early (should fail). The scores use the same rules
+half as if the speaker stopped early (should fail). Each recording is graded three ways, to compare
+what's done with it first: as recorded, trimmed to the speech keeping 450 ms of the recording either
+side, and trimmed keeping 150 ms with 300 ms of clean silence added. The scores use the same rules
 as app/src/main/java/com/pedant/app/Matching.kt, which this file mirrors; keep the two in step.
 
 Usage: python calibrate_scoring.py <models dir>
@@ -310,11 +312,11 @@ class Clip:
         self.samples, self.sample_rate = samples, sample_rate
 
 
-def trim_edges(clip):
-    """[clip] with the quiet or noise before and after the speech replaced by clean silence, as the
-    app trims a learner's recording before grading it (trimEdges in Speech.kt): the speech is where
-    the loudness stays well above the recording's background for three 20 ms frames running, with
-    150 ms kept either side and 300 ms of silence added either side (the speech recognizer needs it)."""
+def trim_edges(clip, margin_ms=150, silence_ms=300):
+    """[clip] cut down to the speech, as the app can trim a learner's recording before grading it
+    (trimEdges in Speech.kt): the speech is where the loudness stays well above the recording's
+    background for three 20 ms frames running. [margin_ms] of the recording is kept either side of
+    it, and [silence_ms] of clean silence added either side."""
     frame = clip.sample_rate // 50
     frames = len(clip.samples) // frame
     if frames < 6:
@@ -331,9 +333,9 @@ def trim_edges(clip):
     if first is None:
         return clip
     last = next(f for f in range(frames - 1, -1, -1) if running(f - 2))
-    margin = clip.sample_rate * 150 // 1000
+    margin = clip.sample_rate * margin_ms // 1000
     start, end = max(0, first * frame - margin), min(len(clip.samples), (last + 1) * frame + margin)
-    silence = [0.0] * (clip.sample_rate * 300 // 1000)
+    silence = [0.0] * (clip.sample_rate * silence_ms // 1000)
     return Clip(silence + list(clip.samples[start:end]) + silence, clip.sample_rate)
 
 
@@ -384,6 +386,13 @@ def fleurs_sentences(code, max_words):
     return out
 
 
+# What's done with a learner's recording before it's graded, compared side by side.
+HANDLINGS = {
+    "no trimming": lambda clip: clip,
+    "trimmed, 450 ms of the recording kept": lambda clip: trim_edges(clip, margin_ms=450, silence_ms=0),
+    "trimmed, 150 ms kept + 300 ms clean silence": lambda clip: trim_edges(clip, margin_ms=150, silence_ms=300),
+}
+
 rows = []
 for lang, cfg in LANGS.items():
     ref_tts = tts(cfg["ref"])
@@ -421,30 +430,31 @@ for lang, cfg in LANGS.items():
             said = recognize(asr, audio).text
             return said, sounds(audio), sounds(ref_tts.generate(said, sid=0, speed=1.0)) if said.strip() else None
 
-        whole = heard(trim_edges(clip))
-        # The speaker stops halfway: the first half of the recording, against the whole sentence.
-        half = heard(trim_edges(Clip(clip.samples[:len(clip.samples) // 2], clip.sample_rate)))
         other = sentences[(i + 1) % len(sentences)][0]
-        # Otherwise the recording is the real sentence; the wrong cases score it against a wrong target.
-        cases = [("correct", text, whole)] + [(kind, target, whole) for kind, target in variants(text, cfg["swap"][i % len(cfg["swap"])])]
-        cases += [("different sentence", other, whole), ("stopped halfway", text, half)]
-        for kind, target, (transcript, heard_sounds, alike_sounds) in cases:
-            scored = {}
-            for method, refs in references(target):
-                ws, ss, per_word = check(target, transcript, refs, heard_sounds)
-                # Sound-alike check: the reference voice says what Omnilingual heard.
-                alike = word_ratios(refs, alike_sounds) if alike_sounds else [1.0] * len(per_word)
-                # Per word: (Omnilingual heard it, ZIPA's sound error ratio, the sound-alike ratio,
-                # after the last word Omnilingual heard anything for).
-                per_word = [(ok, ratio, alike_ratio, after) for (ok, ratio, after), alike_ratio in zip(per_word, alike)]
-                rows.append((lang, kind, os.path.basename(path), ws, ss, per_word, method))
-                scored[method] = (ws, ss, per_word)
-            # "either": espeak-ng's sounds are shown, and a word counts as right when what was said
-            # is close to them or to ZIPA's hearing of Piper (current), whichever is closer.
-            (ws, ss_c, cur), (_, ss_e, esp) = scored["current"], scored["espeak"]
-            either = [(h1 or h2, min(r1, r2), min(a1, a2), t1) for (h1, r1, a1, t1), (h2, r2, a2, _) in zip(cur, esp)]
-            rows.append((lang, kind, os.path.basename(path), ws, max(ss_c, ss_e), either, "either"))
-        print(f"{lang} heard: {whole[0]}  |  stopped halfway: {half[0]}", flush=True)
+        for handling, handle in HANDLINGS.items():
+            whole = heard(handle(clip))
+            # The speaker stops halfway: the first half of the recording, against the whole sentence.
+            half = heard(handle(Clip(clip.samples[:len(clip.samples) // 2], clip.sample_rate)))
+            # Otherwise the recording is the real sentence; the wrong cases score it against a wrong target.
+            cases = [("correct", text, whole)] + [(kind, target, whole) for kind, target in variants(text, cfg["swap"][i % len(cfg["swap"])])]
+            cases += [("different sentence", other, whole), ("stopped halfway", text, half)]
+            print(f"{lang} heard ({handling}): {whole[0]}  |  stopped halfway: {half[0]}", flush=True)
+            for kind, target, (transcript, heard_sounds, alike_sounds) in cases:
+                scored = {}
+                for method, refs in references(target):
+                    ws, ss, per_word = check(target, transcript, refs, heard_sounds)
+                    # Sound-alike check: the reference voice says what Omnilingual heard.
+                    alike = word_ratios(refs, alike_sounds) if alike_sounds else [1.0] * len(per_word)
+                    # Per word: (Omnilingual heard it, ZIPA's sound error ratio, the sound-alike ratio,
+                    # after the last word Omnilingual heard anything for).
+                    per_word = [(ok, ratio, alike_ratio, after) for (ok, ratio, after), alike_ratio in zip(per_word, alike)]
+                    rows.append((lang, kind, os.path.basename(path), ws, ss, per_word, method, handling))
+                    scored[method] = (ws, ss, per_word)
+                # "either": espeak-ng's sounds are shown, and a word counts as right when what was said
+                # is close to them or to ZIPA's hearing of Piper (current), whichever is closer.
+                (ws, ss_c, cur), (_, ss_e, esp) = scored["current"], scored["espeak"]
+                either = [(h1 or h2, min(r1, r2), min(a1, a2), t1) for (h1, r1, a1, t1), (h2, r2, a2, _) in zip(cur, esp)]
+                rows.append((lang, kind, os.path.basename(path), ws, max(ss_c, ss_e), either, "either", handling))
 
 # The app's rule: a word is right if Omnilingual heard it, OR ZIPA's sounds for it are close
 # enough, OR what Omnilingual heard sounds like it (the sound-alike check); except that past the
@@ -470,10 +480,11 @@ def bad_words(r, rule=RULES[APP]):
 
 
 print(f"\n== espeak-ng's words lined up with the phrase's: {ESPEAK_SPLIT}")
-for method in ["current", "espeak", "either"]:
+for handling in HANDLINGS:
+    method = "either"
     for group, codes in GROUPS.items():
-        group_rows = [r for r in rows if r[6] == method and r[0] in codes]
-        print(f"\n== Expected sounds: {method}, {group} ==")
+        group_rows = [r for r in rows if r[6] == method and r[7] == handling and r[0] in codes]
+        print(f"\n== {handling}: expected sounds {method}, {group} ==")
         for kind in KINDS:
             for metric, idx in [("words", 3), ("sounds", 4)]:
                 vals = [r[idx] for r in group_rows if r[1] == kind]
@@ -503,3 +514,16 @@ for method in ["current", "espeak", "either"]:
         for r in by_kind["correct"]:
             if bad_words(r):
                 print("  ", r[0], r[2], "bad word indexes", bad_words(r))
+
+
+def share(rs, rule=RULES[APP]):
+    return f"{sum(not bad_words(r, rule) for r in rs) / max(1, len(rs)):.0%}"
+
+
+print("\n== What's done with the recording, compared (the app's rule) ==")
+print(f"{'':46}" + "".join(f"{k:>20}" for k in KINDS) + f"{'never-said words right':>24}")
+for handling in HANDLINGS:
+    hr = [r for r in rows if r[6] == "either" and r[7] == handling]
+    marks = [RULES[APP](*w) for r in hr if r[1] == "stopped halfway" for w in r[5][-(len(r[5]) // 3):]]
+    print(f"{handling:46}" + "".join(f"{share([r for r in hr if r[1] == k]):>20}" for k in KINDS)
+          + f"{sum(marks) / max(1, len(marks)):>24.0%}")
