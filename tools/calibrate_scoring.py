@@ -311,9 +311,10 @@ class Clip:
 
 
 def trim_edges(clip):
-    """[clip] without the quiet or noise before and after the speech, as the app trims a learner's
-    recording before grading it (trimEdges in Speech.kt): the speech is where the loudness stays
-    well above the recording's background for three 20 ms frames running, with 150 ms kept either side."""
+    """[clip] with the quiet or noise before and after the speech replaced by clean silence, as the
+    app trims a learner's recording before grading it (trimEdges in Speech.kt): the speech is where
+    the loudness stays well above the recording's background for three 20 ms frames running, with
+    150 ms kept either side and 300 ms of silence added either side (the speech recognizer needs it)."""
     frame = clip.sample_rate // 50
     frames = len(clip.samples) // frame
     if frames < 6:
@@ -332,7 +333,8 @@ def trim_edges(clip):
     last = next(f for f in range(frames - 1, -1, -1) if running(f - 2))
     margin = clip.sample_rate * 150 // 1000
     start, end = max(0, first * frame - margin), min(len(clip.samples), (last + 1) * frame + margin)
-    return Clip(clip.samples[start:end], clip.sample_rate)
+    silence = [0.0] * (clip.sample_rate * 300 // 1000)
+    return Clip(silence + list(clip.samples[start:end]) + silence, clip.sample_rate)
 
 
 def read_wav(path):

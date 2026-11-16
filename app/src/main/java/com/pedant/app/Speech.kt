@@ -28,12 +28,14 @@ const val SAMPLE_RATE = 16_000
 class Audio(val samples: FloatArray, val sampleRate: Int)
 
 /**
- * [audio] (a recording of the learner) without the quiet or noise before and after the speech, so
- * a breath or the microphone starting up isn't graded as a sound. The speech is where the loudness
- * stays well above the recording's own background for at least [SPEECH_FRAMES] frames of 20 ms
- * running, so a single click doesn't count; [EDGE_MARGIN_MS] is kept either side, for soft sounds
- * at the edges. Left as it is when nothing in it stands out from the background.
- * tools/calibrate_scoring.py trims recordings the same way.
+ * [audio] (a recording of the learner) with the quiet or noise before and after the speech replaced
+ * by clean silence, so a breath or the microphone starting up isn't graded as a sound. The speech
+ * is where the loudness stays well above the recording's own background for at least
+ * [SPEECH_FRAMES] frames of 20 ms running, so a single click doesn't count; [EDGE_MARGIN_MS] is
+ * kept either side, for soft sounds at the edges, and [SILENCE_MS] of silence is added either side,
+ * which the speech recognizer needs (with none, it wrote nonsense for some recordings). Left as it
+ * is when nothing in it stands out from the background. tools/calibrate_scoring.py trims
+ * recordings the same way.
  */
 fun trimEdges(audio: Audio): Audio {
     val frame = audio.sampleRate / 50
@@ -56,11 +58,15 @@ fun trimEdges(audio: Audio): Audio {
     val margin = audio.sampleRate * EDGE_MARGIN_MS / 1000
     val start = (first * frame - margin).coerceAtLeast(0)
     val end = ((last + 1) * frame + margin).coerceAtMost(audio.samples.size)
-    return Audio(audio.samples.copyOfRange(start, end), audio.sampleRate)
+    val silence = audio.sampleRate * SILENCE_MS / 1000
+    val out = FloatArray(silence + (end - start) + silence)
+    audio.samples.copyInto(out, destinationOffset = silence, startIndex = start, endIndex = end)
+    return Audio(out, audio.sampleRate)
 }
 
 private const val SPEECH_FRAMES = 3
 private const val EDGE_MARGIN_MS = 150
+private const val SILENCE_MS = 300
 
 /** Records 16 kHz mono audio from the microphone while the talk button is held. */
 class MicRecorder {
