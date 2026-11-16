@@ -6,6 +6,9 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+/** A Tutor's note: a common [expression] in a phrase, and Gemma's [text] on what it means and how it's used. */
+data class TutorNote(val expression: String, val text: String)
+
 /** An opening: Gemma's first line in the language being learned, and its English. */
 data class Opening(val reply: String, val english: String?)
 

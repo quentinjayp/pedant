@@ -136,6 +136,10 @@ class Tutor(context: Context, modelFile: File) {
     suspend fun lookUp(language: Language, word: String, sentence: String): String =
         ask(Instructions.lookup(language), "Word: $word\nSentence: $sentence")
 
+    /** Looks for a common expression in [phrase]. Returns the raw answer; see [parseExpression]. */
+    suspend fun expression(language: Language, phrase: String): String =
+        ask(Instructions.expression(language), phrase)
+
     /** Explains every word of [sentence] at once. Returns the raw answer; see [parseSentenceLookup]. */
     suspend fun lookUpSentence(language: Language, sentence: String): String =
         ask(Instructions.sentenceLookup(language), sentence)
@@ -209,6 +213,19 @@ class Tutor(context: Context, modelFile: File) {
                 if (parts.size < 2 || parts[0].isEmpty() || parts[1].isEmpty()) null
                 else parts[0].lowercase() to parts[1]
             }.toMap()
+
+        /**
+         * The expression and its note in an answer to [expression], or null if there's none, or if
+         * the expression it names isn't in [phrase] (Gemma made it up).
+         */
+        fun parseExpression(raw: String, phrase: String): TutorNote? {
+            val expression = raw.substringAfter("EXPRESSION:", "").substringBefore("NOTE:").trim()
+                .trim('"', '“', '”', '«', '»', '\'').trim()
+            val note = raw.substringAfter("NOTE:", "").trim()
+            if (expression.isEmpty() || note.isEmpty()) return null
+            if (Matching.normalize(expression) !in Matching.normalize(phrase)) return null
+            return TutorNote(expression, note)
+        }
 
         /** The meaning from a single-word lookup answer. */
         fun parseLookup(raw: String): String? =

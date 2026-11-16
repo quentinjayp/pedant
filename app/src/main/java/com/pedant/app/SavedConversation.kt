@@ -59,7 +59,10 @@ data class SavedConversation(
         private fun chatItem(o: JSONObject): ChatItem = when (o.getString("type")) {
             "user" -> ChatItem.User(o.getString("text"))
             "tutor" -> ChatItem.Tutor(o.getString("reply"), o.optStringOrNull("english"))
-            "say" -> ChatItem.Say(o.getString("english"), o.getString("phrase"))
+            "say" -> ChatItem.Say(
+                o.getString("english"), o.getString("phrase"),
+                o.optStringOrNull("noteExpression")?.let { TutorNote(it, o.optString("noteText")) },
+            )
             "attempt" -> ChatItem.Attempt(
                 o.getString("heard"), o.getString("sounds"), attemptResult(o.getJSONObject("result")), o.getString("phrase"),
             )
@@ -115,6 +118,7 @@ data class SavedConversation(
         is ChatItem.Tutor -> JSONObject().put("type", "tutor").put("reply", item.reply)
             .put("english", item.english)
         is ChatItem.Say -> JSONObject().put("type", "say").put("english", item.english).put("phrase", item.phrase)
+            .put("noteExpression", item.note?.expression).put("noteText", item.note?.text)
         is ChatItem.Attempt -> JSONObject().put("type", "attempt").put("heard", item.heard).put("sounds", item.sounds)
             .put("result", json(item.result)).put("phrase", item.phrase)
         is ChatItem.Note -> JSONObject().put("type", "note").put("text", item.text)

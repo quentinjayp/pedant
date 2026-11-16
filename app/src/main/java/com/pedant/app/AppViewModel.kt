@@ -80,7 +80,7 @@ sealed interface ChatItem {
     data class User(val text: String) : ChatItem
     data class Tutor(val reply: String, val english: String? = null) : ChatItem
     /** The phrase to say, translated from what the learner wanted to say. */
-    data class Say(val english: String, val phrase: String) : ChatItem
+    data class Say(val english: String, val phrase: String, val note: TutorNote? = null) : ChatItem
     /** One try at saying [phrase]. */
     data class Attempt(val heard: String, val sounds: String, val result: AttemptResult, val phrase: String) : ChatItem
     data class Note(val text: String) : ChatItem
@@ -733,6 +733,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Clear the lookup queue too, or the background lookups would restart once the app is idle.
         pendingSentences.clear()
         pendingWord = null
+        pendingNote = null
         busy = Busy.Idle
         progress = null
     }
@@ -848,6 +849,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // the learner starts talking or the app needs Gemma or Piper, and picks up again afterwards.
     private val pendingSentences = ArrayDeque<String>()
     private val doneSentences = mutableSetOf<String>()
+    /** A phrase to look for a common expression in, for a Tutor's note (see [noteCountdown]). */
+    private var pendingNote: String? = null
+
+    /**
+     * Translations of the learner's lines left until the next one is checked for a common expression,
+     * so a Tutor's note comes every 5 to 8 phrases, at random. Remembered between conversations. At 0
+     * each translation is checked until one has an expression.
+     */
+    private var noteCountdown = uiPrefs.getInt("noteCountdown", NOTE_EVERY.random())
+        set(value) {
+            field = value
+            uiPrefs.edit().putInt("noteCountdown", value).apply()
+        }
+
     /** A tapped word the sentence lookup didn't cover, to look up on its own. */
     private var pendingWord: Pair<String, String>? = null
     private val triedAlone = mutableSetOf<Pair<String, String>>()
@@ -959,7 +974,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun startBackground() {
         if (backgroundJob?.isActive == true || busy != Busy.Idle || !appVisible) return
-        if (pendingSentences.isEmpty() && pendingWord == null) return
+        if (pendingSentences.isEmpty() && pendingWord == null && pendingNote == null) return
         val lang = language ?: return
         diagnostics.log("Background lookups: start")
         backgroundJob = viewModelScope.launch {
@@ -968,6 +983,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (word != null) {
                     lookUpAlone(lang, word.first, word.second)
                     pendingWord = null
+                    continue
+                }
+                val notePhrase = pendingNote
+                if (notePhrase != null) {
+                    lookForExpression(lang, notePhrase)
+                    pendingNote = null
                     continue
                 }
                 val sentence = pendingSentences.firstOrNull() ?: break
@@ -1035,6 +1056,27 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         refreshOpenLookup()
+    }
+
+    /**
+     * Asks Gemma for a common expression in [phrase]; if there's one, the phrase's card gets a
+     * Tutor's note about it, shown above the card, and the countdown to the next note starts again.
+     * If there's none, the next phrase is checked instead.
+     */
+    private suspend fun lookForExpression(lang: Language, phrase: String) {
+        val note = try {
+            Tutor.parseExpression(checkNotNull(tutor).expression(lang, phrase), phrase)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            diagnostics.log("Couldn't look for an expression: ${e.message}")
+            null
+        }
+        val index = chat.indexOfLast { it is ChatItem.Say && it.phrase == phrase }
+        if (note == null || index < 0) return
+        chat[index] = (chat[index] as ChatItem.Say).copy(note = note)
+        noteCountdown = NOTE_EVERY.random()
+        diagnostics.log("Tutor's note on “${note.expression}”")
     }
 
     /**
@@ -1215,6 +1257,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             hiddenPhraseIndex = null
             return
         }
+        // Every few phrases, a Tutor's note on a common expression in it, looked for in the background.
+        noteCountdown = (noteCountdown - 1).coerceAtLeast(0)
+        if (noteCountdown == 0) pendingNote = phrase
         busy = Busy.Preparing
         diagnostics.step = "Preparing the phrase with Piper and ZIPA"
         val voice = checkNotNull(tts)
@@ -1547,6 +1592,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         /** The shortest piece of a reply the voice is given on its own, in characters. */
         private const val MIN_SPOKEN_CHARS = 20
+
+        /** How many phrases apart the Tutor's notes on common expressions come, at random. */
+        private val NOTE_EVERY = 5..8
 
         /** Failed tries at a phrase before Skip is offered. */
         const val SKIP_AFTER_FAILS = 2

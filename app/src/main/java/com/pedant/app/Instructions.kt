@@ -34,5 +34,6 @@ object Instructions {
     fun translate(language: Language, register: Register) =
         text("translate", language).replace("{register}", register.name.lowercase())
     fun lookup(language: Language) = text("lookup", language)
+    fun expression(language: Language) = text("expression", language)
     fun sentenceLookup(language: Language) = text("sentenceLookup", language)
 }
