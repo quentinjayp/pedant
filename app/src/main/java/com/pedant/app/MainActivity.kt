@@ -1423,6 +1423,17 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
                 Text("Heard /${t.heard.ifEmpty { "—" }}/", fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = Pastel.VioletDark)
             }
         }
+        // The word itself: how it's said on its own, and what it means.
+        p.info?.let { info ->
+            Column(
+                Modifier.fillMaxWidth().card(Pastel.White, shape = RoundedCornerShape(16.dp)).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                WordPronunciation(info)
+                // Scrolls on its own, so a long entry never pushes the rest of the window away.
+                WordMeaning(info, appBusy = !idle, Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState()))
+            }
+        }
         // The phrase: tap a word to pick it.
         Column(Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(16.dp)).padding(12.dp)) {
             SmallLabel("The phrase:", Pastel.InkSoft)

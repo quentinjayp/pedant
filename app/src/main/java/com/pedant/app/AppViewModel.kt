@@ -1074,6 +1074,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun refreshOpenLookup() {
         // The word-by-word step's word may have just been looked up too.
         walk?.let { w -> if (w.info?.loading != false) refreshWalkInfo() }
+        practice?.let { p -> if (p.info?.loading != false) refreshPracticeInfo() }
         val open = lookup ?: return
         val key = open.word.lowercase() to open.sentence
         val found = lookupCache[key] ?: return
@@ -1300,33 +1301,51 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * Fills in the word-by-word step's word details (meaning, IPA and respelling) as the word bubble
-     * would show them: from the lookups already made, or else the dictionary and espeak-ng now,
-     * with Gemma's meaning to follow from the background lookups for a word the dictionary lacks.
+     * [word]'s details as the word bubble shows them (meaning, IPA and respelling), for a page or
+     * window that shows a word of [sentence] without opening the bubble. [show] gets them from the
+     * lookups already made (fromLookups = true), or else from the dictionary and espeak-ng now, with
+     * Gemma's meaning to follow from the background lookups for a word the dictionary lacks; it's
+     * called again (through [refreshOpenLookup]) as those finish.
      */
-    private fun refreshWalkInfo() {
-        val w = walk ?: return
+    private fun fetchWordInfo(word: String, sentence: String, show: (info: WordLookup, fromLookups: Boolean) -> Unit) {
         val lang = language ?: return
-        val word = w.word.word
-        val key = word.lowercase() to w.phrase
+        val key = word.lowercase() to sentence
         lookupCache[key]?.let { found ->
             if (found.meaning == null && found.error == null && key !in triedAlone) {
                 // The sentence lookup missed it: ask about it on its own.
-                walk = w.copy(info = found.copy(loading = true))
-                pendingWord = word to w.phrase
+                show(found.copy(loading = true), true)
+                pendingWord = word to sentence
                 startBackground()
             } else {
-                walk = w.copy(info = found)
+                show(found, true)
             }
             return
         }
         viewModelScope.launch {
             val d = withContext(Dispatchers.IO) { fromDictionary(word) }
             val sounds = if (d?.ipa != null) null else withContext(Dispatchers.Default) { wordIpa(lang, word) }
-            val info = if (d != null) dictionaryLookup(word, w.phrase, d, sounds) else WordLookup(word, w.phrase, sounds = sounds)
-            // Only if the step is still on this word.
-            walk?.takeIf { it.phrase == w.phrase && it.position == w.position && it.info == null }?.let { walk = it.copy(info = info) }
-            if (d == null) queueLookups(w.phrase, first = true)
+            show(if (d != null) dictionaryLookup(word, sentence, d, sounds) else WordLookup(word, sentence, sounds = sounds), false)
+            if (d == null) queueLookups(sentence, first = true)
+        }
+    }
+
+    /** Fills in the word-by-word step's word details. */
+    private fun refreshWalkInfo() {
+        val w = walk ?: return
+        fetchWordInfo(w.word.word, w.phrase) { info, fromLookups ->
+            // Only if the step is still on this word, and never over what the lookups found.
+            walk?.takeIf { it.phrase == w.phrase && it.position == w.position && (fromLookups || it.info == null) }
+                ?.let { walk = it.copy(info = info) }
+        }
+    }
+
+    /** Fills in the practice window's picked word details. */
+    private fun refreshPracticeInfo() {
+        val p = practice ?: return
+        val word = p.result.words.getOrNull(p.position)?.word ?: return
+        fetchWordInfo(word, p.phrase) { info, fromLookups ->
+            practice?.takeIf { it.chatIndex == p.chatIndex && it.position == p.position && (fromLookups || it.info == null) }
+                ?.let { practice = it.copy(info = info) }
         }
     }
 
@@ -1593,6 +1612,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val hasRecording: Boolean,
         val note: String? = null,
         val wordTries: Map<Int, WordTry> = emptyMap(),
+        /** The picked word's meaning, IPA and respelling, as the word bubble has them; null until found. */
+        val info: WordLookup? = null,
     )
 
     var practice by mutableStateOf<Practice?>(null)
@@ -1622,6 +1643,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val at = position?.takeIf { it in words.indices } ?: words.indexOfFirst { !it.passed }.coerceAtLeast(0)
         val p = Practice(index, item.phrase, item.result, at, hasRecording = false)
         practice = p.copy(hasRecording = recordingFor(p) != null)
+        refreshPracticeInfo()
         hearWord(words[at].word, slow = false)
     }
 
@@ -1633,7 +1655,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun practiceSelect(position: Int) {
         val p = practice ?: return
         val at = Math.floorMod(position, p.result.words.size.coerceAtLeast(1))
-        practice = p.copy(position = at)
+        practice = p.copy(position = at, info = null)
+        refreshPracticeInfo()
         p.result.words.getOrNull(at)?.let { hearWord(it.word, slow = false) }
     }
 
