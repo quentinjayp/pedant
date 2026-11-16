@@ -20,6 +20,9 @@ data class SavedConversation(
     val drillWords: List<RefWord>,
     val drillAttempts: Int,
     val editableIndex: Int?,
+    /** Beginner's word-by-word step under way: the word reached, and the failed tries at it. */
+    val walkPosition: Int? = null,
+    val walkFails: Int = 0,
 ) {
     companion object {
         fun file(dir: File) = File(dir, "conversation.json")
@@ -49,6 +52,8 @@ data class SavedConversation(
             }.orEmpty(),
             drillAttempts = o.optInt("drillAttempts"),
             editableIndex = if (o.has("editableIndex")) o.getInt("editableIndex") else null,
+            walkPosition = if (o.has("walkPosition")) o.getInt("walkPosition") else null,
+            walkFails = o.optInt("walkFails"),
         )
 
         private fun chatItem(o: JSONObject): ChatItem = when (o.getString("type")) {
@@ -98,6 +103,8 @@ data class SavedConversation(
             }))
             .put("drillAttempts", drillAttempts)
             .put("editableIndex", editableIndex)
+            .put("walkPosition", walkPosition)
+            .put("walkFails", walkFails)
         val tmp = File(dir, "conversation.json.tmp")
         tmp.writeText(o.toString())
         tmp.renameTo(file(dir))

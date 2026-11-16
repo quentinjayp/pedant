@@ -182,7 +182,8 @@ class MainActivity : ComponentActivity() {
                         Screen.Crashed -> CrashScreen(vm)
                         Screen.Home -> HomeScreen(vm)
                         Screen.PickLanguage -> LanguageScreen(vm)
-                        Screen.Conversation -> ConversationScreen(vm)
+                        // Beginner's word-by-word step is a page of its own, in the conversation's place.
+                        Screen.Conversation -> vm.walk?.let { WordWalkScreen(vm, it) } ?: ConversationScreen(vm)
                         Screen.Settings -> SettingsScreen(vm)
                     }
                 }
@@ -967,7 +968,8 @@ private fun ConversationScreen(vm: AppViewModel) {
     // The "finishing a reply" notice needs permission to show.
     val askNotifications = rememberNotificationPermission()
     LaunchedEffect(Unit) { askNotifications() }
-    val listState = rememberLazyListState()
+    // Starts at the latest item, so coming back from the word-by-word page doesn't scroll the whole chat.
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (vm.chat.size - 1).coerceAtLeast(0))
     LaunchedEffect(vm.chat.size, vm.chat.lastOrNull()) {
         if (vm.chat.isNotEmpty()) listState.animateScrollToItem(vm.chat.size - 1)
     }
@@ -990,7 +992,6 @@ private fun ConversationScreen(vm: AppViewModel) {
 
     BackHandler(onBack = vm::goHome)
     vm.practice?.let { PracticeWindow(vm, it) }
-    vm.walk?.let { WordWalkWindow(vm, it) }
     vm.lookup?.let {
         WordBubble(it, appBusy = vm.busy != Busy.Idle, onLookUp = vm::lookUp, onHear = vm::hearWord, onClose = vm::closeLookup)
     }
@@ -1101,7 +1102,7 @@ private fun ConversationScreen(vm: AppViewModel) {
 
 /** The hold-to-talk button: apricot when ready, pressed in while listening, pale while the app is busy. */
 @Composable
-private fun MicButton(vm: AppViewModel) {
+private fun MicButton(vm: AppViewModel, onStart: () -> Unit = vm::startTalking) {
     val context = LocalContext.current
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     val listening = vm.busy == Busy.Listening
@@ -1133,7 +1134,7 @@ private fun MicButton(vm: AppViewModel) {
                         return@detectTapGestures
                     }
                     if (!enabled) return@detectTapGestures
-                    vm.startTalking()
+                    onStart()
                     tryAwaitRelease()
                     vm.stopTalking()
                 })
@@ -1454,58 +1455,116 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
 }
 
 /**
- * Beginner's word-by-word step: the phrase with the word to say picked out, that word's expected
- * sounds to hear, and a button to hold and say it. Each word said right moves on to the next;
- * after the last, the bubble closes and the whole phrase is said. Closing it early goes straight
- * to the whole phrase.
+ * Beginner's word-by-word step, a page of its own in the conversation's place: the word to say,
+ * how it's said (respelling, IPA) and what it means, the sounds the app expects and the sounds it
+ * heard in the last try, and the phrase below with the words done in green. There's no closing it:
+ * each word said right moves on to the next (Skip is offered after two failed tries), and after
+ * the last the conversation comes back for the whole phrase. Back leaves the conversation; the
+ * word reached is kept for continuing.
  */
 @Composable
-private fun WordWalkWindow(vm: AppViewModel, w: AppViewModel.WordWalk) {
+private fun WordWalkScreen(vm: AppViewModel, w: AppViewModel.WordWalk) {
+    BackHandler(onBack = vm::goHome)
     val idle = vm.busy == Busy.Idle
     val word = w.word
-    PopupCard(
-        "Word by word · ${w.position + 1} of ${w.words.size}",
-        vm::closeWalk,
-        closeStyle = PillStyle.Outline,
-        // A stray tap beside the bubble shouldn't end the step; Close and Back do.
-        closeOnTapOutside = false,
+    AppScreen(
         header = {
-            // The phrase: the words done in green, the one to say picked out.
-            TappableText(
-                w.phrase,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Pastel.PrimaryInk,
-                highlight = w.position,
-                right = (0 until w.position).toSet(),
-                onWord = { _, _, _ -> },
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(Pastel.PrimaryDark))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "Word by word" + (vm.language?.let { " · ${it.englishName}" } ?: ""),
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.weight(1f),
+                )
+                Text("${w.position + 1} of ${w.words.size}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Pastel.InkSoft)
+            }
+            Spacer(Modifier.height(10.dp))
+            ProgressBar(w.position.toFloat() / w.words.size)
+        },
+        dock = {
+            Text(
+                if (idle) "Hold the button and say “${word.word}”" else vm.busy.label,
+                fontSize = 12.sp,
+                color = Pastel.InkSoft,
+                modifier = Modifier.padding(top = 6.dp, bottom = 6.dp),
             )
+            MicButton(vm, onStart = vm::startWalkTalking)
         },
     ) {
-        w.note?.let { Text(it, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Pastel.InkSoft) }
-        Text(word.word, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = Pastel.PrimaryInk)
-        // The word's expected sounds, and what was heard in the last try; tapping either says it.
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SoundBox(
-                "Expected", word.shown.joinToString("").replace("▁", ""), Pastel.PrimaryContainer, Pastel.PrimaryDark,
-                Modifier.weight(1f).fillMaxHeight(), enabled = idle, onPlay = vm::hearWalkWord,
-            )
-            if (w.heard.isNotEmpty()) {
-                SoundBox(
-                    "Heard", w.heard, Pastel.VioletContainer, Pastel.VioletDark,
-                    Modifier.weight(1f).fillMaxHeight(), enabled = idle, onPlay = { vm.saySounds(w.heard) },
+        Column(
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            w.note?.let {
+                Text(
+                    it,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Pastel.InkSoft,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
                 )
             }
-        }
-        Text(
-            if (idle) "Hold the button and say the word" else vm.busy.label,
-            fontSize = 12.sp,
-            color = Pastel.InkSoft,
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        )
-        HoldToTalk("Say “${word.word}”", Pastel.Cta, Pastel.CtaInk, vm, Modifier.fillMaxWidth(), onStart = vm::startWalkTalking)
-        if (w.fails >= AppViewModel.SKIP_AFTER_FAILS) {
-            Box(Modifier.align(Alignment.CenterHorizontally)) { LinkButton("Skip this word", vm::skipWalkWord) }
+            // The word, and how it's said.
+            Text(
+                word.word,
+                fontSize = 44.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Pastel.PrimaryInk,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+            Column(
+                Modifier.align(Alignment.CenterHorizontally),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                w.info?.let { WordPronunciation(it, large = true) }
+            }
+            Box(Modifier.align(Alignment.CenterHorizontally)) {
+                HearButtons("Hear it:", onHear = { slow -> vm.hearWord(word.word, slow) })
+            }
+            // The sounds the app expects, and those it heard in the last try; tapping either says it.
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SoundBox(
+                    "Expected", word.shown.joinToString("").replace("▁", ""), Pastel.PrimaryContainer, Pastel.PrimaryDark,
+                    Modifier.weight(1f).fillMaxHeight(), enabled = idle, onPlay = vm::hearWalkWord,
+                )
+                if (w.heard.isNotEmpty()) {
+                    SoundBox(
+                        "Heard", w.heard, Pastel.VioletContainer, Pastel.VioletDark,
+                        Modifier.weight(1f).fillMaxHeight(), enabled = idle, onPlay = { vm.saySounds(w.heard) },
+                    )
+                }
+            }
+            if (w.fails >= AppViewModel.SKIP_AFTER_FAILS) {
+                Box(Modifier.align(Alignment.CenterHorizontally)) { LinkButton("Skip this word", vm::skipWalkWord) }
+            }
+            // What the word means.
+            w.info?.let { info ->
+                Column(
+                    Modifier.fillMaxWidth().card(Pastel.White, shape = RoundedCornerShape(18.dp)).padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    SmallLabel("Meaning", Pastel.InkSoft)
+                    WordMeaning(info, appBusy = !idle)
+                }
+            }
+            // The phrase, the words done in green and the one to say picked out.
+            Column(Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(18.dp)).padding(14.dp)) {
+                SmallLabel("The phrase", Pastel.InkSoft)
+                Spacer(Modifier.height(6.dp))
+                TappableText(
+                    w.phrase,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Pastel.Ink,
+                    highlight = w.position,
+                    right = (0 until w.position).toSet(),
+                    onWord = { _, _, _ -> },
+                )
+            }
         }
     }
 }
@@ -1742,15 +1801,10 @@ private fun PopupCard(
     headerSpacing: Dp = 6.dp,
     /** Called when the bubble is swiped sideways: true for a swipe to the left (onwards), false to the right (back). */
     onSwipe: ((onwards: Boolean) -> Unit)? = null,
-    /** Whether a tap outside the bubble closes it. */
-    closeOnTapOutside: Boolean = true,
     header: @Composable ColumnScope.() -> Unit = {},
     body: @Composable ColumnScope.() -> Unit,
 ) {
-    Dialog(
-        onDismissRequest = onClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = closeOnTapOutside),
-    ) {
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
             Modifier
                 .padding(16.dp)
@@ -1842,63 +1896,11 @@ private fun WordBubble(
                     ChevronButton(Chevron.Right, onClick = { show(position + 1) })
                 }
             }
-            lookup.soundsLike?.let {
-                Text(
-                    buildAnnotatedString {
-                        append("Sounds like: ")
-                        withStyle(SpanStyle(color = Pastel.Ink)) { append(it) }
-                    },
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Pastel.PrimaryDark,
-                    modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Pastel.White).padding(horizontal = 10.dp, vertical = 4.dp),
-                )
-            }
-            lookup.sounds?.let {
-                Text(
-                    if (lookup.soundsGenerated) "IPA (generated): /$it/" else "IPA: /$it/",
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = Pastel.VioletDark,
-                    modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Pastel.VioletContainer)
-                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                )
-            }
+            WordPronunciation(lookup)
         },
     ) {
-        when {
-            lookup.groups != null || lookup.meaning != null -> Column(
-                // Scrolls on its own, so a long entry never pushes the rest of the bubble away.
-                Modifier.fillMaxWidth().heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                val groups = lookup.groups
-                if (groups == null) {
-                    Text(lookup.meaning.orEmpty(), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Pastel.Ink)
-                } else {
-                    // Each part of speech: what it is in italics, then each meaning on its own line.
-                    groups.forEach { g ->
-                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            g.label?.let { Text(it, fontSize = 13.sp, fontStyle = FontStyle.Italic, color = Pastel.InkSoft) }
-                            g.meanings.forEach { Text(it, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Pastel.Ink) }
-                        }
-                    }
-                }
-            }
-            lookup.loading -> Text(
-                if (appBusy) "Will look this up once the app is free…" else "Looking up the meaning…",
-                fontSize = 14.sp,
-                color = Pastel.InkSoft,
-            )
-        }
-        lookup.error?.let { PeachNotice(it) }
-        if (lookup.fromDictionary) {
-            HorizontalDivider(color = Pastel.SurfaceLow)
-            Text(Dictionary.CREDIT, fontSize = 11.sp, color = Pastel.InkSoft)
-        } else if (lookup.meaning != null) {
-            HorizontalDivider(color = Pastel.SurfaceLow)
-            Text("Meaning generated by Gemma", fontSize = 11.sp, color = Pastel.InkSoft)
-        }
+        // Scrolls on its own, so a long entry never pushes the rest of the bubble away.
+        WordMeaning(lookup, appBusy, Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()))
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Pastel.Bg)
                 .padding(horizontal = 14.dp, vertical = 4.dp),
@@ -1917,6 +1919,73 @@ private fun WordBubble(
                 onWord = { _, _, i -> show(i) },
             )
         }
+    }
+}
+
+/** How a word is said: its English-style respelling ("Sounds like") and its IPA, labelled if generated. */
+@Composable
+private fun WordPronunciation(lookup: WordLookup, large: Boolean = false) {
+    val size = if (large) 15.sp else 12.sp
+    lookup.soundsLike?.let {
+        Text(
+            buildAnnotatedString {
+                append("Sounds like: ")
+                withStyle(SpanStyle(color = Pastel.Ink)) { append(it) }
+            },
+            fontSize = size,
+            fontWeight = FontWeight.Bold,
+            color = Pastel.PrimaryDark,
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Pastel.White).padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+    }
+    lookup.sounds?.let {
+        Text(
+            if (lookup.soundsGenerated) "IPA (generated): /$it/" else "IPA: /$it/",
+            fontSize = size,
+            fontFamily = FontFamily.Monospace,
+            color = Pastel.VioletDark,
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Pastel.VioletContainer)
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+        )
+    }
+}
+
+/**
+ * A word's meaning: the dictionary's, a group per part of speech (in italics, then each meaning on
+ * its own line), or Gemma's, labelled as generated; or a note while it's being looked up.
+ */
+@Composable
+private fun WordMeaning(lookup: WordLookup, appBusy: Boolean, modifier: Modifier = Modifier) {
+    when {
+        lookup.groups != null || lookup.meaning != null -> Column(
+            modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            val groups = lookup.groups
+            if (groups == null) {
+                Text(lookup.meaning.orEmpty(), fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Pastel.Ink)
+            } else {
+                groups.forEach { g ->
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        g.label?.let { Text(it, fontSize = 13.sp, fontStyle = FontStyle.Italic, color = Pastel.InkSoft) }
+                        g.meanings.forEach { Text(it, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = Pastel.Ink) }
+                    }
+                }
+            }
+        }
+        lookup.loading -> Text(
+            if (appBusy) "Will look this up once the app is free…" else "Looking up the meaning…",
+            fontSize = 14.sp,
+            color = Pastel.InkSoft,
+        )
+    }
+    lookup.error?.let { PeachNotice(it) }
+    if (lookup.fromDictionary) {
+        HorizontalDivider(color = Pastel.SurfaceLow)
+        Text(Dictionary.CREDIT, fontSize = 11.sp, color = Pastel.InkSoft)
+    } else if (lookup.meaning != null) {
+        HorizontalDivider(color = Pastel.SurfaceLow)
+        Text("Meaning generated by Gemma", fontSize = 11.sp, color = Pastel.InkSoft)
     }
 }
 

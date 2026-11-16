@@ -150,11 +150,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val fails: Int = 0,
         val heard: String = "",
         val note: String? = null,
+        /** The word's meaning, IPA and respelling, as the word bubble has them; null until found. */
+        val info: WordLookup? = null,
     ) {
         val word: RefWord get() = words[position]
     }
 
-    /** The word-by-word step under way, shown as a bubble; null when there is none. */
+    /**
+     * The word-by-word step under way, shown as a page of its own in place of the conversation;
+     * null when there is none. It can't be closed: only each word said right (or skipped after
+     * [SKIP_AFTER_FAILS] failed tries) moves it on. Leaving the conversation keeps the word
+     * reached, and continuing comes back to it.
+     */
     var walk by mutableStateOf<WordWalk?>(null)
         private set
 
@@ -438,6 +445,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             drillWords = d?.refWords?.takeIf { it.isCompleted }?.let { runCatching { it.getCompleted() }.getOrNull() }.orEmpty(),
             drillAttempts = drillAttempts,
             editableIndex = editableIndex,
+            walkPosition = walk?.position,
+            walkFails = walk?.fails ?: 0,
         )
         val dir = getApplication<Application>().filesDir
         viewModelScope.launch(Dispatchers.IO) {
@@ -525,6 +534,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                         Drill(phrase, audio, CompletableDeferred(words))
                                     }
                                     drillAttempts = start.saved.drillAttempts
+                                    // Back to the word reached in the word-by-word step, if one was under way.
+                                    val words = checkNotNull(drill).refWords.await()
+                                    start.saved.walkPosition?.takeIf { it in words.indices }?.let { at ->
+                                        walk = WordWalk(phrase, words, at, fails = start.saved.walkFails)
+                                        refreshWalkInfo()
+                                    }
                                 }
                                 gemmaReady.await()
                             }
@@ -702,7 +717,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun stopConversationWork() {
         practice = null
         practiceTarget = null
-        walk = null
+        // The word-by-word step stays, so leaving the conversation saves the word reached.
         walkTalking = false
         tutor?.cancelGeneration()
         tts?.stopPlayback()
@@ -1057,6 +1072,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Updates the open bubble once its word has been looked up. */
     private fun refreshOpenLookup() {
+        // The word-by-word step's word may have just been looked up too.
+        walk?.let { w -> if (w.info?.loading != false) refreshWalkInfo() }
         val open = lookup ?: return
         val key = open.word.lowercase() to open.sentence
         val found = lookupCache[key] ?: return
@@ -1216,6 +1233,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val words = expected.await()
             if (words.isNotEmpty()) {
                 walk = WordWalk(phrase, words, position = 0)
+                refreshWalkInfo()
                 sayWalkWord()
             }
         }
@@ -1256,7 +1274,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Moves the word-by-word step to its next word; after the last, it's the whole phrase's turn. */
     private suspend fun walkOn(w: WordWalk, note: String) {
         if (w.position + 1 < w.words.size) {
-            walk = w.copy(position = w.position + 1, fails = 0, heard = "", note = note)
+            walk = w.copy(position = w.position + 1, fails = 0, heard = "", note = note, info = null)
+            refreshWalkInfo()
             sayWalkWord()
         } else {
             walk = null
@@ -1280,9 +1299,35 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         walk?.let { hearWord(it.word.word, slow = false) }
     }
 
-    /** Ends the word-by-word step early; the whole phrase is still there to say. */
-    fun closeWalk() {
-        walk = null
+    /**
+     * Fills in the word-by-word step's word details (meaning, IPA and respelling) as the word bubble
+     * would show them: from the lookups already made, or else the dictionary and espeak-ng now,
+     * with Gemma's meaning to follow from the background lookups for a word the dictionary lacks.
+     */
+    private fun refreshWalkInfo() {
+        val w = walk ?: return
+        val lang = language ?: return
+        val word = w.word.word
+        val key = word.lowercase() to w.phrase
+        lookupCache[key]?.let { found ->
+            if (found.meaning == null && found.error == null && key !in triedAlone) {
+                // The sentence lookup missed it: ask about it on its own.
+                walk = w.copy(info = found.copy(loading = true))
+                pendingWord = word to w.phrase
+                startBackground()
+            } else {
+                walk = w.copy(info = found)
+            }
+            return
+        }
+        viewModelScope.launch {
+            val d = withContext(Dispatchers.IO) { fromDictionary(word) }
+            val sounds = if (d?.ipa != null) null else withContext(Dispatchers.Default) { wordIpa(lang, word) }
+            val info = if (d != null) dictionaryLookup(word, w.phrase, d, sounds) else WordLookup(word, w.phrase, sounds = sounds)
+            // Only if the step is still on this word.
+            walk?.takeIf { it.phrase == w.phrase && it.position == w.position && it.info == null }?.let { walk = it.copy(info = info) }
+            if (d == null) queueLookups(w.phrase, first = true)
+        }
     }
 
     /**
