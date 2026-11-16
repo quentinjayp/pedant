@@ -34,11 +34,10 @@ LANGS = {
     "es": {"ref": "es_ES-davefx-medium", "fleurs": "es_419", "swap": ["perro", "rojo", "nunca", "casa"]},
     "de": {"ref": "de_DE-thorsten-medium", "fleurs": "de_de", "swap": ["Hund", "rot", "niemals", "Haus"]},
     "en": {"ref": "en_US-lessac-medium", "fleurs": "en_us", "swap": ["dog", "red", "never", "house"]},
-    # Mandarin's words are its characters, and FLEURS has few sentences of 12 or fewer.
-    "zh": {"ref": "zh_CN-huayan-medium", "fleurs": "cmn_hans_cn", "swap": ["狗", "红", "不", "家"], "max_words": 20},
 }
-# Reported apart: Mandarin, written without spaces, is graded a character at a time.
-GROUPS = {"fr, es, de, en": ["fr", "es", "de", "en"], "zh": ["zh"]}
+# The languages reported together (Mandarin, graded a character at a time, was reported apart
+# before it was removed from the app).
+GROUPS = {"fr, es, de, en": ["fr", "es", "de", "en"]}
 # Sentences per language, and their length in words (the app's phrases are short).
 PER_LANGUAGE = 25
 MIN_WORDS, MAX_WORDS = 4, 12

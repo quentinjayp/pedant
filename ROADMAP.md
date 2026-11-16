@@ -22,6 +22,13 @@ Beginner and Intermediate are built. A third mode is planned.
 - **Sounds practice.** A learning section where you practise saying different IPA sounds and are
   graded on them.
 
+## Languages
+
+- **Tones and intonation.** Grade the pitch of each syllable against its expected tone (espeak-ng
+  gives the tones for Mandarin and Vietnamese), and the rise and fall of a sentence, such as a
+  question's. Then bring back Mandarin and Vietnamese, removed because the app couldn't tell when a
+  tone was wrong.
+
 ## Conversations
 
 - **Voice selector.** Choose the language's voice in the conversation settings (the gear).

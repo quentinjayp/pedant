@@ -1,5 +1,5 @@
 {
-  "_about": "The languages the app can hold a conversation in: those supported by Gemma 4, Omnilingual ASR, ZIPA and Piper together. Read by the app (Languages.kt) and by the tools (tools/app_languages.py). piperVoice is the voice that speaks the language; espeakVoice is the espeak-ng voice it reads text with (its .onnx.json's espeak.voice); ttsRewrites fix text espeak-ng misreads, applied before it reads any. Arabic was removed: it's written without most vowels, so its expected sounds (espeak-ng's) are often guesses, and the app teaches and judges by sounds.",
+  "_about": "The languages the app can hold a conversation in: those supported by Gemma 4, Omnilingual ASR, ZIPA and Piper together. Read by the app (Languages.kt) and by the tools (tools/app_languages.py). piperVoice is the voice that speaks the language; espeakVoice is the espeak-ng voice it reads text with (its .onnx.json's espeak.voice); ttsRewrites fix text espeak-ng misreads, applied before it reads any. Arabic was removed: it's written without most vowels, so its expected sounds (espeak-ng's) are often guesses, and the app teaches and judges by sounds. Mandarin and Vietnamese were removed: their tones are part of saying a word right, and the app doesn't hear pitch, so it can't tell when a tone is wrong.",
   "languages": [
     {"code": "cs", "englishName": "Czech", "nativeName": "Čeština", "piperVoice": "cs_CZ-jirka-medium", "espeakVoice": "cs"},
     {"code": "da", "englishName": "Danish", "nativeName": "Dansk", "piperVoice": "da_DK-talesyntese-medium", "espeakVoice": "da"},
@@ -25,8 +25,6 @@
     {"code": "sv", "englishName": "Swedish", "nativeName": "Svenska", "piperVoice": "sv_SE-nst-medium", "espeakVoice": "sv"},
     {"code": "sw", "englishName": "Swahili", "nativeName": "Kiswahili", "piperVoice": "sw_CD-lanfrica-medium", "espeakVoice": "sw"},
     {"code": "tr", "englishName": "Turkish", "nativeName": "Türkçe", "piperVoice": "tr_TR-dfki-medium", "espeakVoice": "tr"},
-    {"code": "uk", "englishName": "Ukrainian", "nativeName": "Українська", "piperVoice": "uk_UA-tetiana-high", "espeakVoice": "uk"},
-    {"code": "vi", "englishName": "Vietnamese", "nativeName": "Tiếng Việt", "piperVoice": "vi_VN-vais1000-medium", "espeakVoice": "vi"},
-    {"code": "zh", "englishName": "Mandarin", "nativeName": "中文", "piperVoice": "zh_CN-huayan-medium", "espeakVoice": "cmn"}
+    {"code": "uk", "englishName": "Ukrainian", "nativeName": "Українська", "piperVoice": "uk_UA-tetiana-high", "espeakVoice": "uk"}
   ]
 }

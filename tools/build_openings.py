@@ -62,8 +62,6 @@ def jobs(ins):
     return out
 
 
-# Mandarin is looked up a character at a time, which its dictionary doesn't cover well enough to judge.
-UNCHECKED = {"zh"}
 TRIES = 5
 
 
@@ -92,8 +90,6 @@ class Words:
 
     def unknown(self, code, text):
         """The words of [text] that aren't in [code]'s dictionary."""
-        if code in UNCHECKED:
-            return []
         words = [w.strip("-") for w in re.findall(r"[\w'’-]+", text)]
         return [w for w in words if w and not w.isdigit() and not self.known(code, w)]
 
