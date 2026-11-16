@@ -1455,9 +1455,9 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
 }
 
 /**
- * Beginner's word-by-word step, a page of its own in the conversation's place: the word to say,
- * how it's said (respelling, IPA) and what it means, the sounds the app expects and the sounds it
- * heard in the last try, and the phrase below with the words done in green. There's no closing it:
+ * Beginner's word-by-word step, a page of its own in the conversation's place: the phrase at the
+ * top with the words done in green, then the word to say, how it's said (respelling, IPA) and what
+ * it means, and the sounds the app expects and the sounds it heard in the last try. There's no closing it:
  * each word said right moves on to the next (Skip is offered after two failed tries), and after
  * the last the conversation comes back for the whole phrase. Back leaves the conversation; the
  * word reached is kept for continuing.
@@ -1497,6 +1497,20 @@ private fun WordWalkScreen(vm: AppViewModel, w: AppViewModel.WordWalk) {
             Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            // At the top, the phrase: the words done in green and the one to say picked out.
+            Column(Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(18.dp)).padding(14.dp)) {
+                SmallLabel("The phrase", Pastel.InkSoft)
+                Spacer(Modifier.height(6.dp))
+                TappableText(
+                    w.phrase,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Pastel.Ink,
+                    highlight = w.position,
+                    right = (0 until w.position).toSet(),
+                    onWord = { _, _, _ -> },
+                )
+            }
             w.note?.let {
                 Text(
                     it,
@@ -1550,20 +1564,6 @@ private fun WordWalkScreen(vm: AppViewModel, w: AppViewModel.WordWalk) {
                     SmallLabel("Meaning", Pastel.InkSoft)
                     WordMeaning(info, appBusy = !idle)
                 }
-            }
-            // The phrase, the words done in green and the one to say picked out.
-            Column(Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(18.dp)).padding(14.dp)) {
-                SmallLabel("The phrase", Pastel.InkSoft)
-                Spacer(Modifier.height(6.dp))
-                TappableText(
-                    w.phrase,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Pastel.Ink,
-                    highlight = w.position,
-                    right = (0 until w.position).toSet(),
-                    onWord = { _, _, _ -> },
-                )
             }
         }
     }
