@@ -252,7 +252,7 @@ object QuizMaker {
     private fun alternatives(text: String, word: String): List<String> =
         text.lines().first().split('|').map(::cleanWord)
             .filter { it.isNotEmpty() && wordsOf(it) == listOf(it) && !same(it, word) }
-            .distinctBy(Dictionary::key)
+            .distinctBy { Dictionary.key(it) }
 
     private fun cleanWord(s: String) = s.trim().trim('"', '“', '”', '«', '»', '\'', '*', '.', ',', '`').trim()
 

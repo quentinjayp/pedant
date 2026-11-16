@@ -2083,7 +2083,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The words of [phrase] worth asking about: those of three letters or more, or else all of them. */
     private fun quizWords(phrase: String): List<String> {
-        val words = wordsOf(phrase).distinctBy(Dictionary::key)
+        val words = wordsOf(phrase).distinctBy { Dictionary.key(it) }
         return words.filter { w -> w.count { it.isLetter() } >= 3 }.ifEmpty { words }
     }
 
