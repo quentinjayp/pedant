@@ -15,10 +15,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import java.io.File
 
-/** One tutor answer, split into its labelled parts: the reply, its English, or a phrase to say. */
+/** One tutor answer, split into its labelled parts: the reply, its translation into the learner's own language, or a phrase to say. */
 data class TutorTurn(
     val reply: String = "",
-    val english: String? = null,
+    val translation: String? = null,
     val say: String? = null,
 )
 
@@ -42,6 +42,9 @@ class Tutor(context: Context, modelFile: File) {
 
     private val turns = mutableListOf<Turn>()
 
+    /** The learner's own language in the conversation under way: what translations and explanations are in. */
+    private var own: Language = LANGUAGES.first { it.code == DEFAULT_OWN }
+
     /**
      * What has been said in the main conversation, in the language being learned only (no English
      * translations), so it can be picked up again later.
@@ -52,7 +55,8 @@ class Tutor(context: Context, modelFile: File) {
      * Starts a new conversation. [earlier] (a saved opening, or a conversation being continued) is
      * given to Gemma as already said: as much of the most recent part as fits.
      */
-    fun startConversation(language: Language, scenario: Scenario, earlier: List<Turn> = emptyList()) {
+    fun startConversation(language: Language, scenario: Scenario, own: Language, earlier: List<Turn> = emptyList()) {
+        this.own = own
         conversation?.close()
         conversation = null
         val kept = fitting(earlier.map { if (it.fromLearner) it else Turn(false, compact(it.text)) })
@@ -61,14 +65,14 @@ class Tutor(context: Context, modelFile: File) {
             turns += kept
         }
         // The instructions don't depend on formal or casual (each message carries it), so neither does this.
-        val key = "${language.code}|${scenario.name}|${kept.hashCode()}"
+        val key = "${language.code}|${own.code}|${scenario.name}|${kept.hashCode()}"
         val base = ready?.takeIf { it.first == key }?.second ?: run {
             ready?.second?.close()
             ready = null
             // Gemma reads the instructions (and what was said before) now, not on the first message.
             engine.createConversation(
                 ConversationConfig(
-                    systemInstruction = Contents.of(systemPrompt(language, scenario)),
+                    systemInstruction = Contents.of(Instructions.system(language, scenario, own)),
                     initialMessages = kept.map { if (it.fromLearner) Message.user(it.text) else Message.model(it.text) },
                     samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.7),
                     prefillPrefaceOnInit = true,
@@ -118,15 +122,16 @@ class Tutor(context: Context, modelFile: File) {
      * Translates what the learner wants to say, in its own short conversation so the main one only
      * ever holds the language being learned. [onText] gets the answer as it is written.
      */
-    suspend fun translate(language: Language, register: Register, english: String, onText: (String) -> Unit): String =
-        ask(Instructions.translate(language, register), english, onText)
+    suspend fun translate(language: Language, register: Register, said: String, onText: (String) -> Unit): String =
+        ask(Instructions.translate(language, register, own), said, onText)
 
     /**
-     * Translates Gemma's [reply] into English, in its own short conversation: the English is written
-     * fresh each time and never kept in the main conversation. See [parse] for the answer's parts.
+     * Translates Gemma's [reply] into the learner's own language, in its own short conversation: the
+     * translation is written fresh each time and never kept in the main conversation. See
+     * [parseTranslation].
      */
     suspend fun translateReply(language: Language, reply: String, onText: (String) -> Unit): String =
-        ask(Instructions.replyTranslate(language), reply, onText)
+        ask(Instructions.replyTranslate(language, own), reply, onText)
 
 
     /** The one-off conversation in progress (a lookup or translation), so it can be stopped. */
@@ -134,15 +139,15 @@ class Tutor(context: Context, modelFile: File) {
 
     /** Looks up one [word] as used in [sentence]. Returns the raw answer; see [parseLookup]. */
     suspend fun lookUp(language: Language, word: String, sentence: String): String =
-        ask(Instructions.lookup(language), "Word: $word\nSentence: $sentence")
+        ask(Instructions.lookup(language, own), "Word: $word\nSentence: $sentence")
 
     /** Looks for a common expression in [phrase]. Returns the raw answer; see [parseExpression]. */
     suspend fun expression(language: Language, phrase: String): String =
-        ask(Instructions.expression(language), phrase)
+        ask(Instructions.expression(language, own), phrase)
 
     /** Explains every word of [sentence] at once. Returns the raw answer; see [parseSentenceLookup]. */
     suspend fun lookUpSentence(language: Language, sentence: String): String =
-        ask(Instructions.sentenceLookup(language), sentence)
+        ask(Instructions.sentenceLookup(language, own), sentence)
 
     /**
      * Asks a one-off question in its own short conversation, so the main one is left untouched.
@@ -195,14 +200,13 @@ class Tutor(context: Context, modelFile: File) {
          */
         private const val HISTORY_CHARS = 2500
 
-        private fun systemPrompt(language: Language, scenario: Scenario) = Instructions.system(language, scenario)
-
         /**
-         * Names the opening for these choices; it changes whenever the instructions change.
+         * Names the opening for these choices; it changes whenever the instructions change, and
+         * differs for each own language (the openings that ship with the app are for English).
          * tools/build_openings.py names the openings that ship with the app the same way.
          */
-        fun openingKey(language: Language, scenario: Scenario, register: Register): String {
-            val hash = (systemPrompt(language, scenario) + Instructions.start(register)).hashCode()
+        fun openingKey(language: Language, scenario: Scenario, register: Register, own: Language): String {
+            val hash = (Instructions.system(language, scenario, own) + Instructions.start(register)).hashCode()
             return "${language.code}-${scenario.name}-${register.name}-${Integer.toHexString(hash)}"
         }
 
@@ -231,7 +235,7 @@ class Tutor(context: Context, modelFile: File) {
         fun parseLookup(raw: String): String? =
             raw.substringAfter("MEANING:", "").trim().lines().firstOrNull()?.trim()?.ifEmpty { null }
 
-        private val LABELS = listOf("REPLY:", "ENGLISH:", "SAY:")
+        private val LABELS = listOf("REPLY:", "TRANSLATION:", "SAY:")
 
         /** A short label at the start of an answer, however it's written ("САЙ:", "Spre:"). */
         private val LOOSE_LABEL = Regex("^[\\p{L}\\p{N}_]{1,10}\\s*:\\s*")
@@ -243,6 +247,14 @@ class Tutor(context: Context, modelFile: File) {
          * being written would show the label's first letters as the phrase.
          */
         fun parseSay(raw: String): String = parse(raw).say ?: raw.trim().replace(LOOSE_LABEL, "").trim()
+
+        /**
+         * The translation in a finished answer to [translateReply]: the text after TRANSLATION:, or,
+         * when the label is left out or written another way, the answer without a short label at
+         * its start (E2B leaves it out often when the learner's own language isn't English).
+         */
+        fun parseTranslation(raw: String): String? =
+            parse(raw).translation ?: raw.trim().replace(LOOSE_LABEL, "").trim().ifEmpty { null }
 
         /** Splits the raw answer into its labelled parts. Works on partial (streaming) text too. */
         fun parse(raw: String): TutorTurn {
@@ -257,7 +269,7 @@ class Tutor(context: Context, modelFile: File) {
             }
             return TutorTurn(
                 reply = part("REPLY:") ?: "",
-                english = part("ENGLISH:")?.ifEmpty { null },
+                translation = part("TRANSLATION:")?.ifEmpty { null },
                 say = part("SAY:")?.ifEmpty { null },
             )
         }

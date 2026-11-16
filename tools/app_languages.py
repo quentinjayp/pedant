@@ -24,6 +24,17 @@ def languages():
                 for l in json.load(f)["languages"]]
 
 
+def with_article(name):
+    """A language's English name after "a" or "an", as Gemma's instructions put it (Language.withArticle)."""
+    return ("an " if name[0] in "AEIO" else "a ") + name
+
+
+def instruction(text, language, own="English"):
+    """One of Gemma's instructions (assets/instructions.json) for learning [language] with [own] as
+    the learner's own language (English names), as the app's Instructions fills it in."""
+    return text.replace("{language}", language).replace("{anOwn}", with_article(own)).replace("{own}", own)
+
+
 def dictionary_key(word):
     """A word's lookup key in the dictionaries, as the app's Dictionary.key makes it."""
     return unicodedata.normalize("NFC", word).lower().replace("’", "'")

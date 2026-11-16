@@ -9,7 +9,7 @@ Two kinds of run:
 - Other own languages (--own), for when the learner's own language can be another: the learner's
   line translated from it into each other language, and the tutor's reply translated from each
   other language back into it (the Evals (other own languages) workflow). The app's instructions
-  are used with "English" put in the own language's place, as the app would.
+  are filled in with the own language, as the app does.
 
     python3 tools/evals.py references <fleurs dir>            # writes evals/references.json
     python3 tools/evals.py translate --model m.litertlm --name NAME [--own fr] --out outputs/NAME.json
@@ -36,8 +36,8 @@ import json
 import os
 import time
 
-from app_languages import languages
-from evals_promptfoo import answer, labelled, parts, score
+from app_languages import instruction as fill, languages
+from evals_promptfoo import answer, labelled, parts, replied_labelled, score
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 INSTRUCTIONS = f"{ROOT}/app/src/main/assets/instructions.json"
@@ -96,16 +96,12 @@ def jobs(own):
 
 
 def instruction(ins, kind, source, target):
-    """What the app tells Gemma for a translation from [source] into [target] (codes): its own
-    instruction, with the learner's own language in English's place when it isn't English."""
+    """What the app tells Gemma for a translation from [source] into [target] (codes)."""
     n = names()
     own = source if kind == "line" else target
     learned = target if kind == "line" else source
     text = ins["translate"] if kind == "line" else ins["replyTranslate"]
-    if own != "en":
-        article = "an" if n[own][0] in "AEIOU" else "a"
-        text = text.replace("an English speaker", f"{article} {n[own]} speaker").replace("English", n[own])
-    return text.replace("{language}", n[learned]).replace("{register}", "formal")
+    return fill(text, n[learned], n[own]).replace("{register}", "formal")
 
 
 def references(fleurs):
@@ -247,7 +243,7 @@ def scored(outputs):
             reference = text_in(s, target) if s else None
             if reference is None:
                 continue
-            had_label = bool(labelled(out["raw"])) if kind == "line" else bool(answer(kind, out["raw"]))
+            had_label = bool(labelled(out["raw"]) if kind == "line" else replied_labelled(out["raw"]))
             rows.append((model, kind, source, target, score(answer(kind, out["raw"]), reference, target), out["seconds"], had_label))
     return rows
 
@@ -300,7 +296,7 @@ def summary(outputs_dir):
     print("| **All** | " + " | ".join(f"**{mean([r[4] for r in others if r[0] == m and r[1] == k])}**" for m in models for k in ("line", "reply")) + " |")
     print("| Seconds per translation (on the CI machine) | "
           + " | ".join(mean([r[5] for r in others if r[0] == m and r[1] == k]) for m in models for k in ("line", "reply")) + " |")
-    print("| Answers the app couldn't read (no SAY: or ENGLISH: label) | "
+    print("| Answers without their label (SAY: or TRANSLATION:), which the app takes whole | "
           + " | ".join(str(sum(1 for r in others if r[0] == m and r[1] == k and not r[6])) for m in models for k in ("line", "reply")) + " |")
     print()
     for m in models:

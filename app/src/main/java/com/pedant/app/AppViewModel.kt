@@ -129,6 +129,25 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val uiPrefs = app.getSharedPreferences("ui", Context.MODE_PRIVATE)
 
+    /**
+     * The learner's own language, chosen in Settings (English unless chosen otherwise): what they
+     * say before it's translated, and what translations, meanings from Gemma and notes are in.
+     * A new conversation takes it; one under way keeps the own language it started with ([own]).
+     */
+    var ownSetting by mutableStateOf(
+        LANGUAGES.firstOrNull { it.code == uiPrefs.getString("ownLanguage", DEFAULT_OWN) } ?: LANGUAGES.first { it.code == DEFAULT_OWN },
+    )
+        private set
+
+    fun chooseOwnLanguage(lang: Language) {
+        ownSetting = lang
+        uiPrefs.edit().putString("ownLanguage", lang.code).apply()
+    }
+
+    /** The learner's own language in the conversation on screen. */
+    var own by mutableStateOf(ownSetting)
+        private set
+
     /** Beginner or Intermediate: how much help there is with each phrase. Remembered. */
     var mode by mutableStateOf(Mode.entries.firstOrNull { it.name == uiPrefs.getString("mode", null) } ?: Mode.Intermediate)
         private set
@@ -239,7 +258,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val hint: String
         get() = when {
             busy != Busy.Idle -> busy.label
-            drillPhrase == null -> "Hold the button and say in English what you want to say, or type it"
+            drillPhrase == null -> "Hold the button and say in ${own.englishName} what you want to say, or type it"
             else -> "Hold the button and say the phrase"
         }
 
@@ -447,6 +466,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             editableIndex = editableIndex,
             walkPosition = walk?.position,
             walkFails = walk?.fails ?: 0,
+            ownCode = own.code,
         )
         val dir = getApplication<Application>().filesDir
         viewModelScope.launch(Dispatchers.IO) {
@@ -493,10 +513,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             stopConversationWork()
             conversationScope.launch {
                 val voice = voiceFor(lang) ?: return@launch
+                // A continued conversation keeps the own language it started with; a new one takes the setting.
+                own = resume?.let { r -> LANGUAGES.firstOrNull { it.code == r.ownCode } } ?: ownSetting
                 val start = when {
                     resume != null -> Start.Continue(resume)
                     else -> {
-                        val key = Tutor.openingKey(lang, scenario, register)
+                        val key = Tutor.openingKey(lang, scenario, register, own)
                         withContext(Dispatchers.IO) { openings.get(key) }?.let { Start.Opened(key, it) } ?: Start.Fresh(key)
                     }
                 }
@@ -516,7 +538,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                 )
                                 is Start.Fresh -> emptyList()
                             }
-                            checkNotNull(tutor).startConversation(lang, scenario, earlier)
+                            checkNotNull(tutor).startConversation(lang, scenario, own, earlier)
                             diagnostics.log("Gemma ready for the ${lang.englishName} session")
                         }
                         loadVoice(lang, voice)
@@ -1538,14 +1560,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     try {
                         if (reply.isNotBlank()) {
                             val raw = checkNotNull(tutor).translateReply(lang, reply) { partial ->
-                                update { it.copy(english = Tutor.parse(partial).english) }
+                                update { it.copy(english = Tutor.parse(partial).translation) }
                             }
-                            english = Tutor.parse(raw).english
+                            english = Tutor.parseTranslation(raw)
                         }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {
-                        diagnostics.log("Couldn't add the English: ${e.message}")
+                        diagnostics.log("Couldn't add the translation: ${e.message}")
                     }
                 }
                 speaking.join()

@@ -588,10 +588,69 @@ private fun SettingsScreen(vm: AppViewModel) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ModelLoadingNotice(vm)
+            OwnLanguageSetting(vm)
+            Spacer(Modifier.height(8.dp))
             SmallLabel("Tutor model", Pastel.InkSoft)
             Text("The Gemma model that talks with you, translates and explains.", fontSize = 13.sp, color = Pastel.InkSoft)
             Gemma.entries.forEach { GemmaRow(vm, it) }
             vm.settingsError?.let { PeachNotice(it) }
+        }
+    }
+}
+
+/**
+ * The learner's own language: a row showing it, which opens the list of the app's languages to
+ * choose from. It applies to new conversations.
+ */
+@Composable
+private fun OwnLanguageSetting(vm: AppViewModel) {
+    var choosing by remember { mutableStateOf(false) }
+    SmallLabel("Your language", Pastel.InkSoft)
+    Text(
+        "The language you speak: you say what you want in it, and translations, explanations and notes are in it. " +
+            "Word meanings from the dictionaries stay in English. A change applies to new conversations.",
+        fontSize = 13.sp,
+        color = Pastel.InkSoft,
+    )
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .card(Pastel.White, shape = RoundedCornerShape(20.dp))
+            .clickable { choosing = true }
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(vm.ownSetting.englishName, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(vm.ownSetting.nativeName, fontSize = 14.sp, color = Pastel.InkSoft)
+        Spacer(Modifier.width(8.dp))
+        Text("›", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Pastel.InkSoft)
+    }
+    if (choosing) {
+        PopupCard("Your language", onClose = { choosing = false }, closeStyle = PillStyle.Outline) {
+            LANGUAGES.forEach { lang ->
+                val chosen = lang == vm.ownSetting
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (chosen) Pastel.VioletContainer else Color.Transparent)
+                        .clickable {
+                            vm.chooseOwnLanguage(lang)
+                            choosing = false
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        lang.englishName,
+                        fontSize = 15.sp,
+                        fontWeight = if (chosen) FontWeight.Bold else FontWeight.SemiBold,
+                        color = if (chosen) Pastel.VioletInk else Pastel.Ink,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(lang.nativeName, fontSize = 13.sp, color = Pastel.InkSoft)
+                }
+            }
         }
     }
 }
@@ -937,7 +996,7 @@ private fun LanguageScreen(vm: AppViewModel) {
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                items(LANGUAGES) { lang ->
+                items(LANGUAGES.filter { it.code != vm.ownSetting.code }) { lang ->
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -994,7 +1053,7 @@ private fun ConversationScreen(vm: AppViewModel) {
     BackHandler(onBack = vm::goHome)
     vm.practice?.let { PracticeWindow(vm, it) }
     vm.lookup?.let {
-        WordBubble(it, appBusy = vm.busy != Busy.Idle, onLookUp = vm::lookUp, onHear = vm::hearWord, onClose = vm::closeLookup)
+        WordBubble(it, appBusy = vm.busy != Busy.Idle, own = vm.own, onLookUp = vm::lookUp, onHear = vm::hearWord, onClose = vm::closeLookup)
     }
     var settingsOpen by remember { mutableStateOf(false) }
     if (settingsOpen) ConversationSettings(vm) { settingsOpen = false }
@@ -1002,6 +1061,7 @@ private fun ConversationScreen(vm: AppViewModel) {
     editing?.let { (index, original) ->
         EditLineDialog(
             original,
+            vm.own,
             onSave = { vm.editEnglish(index, it); editing = null },
             onCancel = { editing = null },
         )
@@ -1076,7 +1136,7 @@ private fun ConversationScreen(vm: AppViewModel) {
                         Bubble(
                             item.text,
                             mine = true,
-                            label = "You said in English",
+                            label = "You said in ${vm.own.englishName}",
                             menu = if (!editable) null else listOf(
                                 "Edit" to { editing = index to item.text },
                                 "Delete" to { vm.deleteEnglish(index) },
@@ -1475,9 +1535,9 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
                 Modifier.fillMaxWidth().card(Pastel.White, shape = RoundedCornerShape(16.dp)).padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                WordPronunciation(info)
+                WordPronunciation(info, respell = vm.own.code == DEFAULT_OWN)
                 // Scrolls on its own, so a long entry never pushes the rest of the window away.
-                WordMeaning(info, appBusy = !idle, Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState()))
+                WordMeaning(info, appBusy = !idle, vm.own, Modifier.heightIn(max = 200.dp).verticalScroll(rememberScrollState()))
             }
         }
         // The phrase: tap a word to pick it.
@@ -1591,7 +1651,7 @@ private fun WordWalkScreen(vm: AppViewModel, w: AppViewModel.WordWalk) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                w.info?.let { WordPronunciation(it, large = true) }
+                w.info?.let { WordPronunciation(it, respell = vm.own.code == DEFAULT_OWN, large = true) }
             }
             Box(Modifier.align(Alignment.CenterHorizontally)) {
                 HearButtons("Hear it:", onHear = { slow -> vm.hearWord(word.word, slow) })
@@ -1619,7 +1679,7 @@ private fun WordWalkScreen(vm: AppViewModel, w: AppViewModel.WordWalk) {
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     SmallLabel("Meaning", Pastel.InkSoft)
-                    WordMeaning(info, appBusy = !idle)
+                    WordMeaning(info, appBusy = !idle, vm.own)
                 }
             }
         }
@@ -1918,6 +1978,8 @@ private fun Modifier.sidewaysSwipe(onSwipe: ((onwards: Boolean) -> Unit)?): Modi
 private fun WordBubble(
     lookup: WordLookup,
     appBusy: Boolean,
+    /** The learner's own language: English gets the "Sounds like" respelling. */
+    own: Language,
     onLookUp: (word: String, sentence: String) -> Unit,
     onHear: (String, Boolean) -> Unit,
     onClose: () -> Unit,
@@ -1953,11 +2015,11 @@ private fun WordBubble(
                     ChevronButton(Chevron.Right, onClick = { show(position + 1) })
                 }
             }
-            WordPronunciation(lookup)
+            WordPronunciation(lookup, respell = own.code == DEFAULT_OWN)
         },
     ) {
         // Scrolls on its own, so a long entry never pushes the rest of the bubble away.
-        WordMeaning(lookup, appBusy, Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()))
+        WordMeaning(lookup, appBusy, own, Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()))
         Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Pastel.Bg)
                 .padding(horizontal = 14.dp, vertical = 4.dp),
@@ -1979,11 +2041,14 @@ private fun WordBubble(
     }
 }
 
-/** How a word is said: its English-style respelling ("Sounds like") and its IPA, labelled if generated. */
+/**
+ * How a word is said: its English-style respelling ("Sounds like"), only when the learner's own
+ * language is English ([respell]), and its IPA, labelled if generated.
+ */
 @Composable
-private fun WordPronunciation(lookup: WordLookup, large: Boolean = false) {
+private fun WordPronunciation(lookup: WordLookup, respell: Boolean, large: Boolean = false) {
     val size = if (large) 15.sp else 12.sp
-    lookup.soundsLike?.let {
+    lookup.soundsLike?.takeIf { respell }?.let {
         Text(
             buildAnnotatedString {
                 append("Sounds like: ")
@@ -2012,7 +2077,7 @@ private fun WordPronunciation(lookup: WordLookup, large: Boolean = false) {
  * its own line), or Gemma's, labelled as generated; or a note while it's being looked up.
  */
 @Composable
-private fun WordMeaning(lookup: WordLookup, appBusy: Boolean, modifier: Modifier = Modifier) {
+private fun WordMeaning(lookup: WordLookup, appBusy: Boolean, own: Language, modifier: Modifier = Modifier) {
     when {
         lookup.groups != null || lookup.meaning != null -> Column(
             modifier.fillMaxWidth(),
@@ -2039,7 +2104,12 @@ private fun WordMeaning(lookup: WordLookup, appBusy: Boolean, modifier: Modifier
     lookup.error?.let { PeachNotice(it) }
     if (lookup.fromDictionary) {
         HorizontalDivider(color = Pastel.SurfaceLow)
-        Text(Dictionary.CREDIT, fontSize = 11.sp, color = Pastel.InkSoft)
+        // The dictionaries are English Wiktionary's, so their meanings are in English.
+        Text(
+            if (own.code == "en") Dictionary.CREDIT else "${Dictionary.CREDIT} · in English",
+            fontSize = 11.sp,
+            color = Pastel.InkSoft,
+        )
     } else if (lookup.meaning != null) {
         HorizontalDivider(color = Pastel.SurfaceLow)
         Text("Meaning generated by Gemma", fontSize = 11.sp, color = Pastel.InkSoft)
@@ -2048,7 +2118,7 @@ private fun WordMeaning(lookup: WordLookup, appBusy: Boolean, modifier: Modifier
 
 /** Edits the English line being practised; saving translates it again. */
 @Composable
-private fun EditLineDialog(original: String, onSave: (String) -> Unit, onCancel: () -> Unit) {
+private fun EditLineDialog(original: String, own: Language, onSave: (String) -> Unit, onCancel: () -> Unit) {
     var text by remember { mutableStateOf(original) }
     AlertDialog(
         onDismissRequest = onCancel,
@@ -2056,7 +2126,7 @@ private fun EditLineDialog(original: String, onSave: (String) -> Unit, onCancel:
         titleContentColor = Pastel.Ink,
         shape = RoundedCornerShape(28.dp),
         title = { Text("Edit what you said", fontWeight = FontWeight.ExtraBold) },
-        text = { EnglishField(text, { text = it }, Modifier.fillMaxWidth(), singleLine = false) },
+        text = { OwnLanguageField(text, { text = it }, own, Modifier.fillMaxWidth(), singleLine = false) },
         confirmButton = {
             PillButton("Translate again", { onSave(text) }, enabled = text.isNotBlank() && text.trim() != original)
         },
@@ -2065,16 +2135,17 @@ private fun EditLineDialog(original: String, onSave: (String) -> Unit, onCancel:
 }
 
 @Composable
-private fun EnglishField(
+private fun OwnLanguageField(
     value: String,
     onValueChange: (String) -> Unit,
+    own: Language,
     modifier: Modifier = Modifier,
     singleLine: Boolean = true,
 ) {
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = { Text("Type in English", color = Pastel.InkSoft) },
+        placeholder = { Text("Type in ${own.englishName}", color = Pastel.InkSoft) },
         singleLine = singleLine,
         shape = RoundedCornerShape(16.dp),
         colors = OutlinedTextFieldDefaults.colors(
@@ -2099,7 +2170,7 @@ private fun LearningControls(vm: AppViewModel) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            EnglishField(text, { text = it }, Modifier.weight(1f))
+            OwnLanguageField(text, { text = it }, vm.own, Modifier.weight(1f))
             PillButton("Send", { vm.submitEnglish(text); text = "" }, enabled = text.isNotBlank())
         }
     } else {

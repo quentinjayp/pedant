@@ -26,7 +26,7 @@ def score(output, reference, code):
 
 def labelled(raw):
     """The text after SAY: in a model's answer, up to the next label; empty if it has no SAY: label."""
-    m = re.search(r"SAY:(.*?)(?=\n?(?:REPLY|ENGLISH|SAY):|\Z)", raw, re.S)
+    m = re.search(r"SAY:(.*?)(?=\n?(?:REPLY|TRANSLATION|ENGLISH|SAY):|\Z)", raw, re.S)
     return m.group(1).strip() if m else ""
 
 
@@ -38,13 +38,20 @@ def said(raw):
     return labelled(raw) or re.sub(r"^\w{1,10}\s*:\s*", "", raw).strip()
 
 
-def replied(raw):
-    """The translation in an answer about the tutor's reply, as the app reads it (Tutor.parse): the
-    text after ENGLISH:, up to the next label; empty if it has no ENGLISH: label. The label is
-    ENGLISH: whatever the learner's own language is, as the app's instruction says."""
-    raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.S)
-    m = re.search(r"ENGLISH:(.*?)(?=\n?(?:REPLY|ENGLISH|SAY):|\Z)", raw, re.S)
+def replied_labelled(raw):
+    """The text after the translation's label in an answer about the tutor's reply, up to the next
+    label; empty if it has none. The label is TRANSLATION: (ENGLISH: in runs from before it was
+    renamed)."""
+    m = re.search(r"(?:TRANSLATION|ENGLISH):(.*?)(?=\n?(?:REPLY|TRANSLATION|ENGLISH|SAY):|\Z)", raw, re.S)
     return m.group(1).strip() if m else ""
+
+
+def replied(raw):
+    """The translation in an answer about the tutor's reply, as the app reads it
+    (Tutor.parseTranslation): the text after the label, or, when the label is left out or written
+    another way, the answer without a short label at its start."""
+    raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.S).strip()
+    return replied_labelled(raw) or re.sub(r"^\w{1,10}\s*:\s*", "", raw).strip()
 
 
 def answer(kind, raw):

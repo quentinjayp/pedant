@@ -29,11 +29,6 @@ Beginner and Intermediate are built. A third mode is planned.
   built-in ones. Their openings are written on the phone the first time and saved, since only the
   built-in scenarios' openings ship with the app.
 
-## Settings
-
-- **Your own language.** Choose the language you speak (English today) for translations, meanings
-  and explanations.
-
 ## Platforms
 
 - **Investigate iOS feasibility.**

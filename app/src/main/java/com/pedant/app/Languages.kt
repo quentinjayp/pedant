@@ -16,6 +16,9 @@ data class Language(
     /** The espeak-ng voice the Piper voice reads text with (its .onnx.json's espeak.voice). */
     val espeakVoice: String,
 ) {
+    /** The language's English name after "a" or "an", as Gemma's instructions put it ("an English", "a French"). */
+    val withArticle: String get() = (if (englishName.first() in "AEIO") "an " else "a ") + englishName
+
     /** [text] with [ttsRewrites] applied, as espeak-ng should be given it. */
     fun espeakText(text: String): String =
         ttsRewrites.fold(text) { t, (pattern, replacement) -> pattern.replace(t, replacement) }
@@ -27,6 +30,9 @@ data class Language(
  */
 lateinit var LANGUAGES: List<Language>
     private set
+
+/** The learner's own language until they choose another. */
+const val DEFAULT_OWN = "en"
 
 /** Reads [LANGUAGES]; called once as the app starts, before anything uses them. */
 fun loadLanguages(context: Context) {

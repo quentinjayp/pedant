@@ -23,7 +23,7 @@ import re
 import sqlite3
 import time
 
-from app_languages import dictionary_key, languages
+from app_languages import dictionary_key, instruction, languages
 
 ROOT = "app/src/main"
 INSTRUCTIONS = f"{ROOT}/assets/instructions.json"
@@ -44,7 +44,8 @@ def java_hash_hex(text):
 def system_prompt(ins, name, scenario):
     role = ins["roles"][scenario]
     opening = ins["openDefault"] if role is None else ins["openRole"].replace("{role}", role)
-    return (ins["learning"] + "\n\n" + opening).replace("{language}", name)
+    # The openings that ship with the app are for learners whose own language is English.
+    return instruction(ins["learning"] + "\n\n" + opening, name)
 
 
 def jobs(ins):
@@ -108,7 +109,7 @@ def text_of(message):
 
 def part(raw, label):
     """The text after LABEL: in Gemma's answer, up to the next label, as the app's Tutor.parse reads it."""
-    m = re.search(re.escape(label) + r"(.*?)(?=\n?(?:REPLY|ENGLISH|SAY):|\Z)", raw, re.S)
+    m = re.search(re.escape(label) + r"(.*?)(?=\n?(?:REPLY|TRANSLATION|SAY):|\Z)", raw, re.S)
     return m.group(1).strip() if m else ""
 
 
@@ -165,9 +166,9 @@ def build(args):
             if not reply:
                 print(f"{key}: no reply, skipped", flush=True)
                 continue
-            translate = ins["replyTranslate"].replace("{language}", name)
+            translate = instruction(ins["replyTranslate"], name)
             with engine.create_conversation(system_message=translate, sampler_config=exact) as conv:
-                english = part(text_of(conv.send_message(reply)), "ENGLISH:")
+                english = part(text_of(conv.send_message(reply)), "TRANSLATION:")
             opening = {"reply": reply, "english": english or None}
             written[key] = opening
             print(f"{key} ({time.time() - started:.0f} s): {opening!r}", flush=True)

@@ -11,8 +11,8 @@ enum class Register(val title: String) {
  * time before saying it whole; in [Intermediate] they say it whole straight away.
  */
 enum class Mode(val title: String, val about: String) {
-    Beginner("Beginner", "Say what you want in English, then say it one word at a time before the whole phrase."),
-    Intermediate("Intermediate", "Say what you want in English, then repeat it back in the language until you get it right."),
+    Beginner("Beginner", "Say what you want in your own language, then say it one word at a time before the whole phrase."),
+    Intermediate("Intermediate", "Say what you want in your own language, then repeat it back in the language until you get it right."),
 }
 
 /**
