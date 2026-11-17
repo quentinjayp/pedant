@@ -1,8 +1,9 @@
 # Research: the bands
 
-Research for [the levels and scenarios plan](../plans/levels-and-scenarios.md). This is task 1, the
-band descriptors. Tasks 2–4 (oral exam task shapes, example courses, test labels) will add their own
-sections.
+Research for [the levels and scenarios plan](../plans/levels-and-scenarios.md): task 1, the band
+descriptors, and task 2, the oral exams' task shapes (in
+[Oral exam task shapes](#oral-exam-task-shapes-task-2)). Tasks 3 and 4 (example courses, test labels)
+will add their own sections.
 
 ## Source
 
@@ -529,12 +530,184 @@ Gemma also needs to behave like the interlocutor each band assumes:
 An eval can check this too: whether Gemma at Basic answers a request for repetition with a simpler
 rephrasing.
 
+## Oral exam task shapes (task 2)
+
+What the speaking parts of the proficiency exams actually ask candidates to do, level by level.
+
+### Sources
+
+**Official, read in full:**
+- Goethe-Institut model papers, German:
+  - Start Deutsch 1 (A1), Übungssatz 01: https://www.goethe.de/pro/relaunch/prf/materialien/A1_sd1/sd_1_uebungssatz01.pdf
+  - Zertifikat B1: https://www.goethe.de/pro/relaunch/prf/materialien/B1/b1_modellsatz_erwachsene.pdf
+  - Zertifikat B2: https://www.goethe.de/pro/relaunch/prf/materialien/B2/b2_modellsatz_erwachsene.pdf
+  - Zertifikat C1: https://www.goethe.de/pro/relaunch/prf/materialien/C1_modular/c1-modular_modellsatz.pdf
+  - Zertifikat C2: https://www.goethe.de/pro/relaunch/prf/materialien/C2/c2_modellsatz.pdf
+- France Éducation international candidate manuals, French:
+  - DELF B1: https://france-education-international.fr/document/manuel-candidat-delf-b1
+  - DALF C2: https://france-education-international.fr/document/manuel-candidat-dalf-c2
+
+**Secondary (preparation sites, university documents, search summaries):**
+- **Spanish (DELE):** the Instituto Cervantes' own guides couldn't be fetched, because the site
+  redirects to a host the session can't reach.
+- **French:** DELF A1, A2 and B2, and DALF C1.
+- **Turkish (TYS), Russian (TORFL) and Indonesian (UKBI).**
+
+These are marked "(secondary)" below, and are less certain than the official ones. The Goethe A2
+model paper's link was dead.
+
+### By exam
+
+**German, Goethe-Zertifikat** (official):
+- **A1** (about 15 minutes, in a group):
+  1. "Sich vorstellen": introduce yourself.
+  2. "Um Informationen bitten und Informationen geben": ask for and give information, from word
+     cards on a theme (for "Wochenende", the weekend: Sonntag, Frühstück, Sport, Familie).
+  3. "Bitten formulieren und darauf reagieren": make requests and respond to them, from picture cards.
+- **B1** (about 15 minutes for two candidates):
+  1. "Gemeinsam etwas planen": plan something together, from four guiding points. In the model
+     paper, a classmate is in hospital: when to visit, how to get there, what to bring, how to help
+     once he's home.
+  2. "In einem Monolog ein Thema präsentieren": a presentation from five given slides.
+  3. Give each other feedback on the presentations, and ask each other a question.
+- **B2:**
+  1. "Vortrag halten": a prepared talk of about 4 minutes in a seminar, with an introduction, main
+     part and conclusion. For "Finanzierung des Studiums" (paying for university): describe several
+     options, give and weigh their advantages and disadvantages, describe one more closely. Then
+     answer the others' questions.
+  2. A discussion of a controversial question, arguing a position, "Argumente pro und kontra
+     erörtern".
+- **C1** (about 20 minutes per pair, plus preparation):
+  1. A talk on a chosen topic from notes, with questions afterwards. It has to use four different
+     language functions; among them: drawing attention to a problem, proposing, describing, politely
+     showing understanding.
+  2. "Freie Diskussion zu einer kontroversen Frage": a free discussion of a controversial question,
+     from a short input text and four points.
+- **C2** (about 15 minutes, 15 minutes' preparation):
+  1. A five-minute talk in a seminar, weighing different viewpoints from three quotations (for "Die
+     Bedeutung von Heimat", what home means), with examples, "anspruchsvolle Sprache", and your own
+     position made clear; then questions.
+  2. A discussion with the examiner. You pick one side of a statement, "Vertreten Sie Ihre Meinung",
+     respond to their arguments, and try to convince them.
+
+**French, DELF and DALF:**
+- **A1** (secondary): a guided interview, an information exchange, and a simulated dialogue.
+- **A2** (secondary): a guided interview, a short monologue, and an interaction exercise.
+- **B1** (official):
+  1. "L'entretien dirigé" (2–3 minutes, no preparation): talk about yourself, your family, work or
+     studies, likes, habits, past, present and plans; the examiner asks follow-up questions ("What
+     did you do last weekend?").
+  2. "L'exercice en interaction" (3–4 minutes, no preparation): a role-play of "une situation
+     inhabituelle de la vie quotidienne", an unusual everyday situation. You give your opinion and
+     propose solutions, express your feelings, insist, and check information. You use "tu" or "vous"
+     according to the examiner's role.
+  3. "L'expression d'un point de vue" (5–7 minutes, 10 minutes' preparation): a structured
+     three-minute talk giving your opinion on the theme of a short document, then the examiner's
+     questions.
+- **B2** (secondary): presenting and defending a point of view from a short document, with
+  30 minutes' preparation.
+- **C1** (secondary): a talk built from two or three documents on one theme, followed by a debate
+  with the jury; one hour's preparation.
+- **C2** (official; 30 minutes, one hour's preparation after two listenings):
+  1. A summary of an audio document ("compte rendu du contenu d'un document sonore").
+  2. A personal argued development of the issue it raises.
+  3. A debate with the jury.
+
+**Spanish, DELE** (secondary):
+- **A1:** a short personal presentation, a talk on a topic, a conversation about it, and a simulated
+  dialogue.
+- **A2:** a short monologue, a description, and a simulated dialogue.
+- **B1** (15 minutes, 15 minutes' preparation):
+  1. A short presentation.
+  2. A conversation about it.
+  3. Describe a photograph and talk about it.
+  4. A simulated situation, 2–3 minutes.
+- **B2** (20 minutes, 20 minutes' preparation):
+  1. Weighing up proposals, then a conversation.
+  2. An imagined situation from photographs.
+  3. A proposal with conversation.
+
+**Turkish, TYS** (secondary): two parts: a conversation of several questions on one topic, and
+independent speaking, answering one question at length.
+
+**Russian, TORFL** (secondary): dialogues at the lower levels; at the third level (C1) a public
+monologue and a public interview.
+
+**Indonesian, UKBI** (secondary): an oral presentation, sometimes recorded into a microphone; guides
+also list describing a picture, retelling, and role-play.
+
+### The shapes, by level
+
+Across the exams, the same few shapes come back, each over a range of levels:
+
+| Shape | Levels | Examples |
+|---|---|---|
+| Interview about yourself | A1–B1 | Goethe A1 "Sich vorstellen"; DELF "entretien dirigé" |
+| Information exchange from prompts | A1–A2 | Goethe A1 theme word cards; DELF A1 |
+| Requests and responses | A1 | Goethe A1 picture cards |
+| Simulated everyday dialogue (role-play) | A1–B1 | DELF A1–A2 "dialogue simulé"; DELE A1–B1 |
+| Role-play of an unusual everyday situation: solve it, insist, propose | B1 | DELF B1 "exercice en interaction" |
+| Plan something together | A2–B1 | Goethe B1 "Gemeinsam etwas planen" |
+| Short monologue or presentation on a theme | A2–B1 | Goethe B1 (from slides); DELE A2–B1 |
+| Describe a picture, then talk about it | B1–B2 | DELE B1; DELE B2 (imagined situation) |
+| Give an opinion from a short document | B1–B2 | DELF B1 and B2 |
+| Prepared talk, then questions | B2–C2 | Goethe B2, C1, C2 |
+| Discussion or debate on a controversial question | B2–C2 | Goethe B2–C2; DALF C1–C2 |
+| Report on a source (texts or audio), then argue and debate | C1–C2 | DALF C1 (documents), DALF C2 (audio) |
+
+The progression matches the Companion Volume's:
+- **Basic:** talk about yourself and get things done in predictable situations.
+- **Independent:** handle something unexpected, plan, and give opinions with reasons.
+- **Proficient:** argue, persuade, and pass on and judge what sources say.
+
+### Which shapes can be instructions to Gemma
+
+**Instructions alone** (Gemma plays its part; the app works as now):
+- **Interview about yourself:** Gemma is the interviewer and asks follow-up questions. This is close
+  to "Gemma asks for the scene" on the roadmap.
+- **Information exchange, requests, and simulated everyday dialogue:** what today's scenarios
+  already are.
+- **Unusual everyday situation:** a generated scenario with a twist, which the roadmap's ingredient
+  lists already have. DELF B1's criteria (propose solutions, insist, express feelings, tu or vous by
+  role) say what the learner's side should include.
+- **Planning together:** Gemma as the friend or colleague, with a few points to settle.
+- **Discussion or debate:** Gemma takes the other side, responds to the learner's arguments, and
+  tries to convince them, as in Goethe C2.
+- **Questions after a talk:** Gemma asks about what the learner said.
+
+**Needs something new in the app:**
+- **Prompts on screen:** word cards (Goethe A1), guiding points (Goethe B1, C1), a statement to take
+  a side on (Goethe C2). A small card above the conversation would do.
+- **Pictures:** describing a photograph (DELE, UKBI). Gemma 4 can read images, but the app shows none,
+  and the pictures would have to come from somewhere.
+- **A source to pass on:**
+  - **Text:** a short text shown on screen, for an opinion on a document (DELF B1–B2) or a report on
+    documents (DALF C1). Gemma could write it.
+  - **Audio:** a short recording to summarise, as in DALF C2. Piper could read out a text Gemma
+    wrote, which would make an audio source possible offline.
+- **Preparation time:** the exams give 10 to 60 minutes to prepare a talk. The app could offer time
+  to think and make notes before a talk.
+- **Long turns:** talks of 3 to 5 minutes. Free talk could take them, but long recordings cost memory
+  (the speech recognizer grows with recording length), so a talk might need taking in parts.
+
+### What the exams grade that matters for Pedant
+
+DELF B1's own grading criteria include:
+- **Phonology:** "je fais les liaisons" (I make the liaisons) and "Mon accent ne gêne pas la
+  compréhension" (my accent doesn't get in the way of understanding). This is the Companion Volume's
+  intelligibility standard, with liaison named as something graded at B1.
+- **Register at B1:** "J'utilise « tu » ou « vous » selon le rôle de l'examinateur" (I use tu or vous
+  according to the examiner's role). The exam expects a choice of register at B1, where the Companion
+  Volume's register scale still says "neutral register". This bears on whether Formal / Casual
+  belongs at the Basic band.
+- **Strategies:** its advice to candidates is the strategy scales in practice. If you don't know a
+  word, find another word or explain it another way; if you don't understand, ask the examiner to
+  repeat or speak more slowly.
+
 ## Open questions
 
-**For tasks 2–4:**
+**For tasks 3 and 4:**
 
-- Which oral exam task shapes (interview, role-play, monologue, debate) appear at each level, and
-  which can be instructions to Gemma (task 2)?
 - Which topics and situations do courses use at each level, and how do they differ by culture
   (task 3)?
 **From this research, for later decisions:**
