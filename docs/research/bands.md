@@ -15,7 +15,13 @@ It updates the 2001 CEFR's descriptors and adds scales for mediation and online 
   the April 2020 edition hosted by blogs.sch.gr (same ISBN):
   https://blogs.sch.gr/mtzotzou/files/2023/09/CEFR-COMPANION-VOLUME_ENGLISH_2020.pdf
 
-Quotations below are the Companion Volume's wording. Page numbers are its own.
+Quotations below are the Companion Volume's wording. Page numbers are its own. Every scale that
+concerns speaking was read: chapter 3's production, interaction and mediation scales (pages 62–122),
+chapter 4's plurilingual repertoire (page 127), chapter 5's linguistic, sociolinguistic and pragmatic
+competences (pages 130–142), and Appendix 3 (pages 183–185).
+
+Most scales also have "plus" levels (A2+, B1+, B2+) printed within the level above them. They're
+counted with their level here, which makes no difference at band level.
 
 The Companion Volume also has a Pre-A1 level, below the bands, which isn't used here.
 
@@ -107,16 +113,22 @@ Companion Volume's wording.
     words is clear."
 
 **Can-do tasks for a conversation:**
-- Greet, introduce yourself, say goodbye.
-- Answer and ask questions about yourself, your family, your home and your work.
-- Order food or drink; buy something; ask the price; pay.
-- Ask for and follow simple directions.
-- Make simple arrangements: when and where to meet; discuss what to do next.
+- Greet, introduce yourself, ask how someone is, say goodbye.
+- Answer and ask questions about yourself, your family, your home, your work and your free time.
+- Order a meal; buy something, saying what you want and asking the price; handle numbers, prices and
+  times.
+- Point out when something is wrong ("The food is cold", "There is no light in my room").
+- Get simple information about travel; use public transport; buy tickets; ask for and give directions.
+- Make an appointment with a doctor, and say what the problem is in simple terms (a cold, the flu).
+- Make and respond to invitations, suggestions and apologies; ask for or offer a favour.
+- Make arrangements: when and where to meet, what to do next. Agree and disagree with others.
 - Say what you like and don't like, and why you prefer one thing to another.
 - Describe your day, your town, a person, in a few simple sentences.
-- Tell what happened, as a simple list of events.
+- Ask and answer simple questions about an event: where and when, who was there, what it was like.
 - Describe plans for the weekend or the holidays.
-- Say you're following, or ask someone to repeat or speak more slowly.
+- Have a short, simple phone conversation with someone you know on a predictable topic (arrival
+  times, arrangements to meet).
+- Say you're following, say you didn't follow, or ask someone to repeat or speak more slowly.
 
 ### Independent (B1–B2)
 
@@ -180,13 +192,27 @@ Companion Volume's wording.
 - Tell a story about something that happened to you, with how you felt about it.
 - Relate the plot of a book or film, and say what you thought of it.
 - Describe your plans, hopes and ambitions, with reasons.
-- Give your opinion on a familiar topic and explain why.
-- Deal with an unexpected problem while travelling: a lost booking, a missed train, a wrong order.
-- Make a complaint (B1), then follow it up and negotiate a solution (B2).
-- Compare options and recommend one, with their advantages and disadvantages.
-- Agree and disagree in a discussion, giving reasons.
+- Give your opinion on a familiar topic and explain why; express beliefs, agreement and disagreement
+  politely.
+- Discuss what to do, where to go, who or which to choose; compare and contrast the options.
+- Deal with most situations while travelling or arranging travel: an agent, a tourist office, asking a
+  passenger where to get off.
+- Cope with less routine situations in shops and banks: ask the difference between two products,
+  return an unsatisfactory purchase, make a complaint.
+- Follow a complaint up: explain the problem and make it clear the other side must make a concession;
+  ask detailed questions about a more complex service (a rental agreement).
+- Describe symptoms to a doctor and ask for advice.
+- Take part in an interview (a job interview, a consultation), taking some of the initiative; carry
+  one out, departing from prepared questions and probing interesting replies (B2).
+- Give important details over the phone about an unexpected incident (a problem at a hotel, with a hire
+  car).
+- Summarise a film, article or talk and give your opinion of it.
+- Explain why something is a problem; speculate about causes and consequences; make and respond to
+  hypotheses.
 - Explain how to do something, giving detailed instructions.
-- Ask follow-up questions, check you've understood, and keep the conversation going.
+- Pass on to a friend what someone said, in the other language, in an everyday situation.
+- Ask follow-up questions, check you've understood, invite the other person in, and keep the
+  conversation going.
 
 ### Proficient (C1–C2)
 
@@ -248,13 +274,176 @@ Companion Volume's wording.
 - Persuade someone to change their mind, without offending them.
 - Indicate reservations and reluctance, state conditions when agreeing, and ask for understanding of
   your position.
-- Smooth over a conflict, or deliver unwelcome news tactfully.
-- Explain something complex (a decision, a system, a situation) clearly and in structure.
-- Argue a position and respond to counter-arguments on the spot.
-- Shift register: the same request to a friend, a stranger and a boss.
-- Use and understand emotional, allusive and joking language.
+- Advise on or discuss a sensitive issue without awkwardness; frame critical remarks or strong
+  disagreement diplomatically.
+- Smooth over a conflict between two other people: find what each side needs and what it might give up,
+  and suggest a way forward.
+- Explain something complex (a decision, a system, a situation) clearly and in structure, or present
+  it to someone unfamiliar with it.
+- Argue a formal position and answer counter-arguments, even hostile questioning, on the spot.
+- Shift register: the same request to a friend, a stranger and a boss, and keep it consistent.
+- Use and understand emotional, allusive and joking language, humour and irony.
 - Summarise and weigh up several viewpoints in a discussion, and draw a conclusion.
 - Negotiate a dispute or a sensitive transaction: who pays for damage, who is to blame.
+- Interpret between two people informally, explaining cultural references.
+
+Plain exchanges of facts aren't Proficient tasks: the information exchange scale has no C-level
+descriptors, "because merely exchanging factual information is no longer a main focus in learning
+objectives for proficient users" (page 78).
+
+## Strategies
+
+The strategy scales describe how a speaker keeps a conversation working when language runs short.
+They matter for how Gemma reacts to the learner, more than for what scenarios ask.
+
+**Asking for clarification** (page 89):
+- **A1:** "Can express in a simple way that they do not understand."
+- **A2:** "Can ask very simply for repetition when they do not understand." Also asks about key words
+  "using stock phrases".
+- **B1–B2:** "Can ask someone to clarify or elaborate what they have just said"; asks follow-up
+  questions to check what someone meant.
+- **C1:** asks for clarification of "complex, abstract ideas in professional or academic contexts".
+
+**Compensating** (page 69), when a word won't come:
+- **A levels:** pointing, gestures, "an inadequate word/sign from their repertoire".
+- **B1:** "Can use a simple word/sign meaning something similar to the concept they want to convey and
+  invite 'correction'." Also: "Can 'foreignise' word/signs in their first language and ask for
+  confirmation."
+- **B2:** "Can use circumlocution and paraphrase to cover gaps in vocabulary and structure."
+- **C2:** "Can substitute an equivalent term for a word/sign they can't recall, so smoothly that it is
+  scarcely noticeable."
+
+**Building on plurilingual repertoire** (page 127): the CEFR counts using words from another language
+as a skill at every level, not a failure. At the A levels, the learner uses "all possible resources in
+order to handle a simple everyday transaction"; from B2, they alternate between languages flexibly to
+help communication. The roadmap's "Reaching for a missing word" (say the sentence with one word in
+your own language) is this, and the B1 compensating descriptor.
+
+**Turntaking and co-operating** (page 88): from A2 "Can initiate, maintain and close simple,
+face-to-face conversation" and "Can indicate when they are following", through B1 repeating back
+"part of what someone has said to confirm mutual understanding", to C1 relating "own contribution
+skilfully to that of others".
+
+## Mediation
+
+Mediation is passing meaning on: between two people, from a text, or between languages
+(pages 90–122). Two scales fit a conversation app:
+
+- **Acting as an intermediary in informal situations** (page 115): passing on what one person said to
+  another who doesn't share their language. It runs from A1 ("other people's personal details and very
+  simple, predictable information … provided other people help with formulation"), through B1 (the main
+  sense on subjects of personal interest), to C2 (conveying "finer shades of meaning and elaborating on
+  sociocultural implications").
+- **Facilitating communication in delicate situations and disagreements** (page 116): at the A levels
+  the speaker can recognise when people disagree and use simple phrases to show sympathy or seek
+  compromise; at B2 they "outline the main points in a disagreement … and explain the positions of the
+  parties involved"; at C1 they "formulate a diplomatic request to each side … to determine what is
+  central to their position, and what they may be willing to give up".
+
+The text-based mediation scales (relaying information from a text, explaining data, processing text,
+note-taking, responding to literature) need a text, which Pedant doesn't show.
+
+## Phonology
+
+The Companion Volume's phonological control scale (pages 133–135) replaced the 2001 one, because "the
+progression appeared unrealistic" and its focus on "accent and on accuracy instead of on
+intelligibility has been detrimental to the development of the teaching of pronunciation". The new
+scale has three parts: overall phonological control, sound articulation, and prosodic features
+(stress, rhythm, intonation). "Intelligibility has been a key factor in discriminating between levels.
+The focus is on how much effort is required from the interlocutor to decode the speaker's message."
+
+**Sound articulation** (pages 134–135):
+- **A1:** "Can reproduce sounds in the target language if carefully guided. Can articulate a limited
+  number of sounds, so that speech is only intelligible if the interlocutor provides support (e.g. by
+  repeating correctly and by eliciting repetition of new sounds)."
+- **A2:** "Systematic mispronunciation of phonemes does not hinder intelligibility, provided the
+  interlocutor makes an effort to recognise and adjust to the influence of the speaker's language
+  background on pronunciation."
+- **B1:** "Is generally intelligible throughout, despite regular mispronunciation of individual sounds
+  and words they are less familiar with."
+- **B2:** "Can articulate a high proportion of the sounds in the target language clearly in extended
+  stretches of production; is intelligible throughout, despite a few systematic mispronunciations."
+- **C1:** "Can articulate virtually all the sounds of the target language with a high degree of
+  control. They can usually self-correct if they noticeably mispronounce a sound."
+- **C2:** "Can articulate virtually all the sounds of the target language with clarity and precision."
+
+**Prosodic features** (pages 134–135):
+- **A1:** "Can use the prosodic features of a limited repertoire of simple words and phrases
+  intelligibly, in spite of a very strong influence on stress, rhythm and/or intonation from the other
+  language(s) they speak; their interlocutor needs to be collaborative."
+- **A2:** "Prosodic features (e.g. word stress) are adequate for familiar everyday words and simple
+  utterances."
+- **B1:** "Can convey their message in an intelligible way in spite of a strong influence on stress,
+  intonation and/or rhythm from the other language(s) they speak."
+- **B2:** "Can employ prosodic features (e.g. stress, intonation, rhythm) to support the message they
+  intend to convey, though with some influence from the other languages they speak."
+- **C1:** "Can vary intonation and place stress correctly in order to express precisely what they mean
+  to say."
+- **C2:** "Can exploit prosodic features (e.g. stress, rhythm and intonation) appropriately and
+  effectively in order to convey finer shades of meaning (e.g. to differentiate and emphasise)."
+
+**For Pedant:**
+- **The standard differs.** The CEFR measures how easily a listener understands; Pedant measures how
+  close each sound is to one voice's pronunciation. By the CEFR, systematic mispronunciation is
+  expected up to B2.
+- **Prosody isn't graded.** Pedant grades sounds, not stress, rhythm or intonation, which the CEFR
+  treats as half of phonological control from A1. (The roadmap's "Tones and intonation" item would add
+  some of it.)
+- **What fits Pedant's approach:** A1's "can reproduce sounds … if carefully guided", with the
+  interlocutor "repeating correctly and … eliciting repetition of new sounds", is close to what
+  Repeat word does.
+
+## Register
+
+**Sociolinguistic appropriateness** (pages 136–137) is where the CEFR describes register:
+- **A1–A2:** polite forms of greeting and address; "Can make and respond to invitations, suggestions,
+  apologies, etc."
+- **B1:** "Can perform and respond to a wide range of language functions, using their most common
+  exponents in a neutral register." Also: "Is aware of the salient politeness conventions and acts
+  appropriately."
+- **B2:** "Can express themselves confidently, clearly and politely in a formal or informal register,
+  appropriate to the situation and person(s) concerned." Also: "Can adjust their expression to make
+  some distinction between formal and informal registers but may not always do so appropriately."
+- **C1:** "Can adjust their level of formality (register and style) to suit the social context: formal,
+  informal or colloquial as appropriate, and maintain a consistent register." Also: "Can frame critical
+  remarks or express strong disagreement diplomatically."
+- **C2:** "Has a good command of idiomatic expressions and colloquialisms with awareness of connotative
+  levels of meaning."
+
+**For Pedant:** the CEFR expects a neutral register at the A levels and B1, choosing between formal
+and informal from B2, and consistent control of formal, informal and colloquial at C1. Pedant's
+Formal / Casual setting asks for a register at every band.
+
+## Vocabulary and grammar
+
+**Vocabulary range** (page 131):
+- **A1:** "Has a basic vocabulary repertoire of words/signs and phrases related to particular concrete
+  situations."
+- **A2:** "Has sufficient vocabulary to conduct routine everyday transactions involving familiar
+  situations and topics."
+- **B1:** "Has sufficient vocabulary to express themselves with some circumlocutions on most topics
+  pertinent to their everyday life such as family, hobbies and interests, work, travel and current
+  events."
+- **B2:** "Has a good range of vocabulary for matters connected to their field and most general topics.
+  Can vary formulation to avoid frequent repetition, but lexical gaps can still cause hesitation and
+  circumlocution."
+- **C1:** "Has a good command of a broad lexical repertoire allowing gaps to be readily overcome with
+  circumlocutions"; "Has a good command of common idiomatic expressions and colloquialisms; can play
+  with words/signs fairly well."
+- **C2:** "Has a good command of a very broad lexical repertoire including idiomatic expressions and
+  colloquialisms; shows awareness of connotative levels of meaning."
+
+**Grammatical accuracy** (page 132) follows the qualitative features above, with one note: "research
+in English, French and German suggests that inaccuracy increases at around B1 as the learner is
+beginning to use language more independently and creatively." Accuracy doesn't rise in a straight line.
+
+## Production beyond conversation
+
+- **Addressing audiences** (page 65): a prepared presentation, then questions. From B1 ("a prepared,
+  straightforward presentation on a familiar topic within their field") to C2 ("Can handle difficult and even hostile
+  questioning"). Possible as a Free talk monologue followed by Gemma's questions.
+- **Public announcements** (pages 64–65): short rehearsed announcements, A2 to C1. Nothing to
+  interact with.
 
 ## Which descriptors Pedant can exercise
 
@@ -262,15 +451,19 @@ Pedant is a spoken conversation with Gemma, one turn at a time. The learner's sp
 speech recognizer and ZIPA.
 
 **What fits:**
-- **Interaction (conversation, discussion, obtaining goods and services, information exchange,
-  interviews, goal-oriented co-operation):** these are what Pedant already does, in role-play. Every
-  band's tasks above are of this kind.
+- **Interaction (conversation, informal discussion, obtaining goods and services, information
+  exchange, interviews, goal-oriented co-operation):** these are what Pedant already does, in
+  role-play. Every band's tasks above are of this kind.
 - **Interaction strategies:** asking for clarification, checking understanding and taking turns
   happen naturally in a conversation, if Gemma's instructions allow them.
 - **Short sustained production:** describing an experience, giving information, or putting a case,
   as longer turns in a conversation.
 - **Mediating communication:** Gemma can stage a situation where the learner helps two people
-  understand each other, or passes on what one said, as a role-play.
+  understand each other, or passes on what one said, as a role-play (acting as an intermediary;
+  delicate situations and disagreements).
+- **Strategies:** asking for clarification and compensating happen in any conversation, if Gemma
+  lets them: answering "say that again, slower" at Basic, or helping when the learner uses a word from
+  their own language.
 
 **What fits only partly:**
 - **Long monologues and addressing audiences:** possible in Free talk, but long recordings cost
@@ -278,7 +471,8 @@ speech recognizer and ZIPA.
   isn't how Pedant grades.
 - **Mediating a text:** relaying a text (an email, a notice) in the language. It needs a text to show
   or read out first, which Pedant doesn't do today.
-- **Using telecommunications:** a phone call can be role-played, but not its audio quality.
+- **Using telecommunications:** a phone call can be role-played (Basic: arrival times and arrangements
+  with someone you know; Independent: booking, and reporting an incident), but not its audio quality.
 
 **What doesn't fit:**
 - **Formal discussion with several people:** Gemma plays one role at a time.
@@ -316,18 +510,38 @@ The qualitative features give each band things to check in Gemma's speech:
 - **Proficient:**
   - idiom and colloquialism;
   - connotation and implication;
-  - register appropriate to the situation;
+  - register appropriate to the situation, kept consistent;
   - well-structured longer turns;
   - diplomacy (reservations, conditions, tact).
 
 The Independent and Proficient features need a judge (tasks 5a and 5b).
 
-## Open questions for tasks 2–4
+Gemma also needs to behave like the interlocutor each band assumes:
+- **Basic:** the A-level descriptors keep saying "provided the other person helps", "addressed
+  clearly, slowly and directly", "the interlocutor … provides support". At Basic, Gemma should speak
+  slowly and simply, repeat and rephrase when asked, and help.
+- **Independent:** the learner can be asked to keep the conversation going, but Gemma may still need to
+  "make an effort to support understanding" (B1 conversation).
+- **Proficient:** no accommodation. Gemma speaks as it would to another proficient speaker, including
+  fast, colloquial and allusive language.
+
+An eval can check this too: whether Gemma at Basic answers a request for repetition with a simpler
+rephrasing.
+
+## Open questions
+
+**For tasks 2–4:**
 
 - Which oral exam task shapes (interview, role-play, monologue, debate) appear at each level, and
   which can be instructions to Gemma (task 2)?
 - Which topics and situations do courses use at each level, and how do they differ by culture
   (task 3)?
+**From this research, for later decisions:**
+- How Pedant's grading should relate to the CEFR's standard of intelligibility, given that systematic
+  mispronunciation is expected up to B2 and prosody is half of the CEFR's phonology.
+- Whether Formal / Casual should be offered at Basic, where the CEFR expects a neutral register.
+- Whether Gemma should welcome words from the learner's own language mid-sentence (compensating,
+  plurilingual repertoire), as the "Reaching for a missing word" roadmap item would.
 - Do the band boundaries matter in practice? B1 and B2 differ a lot (complaining against negotiating;
   "get by" against "without imposing strain"). If generated scenarios feel too wide within a band, the
   band's tasks could carry their CEFR level, even though the menu shows bands.
