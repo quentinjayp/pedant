@@ -82,7 +82,9 @@ A second dimension beside the help modes: how hard the language is, on the scale
 proficiency tests use. The fixed list of scenarios is replaced by scenarios made for each level.
 The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/levels-and-scenarios.md).
 
-- **Research the bands first.** Before building, study what each band actually asks of a speaker:
+- **Research the bands first.** The band descriptors and the oral exams' task shapes are done; see
+  [docs/research/bands.md](docs/research/bands.md). Example courses and per-language test labels
+  are still to research. Before building, study what each band actually asks of a speaker:
   the CEFR's descriptors (its 2020 Companion Volume has detailed ones for speaking and
   interaction), the oral parts of the tests (DELF, DELE, Goethe, TYS and the others, from their free
   sample papers), and example courses at each level, such as the Indonesian government's
@@ -102,25 +104,34 @@ The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/
   doesn't map cleanly (Indonesian's UKBI) or there's no recognised test (Hindi, Swahili), only the
   CEFR is shown, never a made-up equivalence.
 - **The band shapes the whole conversation.** Gemma speaks at the band's level (short, common words
-  at Basic; no simplifying at Proficient); what the learner says is translated into something they
-  can say at that level, with the meaning kept over simplicity; and the quiz's word limits follow
-  the band rather than the help mode.
-- **Generated scenarios.** The app picks a scenario's ingredients at random from lists in a data
-  file: a task from the band's can-do list (Basic: order something, ask the way; Independent: sort
-  out a problem, tell a story, give an opinion; Proficient: persuade, smooth over a conflict,
-  explain something complex), a kind of place or relationship, and sometimes a twist. Gemma writes
-  the scene from them, set where the language is spoken (a warung, not a Parisian café, for
-  Indonesian). Random ingredients stop Gemma drifting back to the same few scenes, and the band's
-  task list keeps the level right.
+  at Basic; no simplifying at Proficient), and acts as the listener the band assumes: at Basic it
+  speaks slowly, repeats, rephrases and helps; at Proficient it doesn't adjust its language at all.
+  What the learner says is translated into something they can say at that level, with the meaning
+  kept over simplicity; and the quiz's word limits follow the band rather than the help mode.
+- **Generated scenarios.** The app draws a scenario's ingredients at random from lists in a data
+  file, in two layers:
+  - **Shape:** one of the band's task shapes, the same for every language, generalised from the oral
+    exams. Basic: an interview about you, an everyday transaction, planning together. Independent: an
+    unusual everyday situation, defending a view then debating it. Proficient: a controversial
+    question where the learner tries to convince Gemma. The shape decides who leads and Gemma's role.
+  - **Content:** a topic, a place or relationship, and sometimes a twist.
+
+  Gemma writes the scene from them, set where the language is spoken (a warung, not a Parisian café,
+  for Indonesian). Random ingredients stop Gemma drifting back to the same few scenes, and the band's
+  shapes keep the level right.
+- **Cards, and a choice of two.** Each draw is shown as a card: the shape, the situation, and the
+  shape's prompts (words to ask about, points to plan, a statement to argue). The app draws two cards
+  and the learner picks one, as the exams do. The chosen card stays above the conversation.
 - **Gemma asks for the scene.** For the kind of situation picked, Gemma asks the learner to fill it
   in ("Where do you usually get food or drinks?"), and the answer becomes the scene, so the
   conversation is about the learner's own life. At Basic it's asked in the learner's own language;
   at Independent and Proficient in the language being learned, as the conversation's first exchange.
 - **Your own scenarios.** The learner describes a situation ("my landlord is late fixing the
   heating") and Gemma builds the scene around it at the chosen band.
-- **Talk about whatever.** Kept in every band, as the option with no scene.
-- **The flow.** Pick a language and band; then a generated scenario, your own, or talk about
-  whatever; Gemma asks its question if there is one; the scene starts.
+- **Talk about whatever.** Kept in every band, as the option with no scene. It and "Gemma asks for
+  the scene" are the interview and conversation shapes, with no topic or with the learner's.
+- **The flow.** Pick a language and band; then one of two drawn cards, your own scenario, or talk
+  about whatever; Gemma asks its question if the shape has one; the scene starts.
 - **What it costs.** Openings are no longer written ahead and shipped, so a conversation no longer
   opens instantly: Gemma writes the scene and opening on the phone (a few seconds with E2B, more
   with E4B). Its question to the learner covers part of that, and the next random scenario can be

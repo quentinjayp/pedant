@@ -23,16 +23,32 @@ Proficient band in every language.
 
 Investigation only. Output: `docs/research/bands.md`.
 
-1. **Band descriptors.** The CEFR 2020 Companion Volume's descriptors for spoken production,
+1. **Band descriptors.** **Done.** The CEFR 2020 Companion Volume's descriptors for spoken production,
    spoken interaction and mediation, A1 to C2, reduced to each band's can-do task list.
    - What can a speaker do at each band, in tasks a conversation can ask for?
    - Which descriptors can a phone app with speech recognition and Gemma actually exercise?
-2. **Oral exam task shapes.** From the free sample papers of DELF/DALF, DELE, Goethe, TYS, TORFL,
-   BIPA and others where they exist: the oral task types at each level (guided interview, information
-   exchange, role-play, monologue, debate).
+
+   **Result:** every speaking-related scale, quoted with page numbers. Each band has a can-do list.
+   - **Fits:** interaction, strategies, short spoken turns, and role-played mediation.
+   - **Gemma as the listener:** each band assumes a different listener. At Basic Gemma speaks slowly,
+     repeats, rephrases and helps; at Proficient it doesn't adjust its language at all. This goes
+     into task 8 and the evals (task 5).
+   - **Roadmap investigations it led to:** grading leniency by band, prosody, Formal / Casual at
+     Basic, and words from the learner's own language mid-sentence.
+2. **Oral exam task shapes.** **Done.** From the free sample papers of DELF/DALF, DELE, Goethe, TYS,
+   TORFL, BIPA and others where they exist: the oral task types at each level (guided interview,
+   information exchange, role-play, monologue, debate).
    - Which task shapes appear at which levels?
    - Which ones are instructions to Gemma, and which need something new in the app (a monologue
      with no reply, for example)?
+
+   **Result:** official French guides (A1–C2) and German model papers (A1, B1–C2), with secondary
+   sources for Spanish, Turkish, Russian and Indonesian, all show the same shapes at the same levels.
+   - **Generalised:** one set of task shapes per band, for every language. No other language's exam
+     is researched. See "Generalised: the task shapes for every language" in the research.
+   - **Instructions only:** most shapes need nothing but instructions to Gemma.
+   - **Needing something new:** some need prompts on screen, pictures, a short text or audio source,
+     preparation time, or long turns taken in parts (task 10).
 3. **Example courses.** Courses for each level, such as *Sahabatku Indonesia* (A1–C2): the topics and
    situations each level covers. This feeds the ingredient lists (task 9).
    - What topics and situations are typical for each band, across languages?
@@ -49,7 +65,8 @@ Investigation only. Output: `docs/research/bands.md`.
    each language.
    - **Measured:** at Basic, short sentences and common words (sentence length, and the share of
      words in a frequency list for the language).
-   - **Judged:** whether replies show the band's features.
+   - **Judged:** whether replies show the band's features, and whether Gemma acts as the listener
+     the band assumes (at Basic, answering a request to repeat with a slower, simpler rephrasing).
    - **Output:** a report per band and language, and a decision on which bands each language offers.
      A band a model can't do isn't offered.
    - **5a. One-time Claude judgment.** In a session, Claude judges a sample of Gemma's replies per
@@ -79,21 +96,36 @@ Investigation only. Output: `docs/research/bands.md`.
 
 ## D. Scenarios
 
-9. **Ingredient lists.** A data file in `app/src/main/assets/` with each band's can-do tasks (from
-   tasks 1–3), kinds of place or relationship, and twists.
-10. **Generated scenarios.** The app picks ingredients at random, and Gemma writes the scene, its role
-    and the opening, set where the language is spoken.
+9. **Ingredient lists.** A data file in `app/src/main/assets/`, in two layers:
+   - **Shapes:** each band's task shapes, from task 2's generalised list (interview, everyday
+     transaction, plan together, talk then questions, defend a view then debate, and so on). Each
+     shape says who leads, Gemma's role, and what prompts it gives the learner.
+   - **Content:** for each shape, the topics, places, relationships and twists it can be filled
+     with, from tasks 1 and 3.
+10. **Generated scenarios.** Gemma writes the scene, its role and the opening, set where the language
+    is spoken. The ingredients are drawn at random:
+    1. a shape among the band's shapes;
+    2. content for that shape;
+    3. the setting, which Gemma localises.
+    - **A choice of two:** the app draws two scenarios and the learner picks one, as the exams do
+      ("Vous tirez au sort deux sujets. Vous en choisissez un").
+    - **The card:** each draw is shown as a card: the shape, the situation, and the shape's prompts
+      (the words to ask about, the points to plan, the statement to argue). The two cards are the
+      choice. The chosen one stays above the conversation, where `scenario.scene` is now.
+    - **New app pieces:** shapes that need something the app doesn't have yet are only drawn once it
+      exists. That covers pictures, a short text or audio source, preparation time, and long turns
+      taken in parts.
     - **Replaces:** `Scenario` (Scenarios.kt) and the `roles` in `instructions.json`.
-    - **Saving:** the scene is saved with the conversation, for Continue and the quiz.
-    - **Showing:** it's shown at the top of the conversation, where `scenario.scene` is now.
-11. **Gemma asks for the scene.** For the kind of situation picked, Gemma asks the learner to fill it
-    in, and the answer becomes the scene. At Basic it asks in the learner's own language; at
-    Independent and Proficient, in the language being learned.
+    - **Saving:** the card is saved with the conversation, for Continue and the quiz.
+11. **Gemma asks for the scene.** This is the interview shape with the topic left to the learner:
+    Gemma asks the learner to fill it in, and the answer becomes the scene. At Basic it asks in the
+    learner's own language; at Independent and Proficient, in the language being learned.
 12. **Your own scenarios.** The learner describes a situation, and Gemma builds the scene at the band.
-13. **Talk about whatever** in every band: today's Default, with the band applied.
-14. **New conversation flow.** Language → band → generated, your own, or talk about whatever →
-    Gemma's question → the scene. This changes `LanguageScreen` in `MainActivity.kt` and
-    `startSession` in `AppViewModel.kt`.
+13. **Talk about whatever** in every band: the conversation shape with no topic, today's Default with
+    the band applied.
+14. **New conversation flow.** Language → band → two drawn cards, your own, or talk about whatever →
+    Gemma's question, if the shape has one → the scene. This changes `LanguageScreen` in
+    `MainActivity.kt` and `startSession` in `AppViewModel.kt`.
 15. **Openings.**
     - **Removed:** the shipped openings (`openings.json`, `OpeningCache.kt`,
       `tools/build_openings.py`, `.github/workflows/openings.yml`).
