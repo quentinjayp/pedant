@@ -3,7 +3,7 @@ Builds the app's word dictionaries from English Wiktionary, via kaikki.org's Wik
 
 Reads the raw data as a stream on stdin (decompressed on the fly, never saved), keeps entries in
 the app's languages, and keeps only what the app uses: spelling, part of speech, IPA (the one
-shown, and every pronunciation listed, tab-separated), a few short English meanings, and the word
+shown, and every pronunciation listed, tab-separated), every English meaning, and the word
 it is a form of. Writes one gzipped SQLite file per
 language, plus a manifest describing them.
 
@@ -84,10 +84,9 @@ UD_TO_POS = {
     "CONTRACTION": {"contraction"},
 }
 
-MAX_SENSES = 3
 MAX_GLOSS = 160
-MAX_ROWS_PER_WORD = 4
-SKIP_SENSE_TAGS = {"obsolete", "archaic", "dated", "rare", "historical"}
+# Meanings with these tags come after the others, labelled with the tag ("(archaic) …").
+LATER_SENSE_TAGS = ["obsolete", "archaic", "dated", "rare", "historical"]
 
 
 def pick_ipa(sounds, code):
@@ -147,11 +146,15 @@ UNLINKED_FORM = re.compile(r"\b(?:inflection|form) of (\S+?)[.,;]?$")
 
 
 def pick_senses(senses):
-    """A few short meanings, common senses first, and the word this is a form of, if any."""
+    """Every meaning, in Wiktionary's order (common senses first), with obsolete, archaic, dated,
+    rare and historical ones after the rest, labelled; and the word this is a form of, if any."""
     kept, form_of = [], None
     usable = [s for s in senses or [] if s.get("glosses")]
-    preferred = [s for s in usable if not SKIP_SENSE_TAGS & set(s.get("tags") or [])] or usable
-    for s in preferred:
+
+    def later_tag(s):
+        return next((t for t in LATER_SENSE_TAGS if t in (s.get("tags") or [])), None)
+
+    for s in [s for s in usable if later_tag(s) is None] + [s for s in usable if later_tag(s) is not None]:
         if form_of is None:
             for link in (s.get("form_of") or []) + (s.get("alt_of") or []):
                 if link.get("word"):
@@ -164,10 +167,11 @@ def pick_senses(senses):
                 form_of = unlinked.group(1)
         if len(gloss) > MAX_GLOSS:
             gloss = gloss[: MAX_GLOSS - 1].rstrip() + "…"
+        tag = later_tag(s)
+        if gloss and tag:
+            gloss = f"({tag}) {gloss}"
         if gloss and gloss not in kept:
             kept.append(gloss)
-        if len(kept) >= MAX_SENSES:
-            break
     return kept, form_of
 
 
@@ -291,7 +295,6 @@ def main():
 
     os.makedirs(args.out, exist_ok=True)
     dbs = {code: open_db(os.path.join(args.out, f"{code}.db")) for code in codes}
-    rows = {code: {} for code in codes}  # key -> number of rows written
     stats = {code: {"entries": 0, "with_ipa": 0} for code in codes}
 
     lines = 0
@@ -316,9 +319,6 @@ def main():
                 [(dictionary_key(f), f, entry.get("pos"), d, word) for f, d in table_forms(entry)],
             )
         key = dictionary_key(word)
-        if rows[code].get(key, 0) >= MAX_ROWS_PER_WORD:
-            continue
-        rows[code][key] = rows[code].get(key, 0) + 1
         ipa = pick_ipa(entry.get("sounds"), code)
         dbs[code].execute(
             "INSERT INTO entries VALUES (?, ?, ?, ?, ?, ?, ?)",

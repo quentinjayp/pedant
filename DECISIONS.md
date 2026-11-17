@@ -125,7 +125,7 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   - switches words with looping arrows or a sideways swipe;
   - has Normal and Slow; Slow is 40% speed.
 - **Dictionaries:** built from English Wiktionary via kaikki.org.
-  - **Contents:** cut down to spelling, part of speech, IPA, short English meanings and the word a form belongs to.
+  - **Contents:** cut down to spelling, part of speech, IPA, every English meaning (obsolete, archaic, dated, rare and historical ones last, labelled) and the word a form belongs to. All meanings are kept so the bubble, whose meanings scroll, shows every sense, rather than Gemma choosing one.
   - **Distribution:** one per language, downloaded separately from the app, from a GitHub Release.
   - **Rebuilds:** monthly. Each run commits a small manifest (versions and checksums), which keeps the schedule active. The dictionaries themselves aren't committed.
   - **Credit:** CC BY-SA, credited to Wiktionary contributors and Wiktextract.

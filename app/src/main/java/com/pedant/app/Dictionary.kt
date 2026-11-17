@@ -8,7 +8,7 @@ import java.util.Locale
 
 /**
  * A language's word dictionary, built from English Wiktionary (CC BY-SA 4.0) by
- * tools/build_dictionaries.py: spelling, part of speech, IPA, short English meanings, and the word
+ * tools/build_dictionaries.py: spelling, part of speech, IPA, every English meaning, and the word
  * each form belongs to. A word's entries come most common part of speech first ("est", is, before
  * "est", east), from counts in Universal Dependencies treebanks.
  */
@@ -114,7 +114,7 @@ class Dictionary(file: File) : Closeable {
         val groups = senses.groupBy { it.pos to it.note }.map { (key, group) ->
             Group(
                 listOfNotNull(posName(key.first), key.second).joinToString(" · ").ifEmpty { null },
-                group.flatMap { it.meanings }.distinct().take(MAX_MEANINGS),
+                group.flatMap { it.meanings }.distinct(),
             )
         }
         return Description(groups, found.firstNotNullOfOrNull { it.ipa })
@@ -142,8 +142,6 @@ class Dictionary(file: File) : Closeable {
             "pron" to "pronoun", "det" to "determiner", "intj" to "interjection", "num" to "number",
             "name" to "name", "particle" to "particle", "article" to "article",
         )
-
-        private const val MAX_MEANINGS = 4
 
         /** Shown with dictionary meanings, as the license requires. */
         const val CREDIT = "From Wiktionary (CC BY-SA 4.0)"
