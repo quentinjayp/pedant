@@ -153,6 +153,14 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
 - **Battery:** a notice asks for unrestricted battery use and opens that setting.
 - **Footer:** the conversation footer folds away with a chevron, leaving Hold to talk.
 
+## Levels and scenarios (planned)
+
+- **One scale for every language.** The CEFR is the scale for every language, with its three bands.
+- **One set of task shapes per band, for every language.** The conversation tasks for each band come
+  from the oral exams' shapes, generalised once and applied to every language, not taken from each
+  language's own exam. Only the test labels and the setting of each scene differ by language. See
+  [docs/research/bands.md](docs/research/bands.md).
+
 ## Development
 
 - **Commits:** authored as quentinjayp with the GitHub noreply address (9011291+quentinjayp@users.noreply.github.com), with no Claude co-author or attribution lines.
