@@ -53,8 +53,20 @@ Beginner and Intermediate are built. A third mode is planned.
   than English. The dictionaries are English Wiktionary, so meanings are in English for every own
   language, and English meanings lose some of what other languages' forms mark (the imperfect's "used
   to", aspect, gender).
+- **Investigate the meaning order for Hungarian.** Other languages show the most common meaning first,
+  using part-of-speech counts from Universal Dependencies treebanks; Hungarian keeps Wiktionary's
+  order because its only treebank is licensed for non-commercial use. Other sources of counts.
+- **Investigate the word bubble scrolling on small phones.** The meanings scroll on their own, but the
+  whole bubble can still scroll when it's taller than the screen.
 - **Investigate inflected forms for Finnish.** Ways to include them without the dictionary growing to
   about 485 MB. Every other language's dictionary includes its inflected forms.
+
+## Grading
+
+- **Investigate optional liaisons.** The expected sounds come from espeak-ng's reading of the whole
+  phrase, which includes liaisons that are optional ("vous avez un", "pas encore"), so leaving one out
+  counts against the learner as if it were required. Whether to tell required from optional ones,
+  and how.
 
 ## Levels and scenarios
 
@@ -134,3 +146,9 @@ proficiency tests use. The fixed list of scenarios is replaced by scenarios made
 - **Investigate the branching and release workflow.** Options discussed: dev and main branches with
   releases cut from main, or trunk-based with release branches; semantic version tags; a fixed link
   to the latest development build; main as the default branch.
+- **Investigate preparing for Google Play.** Release builds signed with a permanent key kept as a
+  GitHub secret (the current builds are debug-signed, so moving to the permanent key needs one
+  reinstall); whether development builds get their own app ID, so they install alongside the release;
+  and whether Play's internal testing track replaces the development build link.
+- **Investigate testing the app on an emulator in CI.** Driving the real app through its screens on
+  an Android emulator, with the models faked, beside the screenshot tests.
