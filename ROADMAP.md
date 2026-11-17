@@ -67,6 +67,11 @@ Beginner and Intermediate are built. A third mode is planned.
   phrase, which includes liaisons that are optional ("vous avez un", "pas encore"), so leaving one out
   counts against the learner as if it were required. Whether to tell required from optional ones,
   and how.
+- **Investigate how Pedant's grading should relate to the CEFR's standard.** The CEFR's phonology
+  scales judge how easily a listener understands the speaker, not closeness to one pronunciation:
+  they expect systematic mispronunciation up to B2, and half of them is stress, rhythm and intonation,
+  which Pedant doesn't grade. Pedant grades each sound against one voice. See
+  [docs/research/bands.md](docs/research/bands.md#phonology).
 
 ## Levels and scenarios
 
@@ -137,6 +142,14 @@ The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/
 ## Conversations
 
 - **Voice selector.** Choose the language's voice in the conversation settings (the gear).
+- **Investigate whether to offer Formal / Casual at the Basic band.** The CEFR expects a neutral
+  register up to B1, a choice between formal and informal from B2, and consistent control of formal,
+  informal and colloquial at C1. See [docs/research/bands.md](docs/research/bands.md#register).
+- **Investigate whether Gemma should welcome words from the learner's own language mid-sentence.**
+  The CEFR counts it as a skill: at B1, "Can 'foreignise' word/signs in their first language and ask
+  for confirmation", and using all of one's languages runs through every level. Related to "Reaching
+  for a missing word" under Free talk. See
+  [docs/research/bands.md](docs/research/bands.md#strategies).
 
 ## Platforms
 
