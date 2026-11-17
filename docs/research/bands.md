@@ -543,18 +543,21 @@ What the speaking parts of the proficiency exams actually ask candidates to do, 
   - Zertifikat B2: https://www.goethe.de/pro/relaunch/prf/materialien/B2/b2_modellsatz_erwachsene.pdf
   - Zertifikat C1: https://www.goethe.de/pro/relaunch/prf/materialien/C1_modular/c1-modular_modellsatz.pdf
   - Zertifikat C2: https://www.goethe.de/pro/relaunch/prf/materialien/C2/c2_modellsatz.pdf
-- France Éducation international candidate manuals, French:
+- France Éducation international candidate manuals, French, every level:
+  - DELF A1: https://france-education-international.fr/document/manuel-candidat-delf-a1
+  - DELF A2: https://france-education-international.fr/document/manuel-candidat-delf-a2
   - DELF B1: https://france-education-international.fr/document/manuel-candidat-delf-b1
+  - DELF B2: https://france-education-international.fr/document/manuel-candidat-delf-b2
+  - DALF C1: https://france-education-international.fr/document/manuel-candidat-dalf-c1
   - DALF C2: https://france-education-international.fr/document/manuel-candidat-dalf-c2
 
 **Secondary (preparation sites, university documents, search summaries):**
-- **Spanish (DELE):** the Instituto Cervantes' own guides couldn't be fetched, because the site
-  redirects to a host the session can't reach.
-- **French:** DELF A1, A2 and B2, and DALF C1.
+- **Spanish (DELE):** the Instituto Cervantes' site refuses connections from the session, so its
+  guides couldn't be read.
+- **German A2:** the Goethe A2 model paper's link was dead, and its page refused the request.
 - **Turkish (TYS), Russian (TORFL) and Indonesian (UKBI).**
 
-These are marked "(secondary)" below, and are less certain than the official ones. The Goethe A2
-model paper's link was dead.
+These are marked "(secondary)" below, and are less certain than the official ones.
 
 ### By exam
 
@@ -590,10 +593,28 @@ model paper's link was dead.
   2. A discussion with the examiner. You pick one side of a statement, "Vertreten Sie Ihre Meinung",
      respond to their arguments, and try to convince them.
 
-**French, DELF and DALF:**
-- **A1** (secondary): a guided interview, an information exchange, and a simulated dialogue.
-- **A2** (secondary): a guided interview, a short monologue, and an interaction exercise.
-- **B1** (official):
+**French, DELF and DALF** (official, every level):
+- **A1** (10 minutes' preparation for parts 2 and 3):
+  1. "L'entretien dirigé" (about 1 minute, no preparation): the examiner asks simple questions about
+     you, your family, your tastes and activities ("Comment vous appelez-vous ?", "Où est-ce que vous
+     habitez ?").
+  2. "L'échange d'informations" (about 2 minutes): you draw six cards, each with one word ("Prénom ?
+     Téléphone ? Ordinateur ? Adresse ? Famille ? Livre ?"), and ask the examiner questions from
+     them, to get to know them. You show you understood the answers ("Ah, oui ?", "D'accord").
+  3. "Le dialogue simulé" (about 2 minutes): a role-play of an everyday situation. In the example
+     you're the customer and the examiner the shop assistant: ask the price of what you want to buy,
+     the quantities, and pay, with pictures of coins and notes, greeting and using polite forms.
+- **A2** (10 minutes' preparation for parts 2 and 3):
+  1. "L'entretien dirigé" (about 1 minute 30, no preparation): introduce yourself, your family,
+     friends, studies and tastes; the examiner asks follow-up questions ("Qu'est-ce que vous aimez
+     faire de votre temps libre ?").
+  2. "Le monologue suivi" (about 2 minutes): talk on a chosen theme, answering its questions; then
+     the examiner's questions. You present an event, an activity, a project or a place, linking ideas
+     with "et", "mais" and "parce que".
+  3. "L'exercice en interaction" (3–4 minutes): a role-play to resolve an everyday situation (in the
+     example, you're a customer and the examiner works at the station). You ask for information,
+     make proposals, and use polite forms.
+- **B1:**
   1. "L'entretien dirigé" (2–3 minutes, no preparation): talk about yourself, your family, work or
      studies, likes, habits, past, present and plans; the examiner asks follow-up questions ("What
      did you do last weekend?").
@@ -604,11 +625,20 @@ model paper's link was dead.
   3. "L'expression d'un point de vue" (5–7 minutes, 10 minutes' preparation): a structured
      three-minute talk giving your opinion on the theme of a short document, then the examiner's
      questions.
-- **B2** (secondary): presenting and defending a point of view from a short document, with
-  30 minutes' preparation.
-- **C1** (secondary): a talk built from two or three documents on one theme, followed by a debate
-  with the jury; one hour's preparation.
-- **C2** (official; 30 minutes, one hour's preparation after two listenings):
+- **B2** (30 minutes' preparation):
+  1. "Le monologue suivi : défense d'un point de vue argumenté" (5–7 minutes): find the issue the
+     document raises, announce a plan, and present and defend your view with relevant examples.
+  2. "L'exercice en interaction : débat" (10–13 minutes, no preparation): the examiner questions what
+     you said, and you defend your view to convince them. You confirm and nuance your opinion, concede
+     points, and agree or disagree ("Je comprends ce que vous dites mais…").
+- **C1** (one hour's preparation):
+  1. "Exposé" (8–10 minutes): a structured talk on a theme, built from a set of documents, with three
+     or four main points. The documents are a source: "En aucun cas vous ne devez vous limiter à un
+     simple compte rendu des documents" (you must never limit yourself to a summary of the
+     documents); you add your own comments, ideas and examples.
+  2. "Entretien" (15–20 minutes, no preparation): the jury asks about your talk and discusses it with
+     you; you defend your opinion and keep the discussion going.
+- **C2** (30 minutes, one hour's preparation after two listenings):
   1. A summary of an audio document ("compte rendu du contenu d'un document sonore").
   2. A personal argued development of the issue it raises.
   3. A debate with the jury.
@@ -642,23 +672,75 @@ Across the exams, the same few shapes come back, each over a range of levels:
 
 | Shape | Levels | Examples |
 |---|---|---|
-| Interview about yourself | A1–B1 | Goethe A1 "Sich vorstellen"; DELF "entretien dirigé" |
-| Information exchange from prompts | A1–A2 | Goethe A1 theme word cards; DELF A1 |
+| Interview about yourself | A1–B1 | Goethe A1 "Sich vorstellen"; DELF A1–B1 "entretien dirigé" |
+| Information exchange from prompts: the learner asks the questions | A1–A2 | Goethe A1 theme word cards; DELF A1 word cards |
 | Requests and responses | A1 | Goethe A1 picture cards |
-| Simulated everyday dialogue (role-play) | A1–B1 | DELF A1–A2 "dialogue simulé"; DELE A1–B1 |
+| Simulated everyday dialogue (role-play): buy, ask prices, pay; resolve a routine situation | A1–A2 | DELF A1 "dialogue simulé", DELF A2 "exercice en interaction"; DELE A1–B1 |
 | Role-play of an unusual everyday situation: solve it, insist, propose | B1 | DELF B1 "exercice en interaction" |
 | Plan something together | A2–B1 | Goethe B1 "Gemeinsam etwas planen" |
-| Short monologue or presentation on a theme | A2–B1 | Goethe B1 (from slides); DELE A2–B1 |
+| Short monologue or presentation on a theme, then questions | A2–B1 | DELF A2 "monologue suivi"; Goethe B1 (from slides); DELE A2–B1 |
 | Describe a picture, then talk about it | B1–B2 | DELE B1; DELE B2 (imagined situation) |
 | Give an opinion from a short document | B1–B2 | DELF B1 and B2 |
+| Defend a view, then debate it with the other person | B2–C2 | DELF B2 "débat"; Goethe C2 |
 | Prepared talk, then questions | B2–C2 | Goethe B2, C1, C2 |
-| Discussion or debate on a controversial question | B2–C2 | Goethe B2–C2; DALF C1–C2 |
-| Report on a source (texts or audio), then argue and debate | C1–C2 | DALF C1 (documents), DALF C2 (audio) |
+| Discussion or debate on a controversial question | B2–C2 | Goethe B2–C2; DALF C1 "entretien", DALF C2 "débat" |
+| Talk built from several sources, with your own reflection, then discussion | C1 | DALF C1 "exposé" and "entretien" |
+| Report on a source (audio), then argue and debate | C2 | DALF C2 |
 
 The progression matches the Companion Volume's:
 - **Basic:** talk about yourself and get things done in predictable situations.
 - **Independent:** handle something unexpected, plan, and give opinions with reasons.
 - **Proficient:** argue, persuade, and pass on and judge what sources say.
+
+### Generalised: the task shapes for every language
+
+The official French and German exams, every level of both, confirm the pattern the secondary sources
+showed for Spanish, Turkish, Russian and Indonesian. So Pedant uses one set of task shapes per band,
+for every language, without consulting each language's own exam. Only two things differ by language:
+which test the band corresponds to (task 4), and the setting each scene takes where the language is
+spoken (task 3).
+
+**Basic (A1–A2):**
+- **Interview about you:** Gemma asks about the learner, their family, tastes, activities and town,
+  and follows up.
+- **Getting to know Gemma:** the learner asks the questions, from a few prompt words (name, family,
+  work, weekend), and shows they understood the answers.
+- **Everyday transaction:** buy or order something, ask prices and quantities, pay; ask the way;
+  buy a ticket.
+- **Requests:** ask for something and respond to requests.
+- **Resolve a routine situation:** a simple everyday problem (a wrong ticket, a missing item), asking
+  for information and making proposals.
+- **Short talk on a familiar theme:** about two minutes on an event, an activity, a plan or a place,
+  then Gemma's questions.
+- **Plan something together:** when and where to meet, what to do.
+
+**Independent (B1–B2):**
+- **Interview about you, with past, present and plans:** Gemma asks follow-up questions that need
+  details and reasons.
+- **Unusual everyday situation:** a role-play with a twist. The learner explains the problem, proposes
+  solutions, gives opinions and feelings, insists, and uses the register the role calls for.
+- **Plan and negotiate together:** several points to settle, making and answering suggestions.
+- **Presentation on a theme, then questions.**
+- **Opinion from a short text:** find the issue a short text raises and give a structured opinion,
+  then answer Gemma's questions (B1).
+- **Defend a view, then debate:** argue a position with examples, then defend it as Gemma pushes
+  back, conceding and nuancing (B2).
+- **Prepared talk weighing options:** advantages and disadvantages of several options, then
+  questions (B2).
+- **Describe a picture, then talk about it.**
+
+**Proficient (C1–C2):**
+- **Talk from several sources with your own reflection, then discussion:** not a summary; the
+  learner's own argument, drawing on the sources (C1).
+- **Controversial question:** take a side, answer Gemma's counter-arguments, and try to convince
+  Gemma (C1–C2).
+- **Weigh viewpoints:** a talk weighing several stated positions, with your own made clear, then
+  questions (C2).
+- **Report on an audio source, develop it, debate it** (C2).
+- **Plain exchanges of facts are not Proficient tasks** (see the Companion Volume above).
+
+These shapes are what the scenario ingredient lists (plan task 9) draw on, alongside the can-do tasks
+from task 1. Which ones need something new in the app is below.
 
 ### Which shapes can be instructions to Gemma
 
