@@ -35,7 +35,7 @@ object QuizSamples {
         listOf("The friends arrived last night.", "I'd like a coffee, please.", "We're going to play at the park."), 0,
     )
     val wordMeaning = ChoiceQuestion(QuizKind.WordMeaning, "voudrais", null, null, listOf("to arrive", "to want", "friend"), 1)
-    val order = OrderQuestion(listOf("Nous", "allons", "jouer", "au", "parc"), listOf(2, 0, 4, 1, 3), "We're going to play at the park.")
+    val order = OrderQuestion(listOf("nous", "allons", "jouer", "au", "parc"), listOf(2, 0, 4, 1, 3), "We're going to play at the park.")
     val match = MatchQuestion(listOf("café", "amis", "soir", "parc"), listOf("coffee", "friends", "evening", "park"), listOf(2, 0, 3, 1))
     val speak = SpeakQuestion("I'd like a coffee, please.", "Je voudrais un café, s'il vous plaît.")
     val mistake = MistakeQuestion("Nous allez jouer au parc.", 1, "allons", "We're going to play at the park.")

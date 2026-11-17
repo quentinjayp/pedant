@@ -22,6 +22,8 @@ data class Language(
      * know (French's), so the quiz asks which are said.
      */
     val finalConsonants: Boolean = false,
+    /** Whether nouns are written with a capital wherever they are (German), so a capital doesn't mark a sentence's start. */
+    val capitalNouns: Boolean = false,
 ) {
     /** The language's English name after "a" or "an", as Gemma's instructions put it ("an English", "a French"). */
     val withArticle: String get() = (if (englishName.first() in "AEIO") "an " else "a ") + englishName
@@ -60,6 +62,7 @@ fun loadLanguages(context: Context) {
             espeakVoice = o.getString("espeakVoice"),
             articles = o.optJSONArray("articles")?.let { a -> List(a.length()) { a.getString(it) } }.orEmpty(),
             finalConsonants = o.optBoolean("finalConsonants"),
+            capitalNouns = o.optBoolean("capitalNouns"),
         )
     }
 }

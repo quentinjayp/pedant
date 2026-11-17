@@ -225,11 +225,18 @@ object QuizMaker {
     /** Words the same but for case and curly apostrophes. */
     fun same(a: String, b: String) = Dictionary.key(a) == Dictionary.key(b)
 
-    /** A put-it-in-order question on a sentence of [source] of 3 to [limit] words, or null if it has none. */
-    fun order(source: QuizSource, limit: Int, random: Random = Random.Default): OrderQuestion? {
+    /**
+     * A put-it-in-order question on a sentence of [source] of 3 to [limit] words, or null if it has
+     * none. Its first word is lower-cased, so its capital doesn't give it away, unless
+     * [capitalNouns] (German, whose nouns are written with a capital wherever they are) or it's all
+     * capitals ("I").
+     */
+    fun order(source: QuizSource, limit: Int, capitalNouns: Boolean = false, random: Random = Random.Default): OrderQuestion? {
         val all = sentences(source.phrase)
         val sentence = all.filter { wordsOf(it).size in 3..limit }.randomOrNull(random) ?: return null
-        val words = wordsOf(sentence)
+        val words = wordsOf(sentence).toMutableList()
+        val first = words[0]
+        if (!capitalNouns && first != first.uppercase()) words[0] = first.replaceFirstChar { it.lowercase() }
         // A start that isn't already the sentence (by its words: two of the same word don't count).
         val start = (1..20).map { words.indices.shuffled(random) }.firstOrNull { o -> o.map { words[it] } != words } ?: return null
         return OrderQuestion(words, start, source.english.takeIf { all.size == 1 })

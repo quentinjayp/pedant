@@ -2039,7 +2039,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val gemma = checkNotNull(tutor)
         val phrase = source.phrase
         return when (kind) {
-            QuizKind.Order -> QuizMaker.order(source, q.wordLimit)
+            QuizKind.Order -> QuizMaker.order(source, q.wordLimit, lang.capitalNouns)
             QuizKind.Speak -> QuizMaker.speak(source, q.wordLimit)
             QuizKind.PhraseMeaning -> QuizMaker.phraseMeaning(source, q.phrases)
             QuizKind.FillGap, QuizKind.Mistake -> {

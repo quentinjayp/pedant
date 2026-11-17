@@ -55,8 +55,16 @@ class QuizTest {
     fun orderPicksASentenceThatFits() {
         val source = QuizSource("Bonjour. Je voudrais un café noir, s'il vous plaît, avec du sucre.", "x")
         val order = checkNotNull(QuizMaker.order(QuizSource("Je suis là. " + source.phrase, "x"), Quiz.BEGINNER_WORDS))
-        assertEquals(listOf("Je", "suis", "là"), order.words)
+        assertEquals("the first word's capital doesn't give it away", listOf("je", "suis", "là"), order.words)
         assertNull("no own line for one sentence of several", order.hint)
+    }
+
+    @Test
+    fun orderKeepsCapitalsThatArentTheSentencesStart() {
+        val german = checkNotNull(QuizMaker.order(QuizSource("Kaffee ist gut.", "x"), Quiz.BEGINNER_WORDS, capitalNouns = true))
+        assertEquals(listOf("Kaffee", "ist", "gut"), german.words)
+        val english = checkNotNull(QuizMaker.order(QuizSource("I like coffee.", "x"), Quiz.BEGINNER_WORDS))
+        assertEquals(listOf("I", "like", "coffee"), english.words)
     }
 
     @Test

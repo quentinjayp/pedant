@@ -2505,7 +2505,13 @@ private fun DragToOrder(question: OrderQuestion, answered: List<Int>?, onCheck: 
             PillButton("Check", { onCheck(order.toList()) }, PillStyle.Cta)
         }
     } else if (answered.map { question.words[it] } != question.words) {
-        Text(question.words.joinToString(" "), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Pastel.Right)
+        // As a sentence: its first word lower-cased for the question gets its capital back.
+        Text(
+            question.words.joinToString(" ").replaceFirstChar { it.uppercase() },
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = Pastel.Right,
+        )
     }
 }
 
