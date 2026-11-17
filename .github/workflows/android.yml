@@ -45,6 +45,45 @@ jobs:
             Debug build from commit ${{ github.sha }}.
             Install pedant.apk on an Android phone (allow installs from unknown sources).
 
+  quiz-tests:
+    # The quiz's unit tests (QuizTest) and screenshots of its screens drawn on the JVM
+    # (QuizScreenshotTest), published with the test report on the "screenshots" pre-release as
+    # screenshots.zip. Never fails the run: it's there to be looked at.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Download sherpa-onnx Android library
+        run: |
+          mkdir -p app/libs
+          curl -fsSL -o app/libs/sherpa-onnx-1.13.8.aar \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
+      - name: Run the tests and draw the screenshots
+        run: ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.pedant.app.Quiz*' -Proborazzi.test.record=true
+      - name: Package them
+        if: always()
+        run: |
+          mkdir -p out
+          cd app/build
+          zip -qr ../../out/screenshots.zip outputs/roborazzi reports/tests/testDebugUnitTest test-results/testDebugUnitTest || true
+      - name: Publish them
+        if: always()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: screenshots
+          name: Screenshots
+          prerelease: true
+          make_latest: false
+          files: out/screenshots.zip
+          body: |
+            Screenshots of the app's screens and the test report, from commit ${{ github.sha }}.
+            Replaced on every push to the branch.
+
   check-espeak:
     # Builds the app's espeak-ng bridge (app/src/main/cpp) for Linux and has it give the phonemes of
     # every language's built-in opening, with the espeak-ng-data the voices come with: the expected

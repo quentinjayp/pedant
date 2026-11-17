@@ -2215,7 +2215,7 @@ private fun HearButtons(label: String, onHear: (slow: Boolean) -> Unit) {
 
 /** Offers the quiz on the last conversation before a new one: Quiz or Skip. */
 @Composable
-private fun QuizOfferDialog(vm: AppViewModel, offer: AppViewModel.QuizOffer) {
+internal fun QuizOfferDialog(vm: AppViewModel, offer: AppViewModel.QuizOffer) {
     Dialog(onDismissRequest = vm::dismissQuizOffer) {
         Column(
             Modifier
@@ -2245,7 +2245,7 @@ private fun QuizOfferDialog(vm: AppViewModel, offer: AppViewModel.QuizOffer) {
 
 /** The quiz: a page of its own, a question at a time. Back leaves it, and continuing comes back to it. */
 @Composable
-private fun QuizScreen(vm: AppViewModel, q: Quiz) {
+internal fun QuizScreen(vm: AppViewModel, q: Quiz) {
     BackHandler(onBack = vm::goHome)
     val idle = vm.busy == Busy.Idle
     val question = q.current

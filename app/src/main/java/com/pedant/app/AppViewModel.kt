@@ -2181,6 +2181,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** For the screenshot tests: shows [quiz] on [lang], with the question on screen answered [answer], or [offer] offered. */
+    @androidx.annotation.VisibleForTesting
+    internal fun showQuizForTest(lang: Language, quiz: Quiz?, answer: QuizAnswer? = null, offer: QuizOffer? = null) {
+        language = lang
+        this.quiz = quiz
+        quizAnswer = answer
+        quizOffer = offer
+        screen = Screen.Quiz
+    }
+
     /** Starts recording the answer to a say-it-from-memory question. */
     fun startQuizTalking() {
         if (quiz?.current !is SpeakQuestion || quizAnswer != null || busy != Busy.Idle) return

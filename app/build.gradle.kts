@@ -2,6 +2,8 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    // Screenshots of the app's screens drawn on the JVM (the quiz-tests job in android.yml).
+    id("io.github.takahirom.roborazzi")
 }
 
 android {
@@ -45,6 +47,11 @@ android {
         compose = true
     }
 
+    testOptions {
+        // The screenshot tests start the app's view model, which reads its assets.
+        unitTests.isIncludeAndroidResources = true
+    }
+
     // espeak-ng, for the expected sounds shown (src/main/cpp, Phonemizer.kt).
     externalNativeBuild {
         cmake {
@@ -80,4 +87,11 @@ dependencies {
     // The dictionary report (DictionaryReportTest), which runs the app's lookup on the JVM.
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
+
+    // The quiz's tests and screenshots (QuizTest, QuizScreenshotTest).
+    testImplementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.77.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.77.0")
 }
