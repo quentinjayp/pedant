@@ -383,9 +383,10 @@ The focus is on how much effort is required from the interlocutor to decode the 
   effectively in order to convey finer shades of meaning (e.g. to differentiate and emphasise)."
 
 **For Pedant:**
-- **The standard differs.** The CEFR measures how easily a listener understands; Pedant measures how
-  close each sound is to one voice's pronunciation. By the CEFR, systematic mispronunciation is
-  expected up to B2.
+- **The standard differs, by design.** The CEFR measures how easily a listener understands; Pedant
+  grades how close each sound is to one voice's pronunciation, a clear model to learn from. What the
+  CEFR's scales can inform is how lenient grading is at each band: systematic mispronunciation is
+  expected at the A levels and B1.
 - **Prosody isn't graded.** Pedant grades sounds, not stress, rhythm or intonation, which the CEFR
   treats as half of phonological control from A1. (The roadmap's "Tones and intonation" item would add
   some of it.)
@@ -488,8 +489,8 @@ vocabulary and structures the learner practises saying.
 
 **Phonology.** The phonology column measures intelligibility, not the absence of an accent: from B2
 up, an accent from the learner's other languages is expected and acceptable as long as it doesn't get
-in the way of being understood. Pedant grades sounds against one voice's pronunciation, which is a
-stricter standard than the CEFR's at every band.
+in the way of being understood. Pedant grades sounds against one voice's pronunciation, by design;
+the bands could set how lenient that grading is (see Phonology above).
 
 ## What this means for the evals (task 5)
 
@@ -537,8 +538,8 @@ rephrasing.
 - Which topics and situations do courses use at each level, and how do they differ by culture
   (task 3)?
 **From this research, for later decisions:**
-- How Pedant's grading should relate to the CEFR's standard of intelligibility, given that systematic
-  mispronunciation is expected up to B2 and prosody is half of the CEFR's phonology.
+- How lenient grading should be at each band, against the one voice, without becoming too strict for
+  ZIPA's own mistakes; and grading prosody (stress, rhythm, intonation).
 - Whether Formal / Casual should be offered at Basic, where the CEFR expects a neutral register.
 - Whether Gemma should welcome words from the learner's own language mid-sentence (compensating,
   plurilingual repertoire), as the "Reaching for a missing word" roadmap item would.

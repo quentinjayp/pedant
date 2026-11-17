@@ -103,6 +103,9 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
 
 ## Grading
 
+- **Graded against one voice.** Each sound is graded against one voice's pronunciation (the
+  language's Piper voice), as a clear model to learn from. Grading's leniency by band and prosody are
+  on the roadmap.
 - **A word passes if:**
   - the speech recognizer heard it; or
   - its sounds are close enough to espeak-ng's expected sounds, or to ZIPA's hearing of Piper (whichever is closer); or

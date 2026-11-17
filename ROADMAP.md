@@ -67,11 +67,14 @@ Beginner and Intermediate are built. A third mode is planned.
   phrase, which includes liaisons that are optional ("vous avez un", "pas encore"), so leaving one out
   counts against the learner as if it were required. Whether to tell required from optional ones,
   and how.
-- **Investigate how Pedant's grading should relate to the CEFR's standard.** The CEFR's phonology
-  scales judge how easily a listener understands the speaker, not closeness to one pronunciation:
-  they expect systematic mispronunciation up to B2, and half of them is stress, rhythm and intonation,
-  which Pedant doesn't grade. Pedant grades each sound against one voice. See
-  [docs/research/bands.md](docs/research/bands.md#phonology).
+- **Investigate grading leniency by band.** Grading stays against one voice, but how forgiving it
+  is could follow the band, as the CEFR's phonology scales do: they expect systematic mispronunciation
+  at the A levels and B1, and fewer mispronunciations at each band above. It has to be done carefully
+  and never too strict, since ZIPA itself mishears: calibrated on real speech, as grading changes are
+  now. See [docs/research/bands.md](docs/research/bands.md#phonology).
+- **Prosody.** Grade stress, rhythm and intonation against the voice, as well as individual sounds.
+  The CEFR treats prosody as half of phonological control from A1. Related to "Tones and intonation"
+  under Languages, which grades the pitch of syllables and the rise and fall of sentences.
 
 ## Levels and scenarios
 
