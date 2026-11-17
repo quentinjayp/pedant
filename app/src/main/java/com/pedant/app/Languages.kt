@@ -17,6 +17,11 @@ data class Language(
     val espeakVoice: String,
     /** The articles a singular noun takes, one per gender ("le", "la"), for the quiz; empty if they don't show it. */
     val articles: List<String> = emptyList(),
+    /**
+     * Whether the language drops most final consonants, said or not by rules a learner has to
+     * know (French's), so the quiz asks which are said.
+     */
+    val finalConsonants: Boolean = false,
 ) {
     /** The language's English name after "a" or "an", as Gemma's instructions put it ("an English", "a French"). */
     val withArticle: String get() = (if (englishName.first() in "AEIO") "an " else "a ") + englishName
@@ -54,6 +59,7 @@ fun loadLanguages(context: Context) {
             },
             espeakVoice = o.getString("espeakVoice"),
             articles = o.optJSONArray("articles")?.let { a -> List(a.length()) { a.getString(it) } }.orEmpty(),
+            finalConsonants = o.optBoolean("finalConsonants"),
         )
     }
 }

@@ -38,6 +38,25 @@ object Phonemizer {
     }
 
     /**
+     * Each word's sounds as espeak-ng reads [phrase] (with its liaisons, carried onto the end of the
+     * word before: "les amis" is /lez ami/), as [symbols]. Null if espeak-ng can't be used or doesn't
+     * read it as [count] words.
+     */
+    @Synchronized
+    fun inPhrase(dataDir: File, voice: String, phrase: String, count: Int): List<List<String>>? {
+        if (!ready(dataDir)) return null
+        val whole = nativePhonemize(voice, phrase)?.split(SPACES)?.filter { it.isNotEmpty() } ?: return null
+        return whole.takeIf { it.size == count }?.map(::symbols)
+    }
+
+    /** [word]'s sounds as espeak-ng says it on its own, as [symbols]; null if espeak-ng can't be used. */
+    @Synchronized
+    fun alone(dataDir: File, voice: String, word: String): List<String>? {
+        if (!ready(dataDir)) return null
+        return nativePhonemize(voice, word)?.replace(SPACES, "")?.let(::symbols)
+    }
+
+    /**
      * [word]'s IPA as espeak-ng says it on its own, with its stress marks, for showing; null if
      * espeak-ng can't be used.
      */

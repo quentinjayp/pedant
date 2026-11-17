@@ -20,6 +20,8 @@ enum class QuizKind(val title: String, val needsGemma: Boolean) {
     Speak("Say it from memory", false),
     /** Intermediate only. */
     Mistake("Spot the mistake", true),
+    /** Only in languages that drop most final consonants (French); see [Language.finalConsonants]. */
+    Finals("Said or silent?", false),
 }
 
 /** "Le or la?", "Der, die or das?": the title of an article question in a language with [articles]. */
@@ -67,6 +69,32 @@ data class MistakeQuestion(val sentence: String, val wrong: Int, val right: Stri
     override val kind get() = QuizKind.Mistake
 }
 
+/** How a word's last written consonant comes out in a phrase. */
+enum class FinalSound(val title: String) {
+    Said("said"),
+    Silent("silent"),
+    /** Silent on its own, but said here, carried onto the next word (a liaison). */
+    CarriedOver("carried onto the next word"),
+}
+
+/**
+ * Tap the words of [sentence] whose last consonant is said: [candidates] are the words (by
+ * position) that end in a consonant letter, [finals] how each one's comes out, and [sounds] each
+ * one's sounds in the sentence, as espeak-ng reads it.
+ */
+data class FinalsQuestion(
+    val sentence: String,
+    val candidates: List<Int>,
+    val finals: List<FinalSound>,
+    val sounds: List<String>,
+    val hint: String?,
+) : QuizQuestion {
+    override val kind get() = QuizKind.Finals
+
+    /** The words whose last consonant is said, carried over or not. */
+    val said: Set<Int> get() = candidates.filterIndexed { i, _ -> finals[i] != FinalSound.Silent }.toSet()
+}
+
 /** How the learner answered the question on screen. */
 sealed interface QuizAnswer {
     data class Chosen(val option: Int) : QuizAnswer
@@ -74,6 +102,7 @@ sealed interface QuizAnswer {
     data object Matched : QuizAnswer
     data class Spoken(val result: AttemptResult) : QuizAnswer
     data class Tapped(val position: Int) : QuizAnswer
+    data class Picked(val positions: Set<Int>) : QuizAnswer
 }
 
 /** Whether [answer] is right for [question]. */
@@ -84,6 +113,7 @@ fun isRight(question: QuizQuestion, answer: QuizAnswer): Boolean = when {
     question is MatchQuestion && answer is QuizAnswer.Matched -> true
     question is SpeakQuestion && answer is QuizAnswer.Spoken -> answer.result.passed
     question is MistakeQuestion && answer is QuizAnswer.Tapped -> answer.position == question.wrong
+    question is FinalsQuestion && answer is QuizAnswer.Picked -> answer.positions == question.said
     else -> false
 }
 
@@ -163,6 +193,9 @@ data class Quiz(
             is SpeakQuestion -> JSONObject().put("type", "speak").put("english", q.english).put("phrase", q.phrase)
             is MistakeQuestion -> JSONObject().put("type", "mistake").put("sentence", q.sentence).put("wrong", q.wrong)
                 .put("right", q.right).put("hint", q.hint)
+            is FinalsQuestion -> JSONObject().put("type", "finals").put("sentence", q.sentence)
+                .put("candidates", JSONArray(q.candidates)).put("finals", JSONArray(q.finals.map { it.name }))
+                .put("sounds", JSONArray(q.sounds)).put("hint", q.hint)
         }
 
         private fun question(o: JSONObject): QuizQuestion = when (o.getString("type")) {
@@ -173,6 +206,11 @@ data class Quiz(
             "order" -> OrderQuestion(o.getJSONArray("words").strings(), o.getJSONArray("start").ints(), o.optStringOrNull("hint"))
             "match" -> MatchQuestion(o.getJSONArray("words").strings(), o.getJSONArray("meanings").strings(), o.getJSONArray("shuffled").ints())
             "speak" -> SpeakQuestion(o.getString("english"), o.getString("phrase"))
+            "finals" -> FinalsQuestion(
+                o.getString("sentence"), o.getJSONArray("candidates").ints(),
+                o.getJSONArray("finals").strings().map { FinalSound.valueOf(it) },
+                o.getJSONArray("sounds").strings(), o.optStringOrNull("hint"),
+            )
             else -> MistakeQuestion(o.getString("sentence"), o.getInt("wrong"), o.getString("right"), o.optStringOrNull("hint"))
         }
     }
@@ -253,6 +291,50 @@ object QuizMaker {
         text.lines().first().split('|').map(::cleanWord)
             .filter { it.isNotEmpty() && wordsOf(it) == listOf(it) && !same(it, word) }
             .distinctBy { Dictionary.key(it) }
+
+    /**
+     * A said-or-silent question on [source]: [inPhrase] is each of its words' sounds as espeak-ng
+     * reads the phrase (with its liaisons), and [alone] gives a word's sounds on its own (by
+     * position). A word's last consonant is said if its sounds end in a consonant; one that's said
+     * here but not on its own is carried onto the next word. Words ending in a glide ("travail",
+     * /tʁavaj/) are left out, since whether their last letter is "said" is unclear. Null unless at
+     * least one word's last consonant is said and one's is silent.
+     */
+    fun finals(source: QuizSource, inPhrase: List<List<String>>, alone: (Int) -> List<String>?): FinalsQuestion? {
+        val words = wordsOf(source.phrase)
+        if (inPhrase.size != words.size) return null
+        val candidates = mutableListOf<Int>()
+        val finals = mutableListOf<FinalSound>()
+        val sounds = mutableListOf<String>()
+        for ((i, word) in words.withIndex()) {
+            val letter = word.last().lowercaseChar()
+            if (!letter.isLetter() || letter in VOWEL_LETTERS) continue
+            val last = lastSound(inPhrase[i]) ?: continue
+            if (last in GLIDES) continue
+            val outcome = when {
+                !isConsonant(last) -> FinalSound.Silent
+                alone(i)?.let(::lastSound)?.let(::isConsonant) == false -> FinalSound.CarriedOver
+                else -> FinalSound.Said
+            }
+            candidates += i
+            finals += outcome
+            sounds += inPhrase[i].joinToString("")
+        }
+        if (candidates.size < 2 || FinalSound.Silent !in finals || finals.all { it == FinalSound.Silent }) return null
+        return FinalsQuestion(source.phrase, candidates, finals, sounds, source.english)
+    }
+
+    /** The last sound of [sounds], without the marks after it (nasal, length). */
+    private fun lastSound(sounds: List<String>): String? = sounds.lastOrNull { s ->
+        s.isNotEmpty() && Character.getType(s[0]) != Character.NON_SPACING_MARK.toInt() && s !in LENGTH_MARKS
+    }
+
+    private fun isConsonant(sound: String) = sound.none { it in VOWEL_SOUNDS } && sound.any { it.isLetter() }
+
+    private const val VOWEL_LETTERS = "aeiouyàâäéèêëîïôöùûüÿœæ"
+    private const val VOWEL_SOUNDS = "aeiouyøœɛɔəɑɐɪʊʏɜæɒʌɤɯɨʉɚ"
+    private val GLIDES = setOf("j", "w", "ɥ")
+    private val LENGTH_MARKS = setOf("ː", "ˑ")
 
     private fun cleanWord(s: String) = s.trim().trim('"', '“', '”', '«', '»', '\'', '*', '.', ',', '`').trim()
 

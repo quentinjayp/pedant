@@ -2298,6 +2298,7 @@ private fun QuizScreen(vm: AppViewModel, q: Quiz) {
                         is OrderQuestion -> "Drag the words into order, then check"
                         is MatchQuestion -> "Tap a word, then its meaning"
                         is MistakeQuestion -> "Tap the word that's wrong"
+                        is FinalsQuestion -> "Tap the words whose last consonant is said, then check"
                         else -> if (idle) "Pick an answer" else vm.busy.label
                     },
                     fontSize = 12.sp,
@@ -2332,6 +2333,7 @@ private fun QuizScreen(vm: AppViewModel, q: Quiz) {
                         is MatchQuestion -> MatchBody(question, answered = answer != null) { vm.answerQuiz(QuizAnswer.Matched) }
                         is SpeakQuestion -> SpeakBody(vm, question, answer as? QuizAnswer.Spoken, idle)
                         is MistakeQuestion -> MistakeBody(question, answer as? QuizAnswer.Tapped) { vm.answerQuiz(QuizAnswer.Tapped(it)) }
+                        is FinalsQuestion -> FinalsBody(question, (answer as? QuizAnswer.Picked)?.positions) { vm.answerQuiz(QuizAnswer.Picked(it)) }
                     }
                     if (answer != null) QuizVerdict(isRight(question, answer))
                 }
@@ -2634,5 +2636,81 @@ private fun MistakeBody(question: MistakeQuestion, answer: QuizAnswer.Tapped?, o
             fontSize = 16.sp,
             color = Pastel.Ink,
         )
+    }
+}
+
+/**
+ * Tap the words whose last consonant is said: the words ending in a consonant are tiles that toggle.
+ * Once checked, each tile is green if it was picked right (said and tapped, or silent and left) and
+ * red if not, and each word's sounds in the sentence are listed with how its last consonant comes out.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FinalsBody(question: FinalsQuestion, answered: Set<Int>?, onCheck: (Set<Int>) -> Unit) {
+    val picked = remember(question) { mutableStateListOf<Int>() }
+    val chosen = answered ?: picked.toSet()
+    val words = wordsOf(question.sentence)
+    Text("Tap the words whose last consonant is said.", fontSize = 14.sp, color = Pastel.InkSoft)
+    FlowRow(
+        Modifier.fillMaxWidth().card(Pastel.SurfaceLow, shape = RoundedCornerShape(18.dp)).padding(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        words.forEachIndexed { i, word ->
+            if (i in question.candidates) {
+                val state = when {
+                    answered == null -> if (i in chosen) TileState.Picked else TileState.Plain
+                    (i in chosen) == (i in question.said) -> TileState.Right
+                    else -> TileState.Wrong
+                }
+                Text(
+                    word,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (state == TileState.Plain) Pastel.PrimaryInk else state.ink(),
+                    modifier = Modifier
+                        .quizTile(state, RoundedCornerShape(14.dp))
+                        .clickable(enabled = answered == null) { if (i in picked) picked.remove(i) else picked.add(i) }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+            } else {
+                Text(
+                    word,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Pastel.InkSoft,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
+        }
+    }
+    question.hint?.let { Text("“$it”", fontSize = 13.sp, color = Pastel.PrimaryDark) }
+    if (answered == null) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            PillButton("Check", { onCheck(picked.toSet()) }, PillStyle.Cta)
+        }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            question.candidates.forEachIndexed { n, i ->
+                val outcome = question.finals[n]
+                Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Pastel.PrimaryInk)) { append(words[i]) }
+                        withStyle(SpanStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = Pastel.PrimaryDark)) {
+                            append("  /${question.sounds[n]}/  ")
+                        }
+                        append(
+                            if (outcome == FinalSound.CarriedOver) {
+                                words.getOrNull(i + 1)?.let { "carried onto “$it”" } ?: outcome.title
+                            } else {
+                                outcome.title
+                            },
+                        )
+                    },
+                    fontSize = 14.sp,
+                    color = if (outcome == FinalSound.Silent) Pastel.InkSoft else Pastel.Ink,
+                )
+            }
+        }
     }
 }

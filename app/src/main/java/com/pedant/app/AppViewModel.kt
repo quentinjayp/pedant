@@ -2014,6 +2014,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val kinds = QuizKind.entries
             .filter { it != QuizKind.Mistake || q.mode == Mode.Intermediate }
             .filter { it != QuizKind.Article || lang.articles.isNotEmpty() }
+            .filter { it != QuizKind.Finals || lang.finalConsonants }
             .filter { it != QuizKind.Match || asked[it] == null }
             .shuffled()
             .sortedBy { asked[it] ?: 0 }
@@ -2067,6 +2068,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val (word, meaning) = meaningsFrom(lang, listOf(source), 1).firstOrNull() ?: return null
                 val others = meaningsFrom(lang, q.phrases.shuffled(), 2, except = word to meaning).map { it.second }
                 if (others.size < 2) null else QuizMaker.choice(kind, word, null, null, meaning, others)
+            }
+            QuizKind.Finals -> withContext(Dispatchers.Default) {
+                val words = wordsOf(phrase)
+                val inPhrase = Phonemizer.inPhrase(store.espeakData, lang.espeakVoice, lang.espeakText(phrase), words.size)
+                    ?: return@withContext null
+                QuizMaker.finals(source, inPhrase) { i -> Phonemizer.alone(store.espeakData, lang.espeakVoice, lang.espeakText(words[i])) }
             }
             QuizKind.Match -> {
                 val pairs = meaningsFrom(lang, listOf(source) + q.phrases.filter { it != source }.shuffled(), MATCH_PAIRS)
