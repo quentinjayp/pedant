@@ -87,6 +87,19 @@ proficiency tests use. The fixed list of scenarios is replaced by scenarios made
   band and language for sense and level, and whether Gemma holds each band's level at all (E2B at
   Basic, both models at Proficient).
 
+## Models
+
+- **Explore running the model on your own computer.** For what Gemma on the phone may not manage
+  (the Proficient band, if the evals show E4B can't hold it in a language), explore letting Pedant
+  use a bigger model served from the learner's own computer: Ollama or llama.cpp's server (both
+  speak the same OpenAI-style API), reached from the phone anywhere over Tailscale, behind HTTPS
+  with `tailscale serve`, with no ports opened to the internet. Nothing goes to a company and
+  nothing is paid per use. Speech, sounds, the voice and grading stay on the phone; only text goes
+  to the server. When the computer can't be reached, Pedant falls back to Gemma, or to the bands
+  Gemma can do. The evals would gain a third engine, "an OpenAI-style server at this address", so
+  the learner's own model is measured the same way as Gemma. The same setting could take a cloud
+  provider's address and key, for learners without a capable computer.
+
 ## Conversations
 
 - **Voice selector.** Choose the language's voice in the conversation settings (the gear).
