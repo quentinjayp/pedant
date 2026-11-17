@@ -2216,9 +2216,11 @@ private fun HearButtons(label: String, onHear: (slow: Boolean) -> Unit) {
 /** Offers the quiz on the last conversation before a new one: Quiz or Skip. */
 @Composable
 internal fun QuizOfferDialog(vm: AppViewModel, offer: AppViewModel.QuizOffer) {
-    Dialog(onDismissRequest = vm::dismissQuizOffer) {
+    // As wide as the app's other bubbles (see PopupCard).
+    Dialog(onDismissRequest = vm::dismissQuizOffer, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
             Modifier
+                .padding(16.dp)
                 .fillMaxWidth()
                 .card(Pastel.White, Pastel.Violet, RoundedCornerShape(30.dp), borderWidth = 2.dp)
                 .padding(20.dp),
