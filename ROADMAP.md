@@ -27,6 +27,9 @@ Beginner and Intermediate are built. A third mode is planned.
 
 - **Sounds practice.** A learning section where you practise saying different IPA sounds and are
   graded on them.
+- **Investigate tracking words said right and wrong over time.** How often each word is said right
+  or wrong, kept over time (for example in a SQLite table of attempts), to see trends. Parked to think
+  about.
 
 ## Languages
 
@@ -34,6 +37,25 @@ Beginner and Intermediate are built. A third mode is planned.
   gives the tones for Mandarin and Vietnamese), and the rise and fall of a sentence, such as a
   question's. Then bring back Mandarin and Vietnamese, removed because the app couldn't tell when a
   tone was wrong.
+
+- **Investigate dialects, such as Québécois French.** Gemma may hold a dialect's vocabulary; the
+  blocker found was the voice, since no Québécois Piper voice was found, so expected sounds would be
+  France French.
+
+## Words
+
+- **Investigate Gemma choosing the meaning that fits the sentence.** Gemma would be given the
+  sentence and the dictionary's candidate meanings and pick one; the bubble would still show
+  Wiktionary's text. Its accuracy would need measuring first, in the evals. A related change, showing
+  both the whole word's meaning and its parts' (for words split at an apostrophe or hyphen), was set
+  aside at the same time.
+- **Investigate expressions with a meaning of their own in the word bubble.** Groups of words whose
+  meaning isn't their words' meanings put together (like "wise ass" in English).
+- **Investigate meanings in the learner's own language.** The dictionaries are English Wiktionary,
+  so meanings are in English for every own language, and English meanings lose some of what other
+  languages' forms mark (the imperfect's "used to", aspect, gender).
+- **Investigate inflected forms for Finnish.** Every other language's dictionary includes its
+  inflected forms; Finnish's would make its dictionary about 485 MB.
 
 ## Levels and scenarios
 
@@ -107,3 +129,9 @@ proficiency tests use. The fixed list of scenarios is replaced by scenarios made
 ## Platforms
 
 - **Investigate iOS feasibility.**
+
+## Development
+
+- **Investigate the branching and release workflow.** Discussed: dev and main branches with releases
+  cut from main, or trunk-based with release branches; semantic version tags; a fixed link to the
+  latest development build; main as the default branch.
