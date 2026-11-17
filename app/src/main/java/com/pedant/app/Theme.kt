@@ -47,6 +47,11 @@ object Pastel {
     val Wrong = Color(0xFFC62828)
     val RightContainer = Color(0xFFE3F3E4)
     val WrongContainer = Color(0xFFFCE4E4)
+
+    // Pastel pink: one of the matched pairs' colours in the quiz.
+    val Pink = Color(0xFFF2A7CF)
+    val PinkContainer = Color(0xFFFCE6F2)
+    val PinkDark = Color(0xFF7A1F52)
 }
 
 /** The logo's own colours, brighter than the app's: orange, violet and cyan. */

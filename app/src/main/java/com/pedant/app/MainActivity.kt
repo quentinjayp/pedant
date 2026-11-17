@@ -2539,7 +2539,6 @@ private fun MatchBody(question: MatchQuestion, answered: Boolean, onDone: () -> 
         }
     }
     fun state(index: Int, picked: Int?, inWrong: Int?): TileState = when {
-        answered || index in matched -> TileState.Right
         index == inWrong -> TileState.Wrong
         index == picked -> TileState.Picked
         else -> TileState.Plain
@@ -2548,14 +2547,15 @@ private fun MatchBody(question: MatchQuestion, answered: Boolean, onDone: () -> 
         Column(Modifier.weight(0.8f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             question.words.forEachIndexed { i, w ->
                 val s = state(i, word, wrong?.first)
+                val pairColours = MATCH_COLOURS[i % MATCH_COLOURS.size].takeIf { answered || i in matched }
                 Text(
                     w,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = if (s == TileState.Plain) Pastel.PrimaryInk else s.ink(),
+                    color = pairColours?.ink ?: if (s == TileState.Plain) Pastel.PrimaryInk else s.ink(),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .quizTile(s, RoundedCornerShape(14.dp))
+                        .then(pairColours?.let { Modifier.pairTile(it) } ?: Modifier.quizTile(s, RoundedCornerShape(14.dp)))
                         .clickable(enabled = !answered && i !in matched) {
                             word = i
                             meaning?.let { pair(i, it) }
@@ -2567,14 +2567,15 @@ private fun MatchBody(question: MatchQuestion, answered: Boolean, onDone: () -> 
         Column(Modifier.weight(1.2f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             question.shuffled.forEach { m ->
                 val s = state(m, meaning, wrong?.second)
+                val pairColours = MATCH_COLOURS[m % MATCH_COLOURS.size].takeIf { answered || m in matched }
                 Text(
                     question.meanings[m],
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = s.ink(),
+                    color = pairColours?.ink ?: s.ink(),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .quizTile(s, RoundedCornerShape(14.dp))
+                        .then(pairColours?.let { Modifier.pairTile(it) } ?: Modifier.quizTile(s, RoundedCornerShape(14.dp)))
                         .clickable(enabled = !answered && m !in matched) {
                             meaning = m
                             word?.let { pair(it, m) }
@@ -2585,6 +2586,23 @@ private fun MatchBody(question: MatchQuestion, answered: Boolean, onDone: () -> 
         }
     }
 }
+
+/** A matched pair's colours: its tiles' background, border and text. */
+private data class PairColours(val background: Color, val border: Color, val ink: Color)
+
+/**
+ * The colours matched pairs take, one per pair, so the word and its meaning are clearly together.
+ * Not violet, which marks the tile picked.
+ */
+private val MATCH_COLOURS = listOf(
+    PairColours(Pastel.PrimaryContainer, Pastel.Primary, Pastel.PrimaryDark),
+    PairColours(Pastel.CtaContainer, Pastel.Cta, Pastel.CtaDark),
+    PairColours(Pastel.RightContainer, Pastel.Right, Pastel.Right),
+    PairColours(Pastel.PinkContainer, Pastel.Pink, Pastel.PinkDark),
+)
+
+private fun Modifier.pairTile(colours: PairColours): Modifier =
+    card(colours.background, colours.border, RoundedCornerShape(14.dp), borderWidth = 2.dp)
 
 /** How long a wrong pair stays red in a match-the-pairs question. */
 private const val MATCH_WRONG_MS = 600L
