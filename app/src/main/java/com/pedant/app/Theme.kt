@@ -52,6 +52,11 @@ object Pastel {
     val Pink = Color(0xFFF2A7CF)
     val PinkContainer = Color(0xFFFCE6F2)
     val PinkDark = Color(0xFF7A1F52)
+
+    // Pastel yellow: another of the matched pairs' colours.
+    val Yellow = Color(0xFFF2D24B)
+    val YellowContainer = Color(0xFFFFF8D6)
+    val YellowDark = Color(0xFF5C4A00)
 }
 
 /** The logo's own colours, brighter than the app's: orange, violet and cyan. */

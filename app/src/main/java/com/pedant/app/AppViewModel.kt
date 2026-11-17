@@ -1684,7 +1684,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         const val LOADING_BAR_FILL_MS = 500
 
         /** How many words a match-the-pairs question has. */
-        private const val MATCH_PAIRS = 4
+        private const val MATCH_PAIRS = 5
 
         /** How many words without a meaning the quiz passes over when looking for meanings. */
         private const val MEANING_MISSES = 4

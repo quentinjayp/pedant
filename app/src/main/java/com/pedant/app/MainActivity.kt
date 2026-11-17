@@ -2599,6 +2599,7 @@ private val MATCH_COLOURS = listOf(
     PairColours(Pastel.CtaContainer, Pastel.Cta, Pastel.CtaDark),
     PairColours(Pastel.RightContainer, Pastel.Right, Pastel.Right),
     PairColours(Pastel.PinkContainer, Pastel.Pink, Pastel.PinkDark),
+    PairColours(Pastel.YellowContainer, Pastel.Yellow, Pastel.YellowDark),
 )
 
 private fun Modifier.pairTile(colours: PairColours): Modifier =
