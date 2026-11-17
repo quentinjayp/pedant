@@ -125,7 +125,7 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   - switches words with looping arrows or a sideways swipe;
   - has Normal and Slow; Slow is 40% speed.
 - **Dictionaries:** built from English Wiktionary via kaikki.org.
-  - **Contents:** cut down to spelling, part of speech, IPA, every English meaning (obsolete, archaic, dated, rare and historical ones last, labelled) and the word a form belongs to. All meanings are kept so the bubble, whose meanings scroll, shows every sense, rather than Gemma choosing one.
+  - **Contents:** cut down to spelling, part of speech, IPA, English meanings and the word a form belongs to.
   - **Distribution:** one per language, downloaded separately from the app, from a GitHub Release.
   - **Rebuilds:** monthly. Each run commits a small manifest (versions and checksums), which keeps the schedule active. The dictionaries themselves aren't committed.
   - **Credit:** CC BY-SA, credited to Wiktionary contributors and Wiktextract.
@@ -133,6 +133,9 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   - Gemma is the fallback for words the dictionary lacks; its meanings are labelled as generated.
   - espeak-ng's IPA is used where the dictionary has none, labelled as generated.
 - **The most common meaning shows first,** using part-of-speech counts from Universal Dependencies treebanks.
+- **Every meaning is shown.** The dictionaries keep every meaning Wiktionary lists, and the bubble's scrolling meanings area shows them all, for now in place of Gemma choosing the meaning that fits the sentence.
+  - Obsolete, archaic, dated, rare and historical meanings come last, labelled ("(archaic) …").
+  - Meanings longer than 160 characters are cut.
 - **Splitting words:** a word the dictionary doesn't have is looked up in parts, split at an apostrophe or hyphens. Words with their own entries aren't split.
 - **Inflected forms:** added for every language except Finnish.
 - **Kept and left out:** definitions aren't removed to tidy entries; phrase-level definitions aren't used.
