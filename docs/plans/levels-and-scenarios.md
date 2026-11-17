@@ -59,9 +59,6 @@ Investigation only. Output: `docs/research/bands.md`.
      itself, set up to look for what's wrong. Its judgments are compared with Claude's.
      - If they agree closely enough, Gemma becomes the permanent judge in CI.
      - If not, the permanent eval keeps only the measurable parts (sentence length, word commonness).
-   - **5c. Free hosted judges.** Check whether GitHub still offers free model inference to Actions
-     (GitHub Models). Reports say it was retired in July 2026; that's unconfirmed. If it still
-     exists, compare it with Claude's judgments the same way.
 6. **Band-aware translation evals.** Extend the translation evals: translations told a band are
    checked for keeping the meaning (chrF against references, as now) and, at Basic, for simplicity.
 
