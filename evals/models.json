@@ -1,7 +1,9 @@
 {
-  "_about": "The models the Evals workflow compares (tools/evals.py): each one's name in the report, and its file on Hugging Face, in the format the app's engine loads.",
+  "_about": "The models the Evals workflow compares (tools/evals.py): each one's name in the report, and its file on Hugging Face. A .litertlm file runs on the app's engine; a .gguf file on llama.cpp, for a model with no .litertlm version (the app can't run it yet).",
   "models": [
     {"name": "Gemma 4 E4B", "repo": "litert-community/gemma-4-E4B-it-litert-lm", "file": "gemma-4-E4B-it.litertlm"},
-    {"name": "Gemma 4 E2B", "repo": "litert-community/gemma-4-E2B-it-litert-lm", "file": "gemma-4-E2B-it.litertlm"}
+    {"name": "Gemma 4 E2B", "repo": "litert-community/gemma-4-E2B-it-litert-lm", "file": "gemma-4-E2B-it.litertlm"},
+    {"name": "Tiny Aya Global", "repo": "CohereLabs/tiny-aya-global-GGUF", "file": "tiny-aya-global-q4_k_m.gguf",
+     "note": "Cohere's 3.35B text-only model for 70 languages (CC BY-NC 4.0). Only published as GGUF, so it runs on llama.cpp here; the app would need it converted to .litertlm, or a second engine."}
   ]
 }

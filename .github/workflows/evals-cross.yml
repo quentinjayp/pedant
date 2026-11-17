@@ -60,12 +60,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install the model engine (the app's version)
-        run: pip install --quiet litert-lm-api==0.19.1
+      - name: Install the model engine
+        # The app's engine for .litertlm files; llama.cpp for a .gguf, a model the app can't run yet.
+        run: |
+          case "${{ matrix.file }}" in
+            *.gguf) pip install --quiet llama-cpp-python==0.3.36 ;;
+            *) pip install --quiet litert-lm-api==0.19.1 ;;
+          esac
       - name: Download the model
-        run: curl -fsSL --retry 3 -o model.litertlm "https://huggingface.co/${{ matrix.repo }}/resolve/main/${{ matrix.file }}" && ls -l model.litertlm
+        run: curl -fsSL --retry 3 -o "${{ matrix.file }}" "https://huggingface.co/${{ matrix.repo }}/resolve/main/${{ matrix.file }}" && ls -l "${{ matrix.file }}"
       - name: Translate
-        run: python3 tools/evals.py translate --model model.litertlm --name "${{ matrix.name }}" --own ${{ matrix.own }} --out outputs/translations.json
+        run: python3 tools/evals.py translate --model "${{ matrix.file }}" --name "${{ matrix.name }}" --own ${{ matrix.own }} --out outputs/translations.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -140,27 +140,52 @@ def text_of(message):
     return str(content)
 
 
-def translate(args):
+def litert_asker(path):
+    """The app's engine (LiteRT-LM) on a .litertlm file: loaded once, holding a conversation per
+    translation as the app does, with the app's settings (CPU, always the likeliest next word)."""
     import litert_lm
 
+    engine = litert_lm.Engine(path, backend=litert_lm.Backend.CPU(), max_num_tokens=2048)
+    exact = litert_lm.SamplerConfig(top_k=1, top_p=1.0, temperature=0.0)
+
+    def ask(system, user):
+        with engine.create_conversation(system_message=system, sampler_config=exact) as conv:
+            return text_of(conv.send_message(user))
+
+    return ask, lambda: engine.__exit__(None, None, None)
+
+
+def gguf_asker(path):
+    """llama.cpp on a .gguf file, for a model with no .litertlm version (the app can't run these
+    yet): the model's own chat template, and always the likeliest next word."""
+    from llama_cpp import Llama
+
+    llm = Llama(model_path=path, n_ctx=2048, n_threads=os.cpu_count(), verbose=False)
+
+    def ask(system, user):
+        reply = llm.create_chat_completion(
+            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+            temperature=0.0, top_k=1, top_p=1.0, max_tokens=512,
+        )
+        return reply["choices"][0]["message"]["content"] or ""
+
+    return ask, lambda: llm.close()
+
+
+def translate(args):
     ins = json.load(open(INSTRUCTIONS, encoding="utf-8"))
     todo = [j for i, j in enumerate(jobs(args.own)) if i % args.shards == args.shard]
     if args.limit:
         todo = todo[:args.limit]
     print(f"{args.name}, own language {args.own}: {len(todo)} translations", flush=True)
-    # The app's settings for a translation: CPU, and always the likeliest next word.
-    exact = litert_lm.SamplerConfig(top_k=1, top_p=1.0, temperature=0.0)
     outputs = {}
-
-    # Loaded once, holding a conversation per translation, as the app does.
-    engine = litert_lm.Engine(args.model, backend=litert_lm.Backend.CPU(), max_num_tokens=2048)
+    ask, close = (gguf_asker if args.model.endswith(".gguf") else litert_asker)(args.model)
     try:
         for key, s, kind, source, target in todo:
             system = instruction(ins, kind, source, target)
             started = time.time()
             try:
-                with engine.create_conversation(system_message=system, sampler_config=exact) as conv:
-                    raw = text_of(conv.send_message(text_in(s, source)))
+                raw = ask(system, text_in(s, source))
             except Exception as e:  # one failure shouldn't lose the run
                 raw = f"(failed: {e})"
             seconds = round(time.time() - started, 1)
@@ -168,7 +193,7 @@ def translate(args):
             outputs[key] = {"raw": raw, "seconds": seconds}
             print(f"{kind} {source}>{target} {s['id']} ({seconds} s): {got!r}" + ("" if got else f"  RAW {raw[:200]!r}"), flush=True)
     finally:
-        engine.__exit__(None, None, None)
+        close()
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     json.dump({"model": args.name, "outputs": outputs}, open(args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
