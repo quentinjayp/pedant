@@ -72,6 +72,7 @@ Beginner and Intermediate are built. A third mode is planned.
 
 A second dimension beside the help modes: how hard the language is, on the scale the international
 proficiency tests use. The fixed list of scenarios is replaced by scenarios made for each level.
+The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/levels-and-scenarios.md).
 
 - **Research the bands first.** Before building, study what each band actually asks of a speaker:
   the CEFR's descriptors (its 2020 Companion Volume has detailed ones for speaking and
