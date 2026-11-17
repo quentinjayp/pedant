@@ -40,6 +40,16 @@ Beginner and Intermediate are built. A third mode is planned.
 A second dimension beside the help modes: how hard the language is, on the scale the international
 proficiency tests use. The fixed list of scenarios is replaced by scenarios made for each level.
 
+- **Research the bands first.** Before building, study what each band actually asks of a speaker:
+  the CEFR's descriptors (its 2020 Companion Volume has detailed ones for speaking and
+  interaction), the oral parts of the tests (DELF, DELE, Goethe, TYS and the others, from their free
+  sample papers), and example courses at each level, such as the Indonesian government's
+  *Sahabatku Indonesia* books (A1–C2). That gives the band's task lists, and what to measure.
+- **Evals of whether the models can do each band.** A pipeline like the translation evals, testing
+  Gemma (E2B and E4B) per band and language: whether it keeps to short, common language at Basic,
+  and whether it can hold a Proficient conversation at all (nuance, idiom, persuading, handling a
+  delicate subject). If a model can't do the Proficient band in a language, that band isn't offered
+  for it, rather than offered badly.
 - **Bands.** The CEFR's three bands, under its own names: **Basic** (A1–A2), **Independent**
   (B1–B2) and **Proficient** (C1–C2). The CEFR is the internal scale for every language: it was
   written to be language-neutral and is used for non-European languages too (Turkey's TYS,
