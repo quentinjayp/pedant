@@ -2090,7 +2090,7 @@ private fun WordPronunciation(lookup: WordLookup, respell: Boolean, large: Boole
  * its own line), or Gemma's, labelled as generated; or a note while it's being looked up.
  */
 @Composable
-private fun WordMeaning(lookup: WordLookup, appBusy: Boolean, own: Language, maxHeight: Dp? = null) {
+internal fun WordMeaning(lookup: WordLookup, appBusy: Boolean, own: Language, maxHeight: Dp? = null) {
     when {
         lookup.groups != null || lookup.meaning != null -> Box(Modifier.fillMaxWidth()) {
             // With [maxHeight], the meanings scroll on their own, so a long entry never pushes the
