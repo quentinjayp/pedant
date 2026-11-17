@@ -152,32 +152,23 @@ def translate(args):
     exact = litert_lm.SamplerConfig(top_k=1, top_p=1.0, temperature=0.0)
     outputs = {}
 
-    def load():
-        return litert_lm.Engine(args.model, backend=litert_lm.Backend.CPU(), max_num_tokens=2048)
-
-    # The app loads a model once and holds many conversations with it. A model that only answers
-    # its first conversation properly (--fresh-engine) is loaded again for each translation, which
-    # isn't counted in its time.
-    engine = None if args.fresh_engine else load()
+    # Loaded once, holding a conversation per translation, as the app does.
+    engine = litert_lm.Engine(args.model, backend=litert_lm.Backend.CPU(), max_num_tokens=2048)
     try:
         for key, s, kind, source, target in todo:
             system = instruction(ins, kind, source, target)
-            one = load() if args.fresh_engine else engine
             started = time.time()
             try:
-                with one.create_conversation(system_message=system, sampler_config=exact) as conv:
+                with engine.create_conversation(system_message=system, sampler_config=exact) as conv:
                     raw = text_of(conv.send_message(text_in(s, source)))
             except Exception as e:  # one failure shouldn't lose the run
                 raw = f"(failed: {e})"
             seconds = round(time.time() - started, 1)
-            if args.fresh_engine:
-                one.__exit__(None, None, None)
             got = answer(kind, raw)
             outputs[key] = {"raw": raw, "seconds": seconds}
             print(f"{kind} {source}>{target} {s['id']} ({seconds} s): {got!r}" + ("" if got else f"  RAW {raw[:200]!r}"), flush=True)
     finally:
-        if engine is not None:
-            engine.__exit__(None, None, None)
+        engine.__exit__(None, None, None)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     json.dump({"model": args.name, "outputs": outputs}, open(args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
@@ -324,7 +315,6 @@ if __name__ == "__main__":
     t.add_argument("--shard", type=int, default=0)
     t.add_argument("--shards", type=int, default=1)
     t.add_argument("--limit", type=int, default=0, help="only the first N translations, to try a model out")
-    t.add_argument("--fresh-engine", action="store_true", help="load the model again for each translation")
     t.add_argument("--own", default="en", help="the learner's own language: en (as today), or another app language's code")
     c = sub.add_parser("config")
     c.add_argument("outputs")

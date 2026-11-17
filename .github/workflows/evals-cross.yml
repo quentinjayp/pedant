@@ -40,8 +40,7 @@ jobs:
           import json
           cross = json.load(open("evals/cross.json", encoding="utf-8"))
           models = {m["name"]: m for m in json.load(open("evals/models.json", encoding="utf-8"))["models"]}
-          include = [{"name": name, "repo": models[name]["repo"], "file": models[name]["file"], "own": own,
-                      "options": "--fresh-engine" if models[name].get("freshEngine") else ""}
+          include = [{"name": name, "repo": models[name]["repo"], "file": models[name]["file"], "own": own}
                      for name in cross["models"] for own in cross["ownLanguages"]]
           print("matrix=" + json.dumps({"include": include}))
           PY
@@ -66,7 +65,7 @@ jobs:
       - name: Download the model
         run: curl -fsSL --retry 3 -o model.litertlm "https://huggingface.co/${{ matrix.repo }}/resolve/main/${{ matrix.file }}" && ls -l model.litertlm
       - name: Translate
-        run: python3 tools/evals.py translate --model model.litertlm --name "${{ matrix.name }}" --own ${{ matrix.own }} --out outputs/translations.json ${{ matrix.options }}
+        run: python3 tools/evals.py translate --model model.litertlm --name "${{ matrix.name }}" --own ${{ matrix.own }} --out outputs/translations.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

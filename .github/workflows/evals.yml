@@ -36,8 +36,7 @@ jobs:
           python3 - >> "$GITHUB_OUTPUT" <<'PY'
           import json
           models = json.load(open("evals/models.json", encoding="utf-8"))["models"]
-          include = [{"name": m["name"], "repo": m["repo"], "file": m["file"],
-                      "options": "--fresh-engine" if m.get("freshEngine") else ""} for m in models]
+          include = [{"name": m["name"], "repo": m["repo"], "file": m["file"]} for m in models]
           print("matrix=" + json.dumps({"include": include}))
           PY
 
@@ -61,7 +60,7 @@ jobs:
       - name: Download the model
         run: curl -fsSL --retry 3 -o model.litertlm "https://huggingface.co/${{ matrix.repo }}/resolve/main/${{ matrix.file }}" && ls -l model.litertlm
       - name: Translate
-        run: python3 tools/evals.py translate --model model.litertlm --name "${{ matrix.name }}" --out outputs/translations.json ${{ matrix.options }}
+        run: python3 tools/evals.py translate --model model.litertlm --name "${{ matrix.name }}" --out outputs/translations.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

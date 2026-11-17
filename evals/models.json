@@ -2,9 +2,6 @@
   "_about": "The models the Evals workflow compares (tools/evals.py): each one's name in the report, and its file on Hugging Face, in the format the app's engine loads.",
   "models": [
     {"name": "Gemma 4 E4B", "repo": "litert-community/gemma-4-E4B-it-litert-lm", "file": "gemma-4-E4B-it.litertlm"},
-    {"name": "Gemma 4 E2B", "repo": "litert-community/gemma-4-E2B-it-litert-lm", "file": "gemma-4-E2B-it.litertlm"},
-    {"name": "Qwen3.5-4B", "repo": "litert-community/Qwen3.5-4B", "file": "Qwen3.5-4B_mixed_int4.litertlm", "freshEngine": true,
-     "note": "Loaded again for each translation: once loaded, only its first conversation is answered properly (the next repeats the last answer, later ones echo the English), with the engine's versions 0.19.1 and 0.19.2. The app holds many conversations with one loaded model, so it couldn't use this file as it is."},
-    {"name": "Ministral 3 3B", "repo": "litert-community/Ministral-3-3B-Instruct-2512", "file": "Ministral-3-3B-Instruct-2512_q4_block32_ekv4096.litertlm"}
+    {"name": "Gemma 4 E2B", "repo": "litert-community/gemma-4-E2B-it-litert-lm", "file": "gemma-4-E2B-it.litertlm"}
   ]
 }
