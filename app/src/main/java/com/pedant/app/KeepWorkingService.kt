@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.os.Process
 import androidx.core.app.ServiceCompat
 
 /**
@@ -44,6 +45,20 @@ class KeepWorkingService : Service() {
         val type = if (Build.VERSION.SDK_INT >= 34) ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE else 0
         ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
         return START_NOT_STICKY
+    }
+
+    /**
+     * The learner swiped Pedant away while a turn was being finished: they want it closed, not kept
+     * running. Ends the turn and the app cleanly, so it isn't left holding its memory until Android
+     * closes it, and the unfinished step isn't reported as a crash on the next launch.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        Diagnostics(this).apply {
+            log("Closed by swiping the app away")
+            step = null
+        }
+        stopSelf()
+        Process.killProcess(Process.myPid())
     }
 
     /** Android allows a short service about three minutes; a turn that takes longer is left to finish if it can. */
