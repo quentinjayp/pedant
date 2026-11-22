@@ -2,7 +2,7 @@
 
 Research for [the levels and scenarios plan](../plans/levels-and-scenarios.md): task 1, the band
 descriptors, and task 2, the oral exams' task shapes (in
-[Oral exam task shapes](#oral-exam-task-shapes-task-2)). Tasks 3 and 4 (example courses, test labels)
+[Oral exam task shapes](#oral-exam-task-shapes-task-2)). Tasks 3 and 4 (topics, test labels)
 will add their own sections.
 
 ## Source
@@ -698,7 +698,7 @@ The official French and German exams, every level of both, confirm the pattern t
 showed for Spanish, Turkish, Russian and Indonesian. So Pedant uses one set of task shapes per band,
 for every language, without consulting each language's own exam. Only two things differ by language:
 which test the band corresponds to (task 4), and the setting each scene takes where the language is
-spoken (task 3).
+spoken (task 10).
 
 **Basic (A1–A2):**
 - **Interview about you:** Gemma asks about the learner, their family, tastes, activities and town,
@@ -790,8 +790,7 @@ DELF B1's own grading criteria include:
 
 **For tasks 3 and 4:**
 
-- Which topics and situations do courses use at each level, and how do they differ by culture
-  (task 3)?
+- Which of the CEFR's themes go with each band (task 3)?
 **From this research, for later decisions:**
 - How lenient grading should be at each band, against the one voice, without becoming too strict for
   ZIPA's own mistakes; and grading prosody (stress, rhythm, intonation).

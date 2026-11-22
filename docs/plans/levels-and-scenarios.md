@@ -49,10 +49,10 @@ Investigation only. Output: `docs/research/bands.md`.
    - **Instructions only:** most shapes need nothing but instructions to Gemma.
    - **Needing something new:** some need prompts on screen, pictures, a short text or audio source,
      preparation time, or long turns taken in parts (task 10).
-3. **Example courses.** Courses for each level, such as *Sahabatku Indonesia* (A1–C2): the topics and
-   situations each level covers. This feeds the ingredient lists (task 9).
-   - What topics and situations are typical for each band, across languages?
-   - What differs by culture, so scenes are set where the language is spoken?
+3. **Topics.** The CEFR's themes, one list per band for every language, as with the task shapes. No
+   language's courses are researched: the CEFR is the standard. Gemma sets each scene where the
+   language is spoken (task 10). This feeds the ingredient lists (task 9).
+   - Which of the CEFR's themes go with each band?
 4. **Per-language test labels.** For each of the 25 languages, the local test that maps onto the
    CEFR, or none (then only the CEFR is shown). Later this becomes data in
    `app/src/main/assets/languages.json`, as `articles` is.

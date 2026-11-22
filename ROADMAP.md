@@ -83,12 +83,12 @@ proficiency tests use. The fixed list of scenarios is replaced by scenarios made
 The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/levels-and-scenarios.md).
 
 - **Research the bands first.** The band descriptors and the oral exams' task shapes are done; see
-  [docs/research/bands.md](docs/research/bands.md). Example courses and per-language test labels
-  are still to research. Before building, study what each band actually asks of a speaker:
-  the CEFR's descriptors (its 2020 Companion Volume has detailed ones for speaking and
-  interaction), the oral parts of the tests (DELF, DELE, Goethe, TYS and the others, from their free
-  sample papers), and example courses at each level, such as the Indonesian government's
-  *Sahabatku Indonesia* books (A1–C2). That gives the band's task lists, and what to measure.
+  [docs/research/bands.md](docs/research/bands.md). The bands' topics (the CEFR's themes, one list
+  for every language) and per-language test labels are still to do. Before building, study what
+  each band actually asks of a speaker: the CEFR's descriptors (its 2020 Companion Volume has
+  detailed ones for speaking and interaction) and the oral parts of the tests (DELF, DELE, Goethe,
+  TYS and the others, from their free sample papers). That gives the band's task lists, and what to
+  measure.
 - **Evals of whether the models can do each band.** A pipeline like the translation evals, testing
   Gemma (E2B and E4B) per band and language: whether it keeps to short, common language at Basic,
   and whether it can hold a Proficient conversation at all (nuance, idiom, persuading, handling a
