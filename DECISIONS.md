@@ -155,9 +155,9 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
 
 ## Levels and scenarios (planned)
 
-- **The CEFR is the framework.** Its levels structure Pedant's conversations. Modelling them gives
-  the app guidance and goals at each band.
-- **One scale for every language.** The CEFR is the scale for every language, with its three bands.
+- **One scale for every language: the CEFR.** Pedant's levels are modelled on the CEFR's three
+  bands, the same for every language. They structure the conversations and give the app guidance
+  and goals at each band.
 - **One set of task shapes per band, for every language.** The conversation tasks for each band come
   from the oral exams' shapes, generalised once and applied to every language, not taken from each
   language's own exam. Only the setting of each scene differs by language. See
