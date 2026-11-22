@@ -20,6 +20,8 @@ Beginner and Intermediate are built. A third mode is planned.
   - **Tutor's note.** After you say something, and before the tutor's reply, a correction or
     clarification of what you said is shown, perhaps as its own card in the conversation called
     "Tutor's note". The tutor then replies as normal.
+  - **Text only.** Type your side of the conversation instead of saying it. The Tutor's note gives
+    Gemma's corrections of the grammar and word use in what you typed.
   - **Asking about the language as you go.** Ask the tutor in English mid-conversation ("What does
     that mean?", "How do I say…?", "Why this word and not that one?"), then carry on.
 
