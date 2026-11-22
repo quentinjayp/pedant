@@ -49,10 +49,19 @@ Investigation only. Output: `docs/research/bands.md`.
    - **Instructions only:** most shapes need nothing but instructions to Gemma.
    - **Needing something new:** some need prompts on screen, pictures, a short text or audio source,
      preparation time, or long turns taken in parts (task 9).
-3. **Topics.** The CEFR's themes, one list per band for every language, as with the task shapes. No
+3. **Topics.** **Done.** The CEFR's themes, one list for every language, as with the task shapes. No
    language's courses are researched: the CEFR is the standard. Gemma sets each scene where the
    language is spoken (task 9). This feeds the ingredient lists (task 8).
    - Which of the CEFR's themes go with each band?
+
+   **Result:** the CEFR's fourteen themes (personal identification, home and environment, daily
+   life, free time, travel, relations with others, health, education, shopping, food and drink,
+   services, places, language, weather), from the 2001 CEFR as reproduced by the Goethe-Institut.
+   - **Every band draws from all of them.** The CEFR doesn't assign themes to levels.
+   - **The band sets the treatment:** Basic, the learner's own life and everyday needs; Independent,
+     familiar and general topics with opinions, current events, culture and the unexpected;
+     Proficient, the abstract, complex, sensitive or contentious side.
+   - **Sensitive issues** belong to the Proficient band.
 
 ## B. Measuring the models
 

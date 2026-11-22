@@ -1,9 +1,9 @@
 # Research: the bands
 
 Research for [the levels and scenarios plan](../plans/levels-and-scenarios.md): task 1, the band
-descriptors, and task 2, the oral exams' task shapes (in
-[Oral exam task shapes](#oral-exam-task-shapes-task-2)). Task 3 (topics) will add its own
-section.
+descriptors; task 2, the oral exams' task shapes (in
+[Oral exam task shapes](#oral-exam-task-shapes-task-2)); and task 3, the topics (in
+[Topics](#topics-task-3)).
 
 ## Source
 
@@ -785,11 +785,95 @@ DELF B1's own grading criteria include:
   word, find another word or explain it another way; if you don't understand, ask the examiner to
   repeat or speak more slowly.
 
+## Topics (task 3)
+
+The topics scenarios are filled with: one list for every language, from the CEFR.
+
+### Sources
+
+- **The themes:** the 2001 CEFR's list of communication themes (section 4.1.3), as reproduced in the
+  Goethe-Institut's Goethe-Zertifikat C1 handbook, pages 18–19, which takes it from "dem
+  Themenkatalog des Gemeinsamen europäischen Referenzrahmens":
+  https://www.goethe.de/pro/relaunch/prf/el/Pruefungsziele_Testbeschreibung_C1.pdf. The 2001 CEFR
+  itself couldn't be downloaded (the Council of Europe's site blocks automated downloads).
+- **How topics change by band:** the Companion Volume's descriptors, quoted with its page numbers.
+
+### The themes
+
+The CEFR's fourteen themes, as Goethe gives them, with examples:
+1. **Persönliche Daten und Verhältnisse** (personal identification): character and appearance,
+   work, training or studies.
+2. **Wohnen, Umwelt** (house and home, environment): rooms and furnishings, people and their
+   environment.
+3. **Tägliches Leben, Arbeit** (daily life, work): habits of life and work, responsibilities.
+4. **Freizeit, Unterhaltung** (free time, entertainment): intellectual and artistic interests, the
+   media, cinema, exhibitions, sport.
+5. **Reise** (travel): public and private transport, holidays, accommodation, tourism.
+6. **Beziehungen zu anderen Menschen, Kultur, Tradition** (relations with other people, culture,
+   tradition): relations between the sexes and the generations, social conventions.
+7. **Gesundheit und Hygiene** (health and body care): healthy living, medical care, insurance.
+8. **Erziehung, Ausbildung, Lernen** (education): schooling, upbringing, qualifications,
+   institutions.
+9. **Konsum, Handel** (shopping): consumer habits, infrastructure, regulations.
+10. **Ernährung** (food and drink): healthy food, feeding the world.
+11. **Dienstleistungen** (services): telecommunications and the like.
+12. **Orte** (places): regional features, landscapes.
+13. **Sprache, Kommunikation** (language): learning languages, foreign languages, communication
+    technology.
+14. **Klima** (weather): local and global climate, climate change.
+
+The CEFR doesn't assign themes to levels. Its descriptors keep the same subjects and change how they
+are treated: "range of settings – from A1 to B2, then unrestricted" (General linguistic range and
+Vocabulary range, pages 130–131).
+
+### How topics change by band
+
+**Basic (A1–A2): personal, concrete and predictable.**
+- "a predictable topic (e.g. their home country, family, school)" (A1, Conversation, page 73).
+- "personal details, daily routines, wants and needs, requests for information" (A2, General
+  linguistic range, page 130).
+- "what to do in the evening or at the weekend"; "everyday practical issues"; "likes and dislikes for
+  sports, foods, etc." (A1–A2, Informal discussion, page 74).
+- "routine everyday transactions involving familiar situations and topics" (A2, Vocabulary range,
+  page 131).
+- "personal details and everyday needs" (Understanding an interlocutor, page 72).
+
+**Independent (B1–B2): familiar and general topics, with opinions, and the unexpected.**
+- "family, hobbies and interests, work, travel and current events" (B1, General linguistic range,
+  page 130; Vocabulary range, page 131).
+- "abstract or cultural topics such as music or films" (B1, Informal discussion, page 74).
+- "unpredictable situations" (B1, General linguistic range, page 130).
+- "most general topics" (B2, Conversation, page 73; Vocabulary range, page 131), and "matters
+  connected to their field" (B2, page 131).
+
+**Proficient (C1–C2): any theme, abstract, complex and sensitive.**
+- "abstract, complex unfamiliar topics" (C1, Informal discussion, page 74).
+- "sensitive issues" (C2, Informal discussion, page 74); "complex, delicate or contentious issues"
+  (C2, Formal discussion, page 75).
+- "abstract and complex topics of a specialist nature beyond their own field" (C1–C2, Understanding
+  an interlocutor, page 72).
+- "emotional, allusive and joking usage" (C1, Conversation, page 73).
+
+### For the ingredient lists (task 8)
+
+- **One list of themes for every band:** the fourteen above. Each band draws from all of them.
+- **The band sets the treatment:**
+  - **Basic:** the learner's own life and everyday needs within the theme: for food and drink,
+    ordering a meal or saying what you like; for travel, buying a ticket or asking the way.
+  - **Independent:** general and familiar topics within the theme, with opinions, current events,
+    culture, and something unexpected: for food and drink, a meal that goes wrong, or what makes a
+    good restaurant; for travel, a missed connection, or planning a trip together.
+  - **Proficient:** the abstract, complex, sensitive or contentious side of the theme: for food and
+    drink, feeding the world; for travel, the effects of tourism on a place.
+- **Sensitive issues:** the speaking descriptors name them at C2 ("sensitive issues", "complex,
+  delicate or contentious issues"), so they belong to the Proficient band. Mediation has "facilitate
+  discussion of delicate issues" at B2 (Overall mediation, page 91), as a mediator between others,
+  not as the learner's own subject.
+- **Where the language is spoken:** the themes are the same for every language. Gemma sets each
+  scene where the language is spoken (task 9).
+
 ## Open questions
 
-**For task 3:**
-
-- Which of the CEFR's themes go with each band (task 3)?
 **From this research, for later decisions:**
 - How lenient grading should be at each band, against the one voice, without becoming too strict for
   ZIPA's own mistakes; and grading prosody (stress, rhythm, intonation).
