@@ -14,7 +14,7 @@ Proficient band in every language.
 
 ## Order
 
-- **A (research)** comes first. It gates the evals (B) and the ingredient lists (task 9).
+- **A (research)** comes first. It gates the evals (B) and the ingredient lists (task 8).
 - **B (measuring the models)** decides which bands each language offers.
 - **C (foundations)** comes before D (scenarios).
 - **E (tests and docs)** runs alongside C and D.
@@ -32,7 +32,7 @@ Investigation only. Output: `docs/research/bands.md`.
    - **Fits:** interaction, strategies, short spoken turns, and role-played mediation.
    - **Gemma as the listener:** each band assumes a different listener. At Basic Gemma speaks slowly,
      repeats, rephrases and helps; at Proficient it doesn't adjust its language at all. This goes
-     into task 8 and the evals (task 5).
+     into task 7 and the evals (task 4).
    - **Roadmap investigations it led to:** grading leniency by band, prosody, Formal / Casual at
      Basic, and words from the learner's own language mid-sentence.
 2. **Oral exam task shapes.** **Done.** From the free sample papers of DELF/DALF, DELE, Goethe, TYS,
@@ -48,19 +48,15 @@ Investigation only. Output: `docs/research/bands.md`.
      is researched. See "Generalised: the task shapes for every language" in the research.
    - **Instructions only:** most shapes need nothing but instructions to Gemma.
    - **Needing something new:** some need prompts on screen, pictures, a short text or audio source,
-     preparation time, or long turns taken in parts (task 10).
+     preparation time, or long turns taken in parts (task 9).
 3. **Topics.** The CEFR's themes, one list per band for every language, as with the task shapes. No
    language's courses are researched: the CEFR is the standard. Gemma sets each scene where the
-   language is spoken (task 10). This feeds the ingredient lists (task 9).
+   language is spoken (task 9). This feeds the ingredient lists (task 8).
    - Which of the CEFR's themes go with each band?
-4. **Per-language test labels.** For each of the 25 languages, the local test that maps onto the
-   CEFR, or none (then only the CEFR is shown). Later this becomes data in
-   `app/src/main/assets/languages.json`, as `articles` is.
-   - Which tests map officially, which only approximately, and which languages have none?
 
 ## B. Measuring the models
 
-5. **Band evals.** Extend the evals pipeline (`tools/evals.py`, `.github/workflows/evals*.yml`,
+4. **Band evals.** Extend the evals pipeline (`tools/evals.py`, `.github/workflows/evals*.yml`,
    non-blocking, models from `evals/models.json`). Gemma, told a band, holds short conversations in
    each language.
    - **Measured:** at Basic, short sentences and common words (sentence length, and the share of
@@ -69,22 +65,22 @@ Investigation only. Output: `docs/research/bands.md`.
      the band assumes (at Basic, answering a request to repeat with a slower, simpler rephrasing).
    - **Output:** a report per band and language, and a decision on which bands each language offers.
      A band a model can't do isn't offered.
-   - **5a. One-time Claude judgment.** In a session, Claude judges a sample of Gemma's replies per
+   - **4a. One-time Claude judgment.** In a session, Claude judges a sample of Gemma's replies per
      band and language against the band descriptors from task 1. This isn't a permanent eval: it's a
      one-off reference, saved with the sample, to test other judges against.
-   - **5b. Gemma as judge.** Gemma judges the same sample: E4B, judging replies written by E2B and by
+   - **4b. Gemma as judge.** Gemma judges the same sample: E4B, judging replies written by E2B and by
      itself, set up to look for what's wrong. Its judgments are compared with Claude's.
      - If they agree closely enough, Gemma becomes the permanent judge in CI.
      - If not, the permanent eval keeps only the measurable parts (sentence length, word commonness).
-6. **Band-aware translation evals.** Extend the translation evals: translations told a band are
+5. **Band-aware translation evals.** Extend the translation evals: translations told a band are
    checked for keeping the meaning (chrF against references, as now) and, at Basic, for simplicity.
 
 ## C. Foundations in the app
 
-7. **Rename the help modes** to Repeat word, Repeat phrase and Free talk. This changes the titles of
+6. **Rename the help modes** to Repeat word, Repeat phrase and Free talk. This changes the titles of
    `Mode` in `app/src/main/java/com/pedant/app/Scenarios.kt` only; Free talk itself is a separate
    roadmap item.
-8. **Band setting.**
+7. **Band setting.**
    - **Choosing:** a `Band` (Basic, Independent, Proficient), chosen first in New conversation and
      remembered.
    - **Saving:** saved with the conversation (`SavedConversation.kt`).
@@ -92,17 +88,16 @@ Investigation only. Output: `docs/research/bands.md`.
      `tools/app_languages.py`), so Gemma's replies and the learner's translations follow the band,
      keeping the meaning over simplicity.
    - **Quiz:** its word limits (`Quiz.wordLimit` in `Quiz.kt`) follow the band, not the help mode.
-   - **Labels:** each band shows its test labels, from task 4's data.
 
 ## D. Scenarios
 
-9. **Ingredient lists.** A data file in `app/src/main/assets/`, in two layers:
+8. **Ingredient lists.** A data file in `app/src/main/assets/`, in two layers:
    - **Shapes:** each band's task shapes, from task 2's generalised list (interview, everyday
      transaction, plan together, talk then questions, defend a view then debate, and so on). Each
      shape says who leads, Gemma's role, and what prompts it gives the learner.
    - **Content:** for each shape, the topics, places, relationships and twists it can be filled
      with, from tasks 1 and 3.
-10. **Generated scenarios.** Gemma writes the scene, its role and the opening, set where the language
+9. **Generated scenarios.** Gemma writes the scene, its role and the opening, set where the language
     is spoken. The ingredients are drawn at random:
     1. a shape among the band's shapes;
     2. content for that shape;
@@ -117,24 +112,24 @@ Investigation only. Output: `docs/research/bands.md`.
       taken in parts.
     - **Replaces:** `Scenario` (Scenarios.kt) and the `roles` in `instructions.json`.
     - **Saving:** the card is saved with the conversation, for Continue and the quiz.
-11. **Gemma asks for the scene.** This is the interview shape with the topic left to the learner:
+10. **Gemma asks for the scene.** This is the interview shape with the topic left to the learner:
     Gemma asks the learner to fill it in, and the answer becomes the scene. At Basic it asks in the
     learner's own language; at Independent and Proficient, in the language being learned.
-12. **Your own scenarios.** The learner describes a situation, and Gemma builds the scene at the band.
-13. **Talk about whatever** in every band: the conversation shape with no topic, today's Default with
+11. **Your own scenarios.** The learner describes a situation, and Gemma builds the scene at the band.
+12. **Talk about whatever** in every band: the conversation shape with no topic, today's Default with
     the band applied.
-14. **New conversation flow.** Language → band → two drawn cards, your own, or talk about whatever →
+13. **New conversation flow.** Language → band → two drawn cards, your own, or talk about whatever →
     Gemma's question, if the shape has one → the scene. This changes `LanguageScreen` in
     `MainActivity.kt` and `startSession` in `AppViewModel.kt`.
-15. **Openings.**
+14. **Openings.**
     - **Removed:** the shipped openings (`openings.json`, `OpeningCache.kt`,
       `tools/build_openings.py`, `.github/workflows/openings.yml`).
     - **Instead:** when a conversation ends, the next random scenario is prepared in the background,
       to cover Gemma writing the opening on the phone.
-16. **Generated-scene evals.** A sample of generated scenes per band and language, checked for sense
-    and level. This extends task 5.
+15. **Generated-scene evals.** A sample of generated scenes per band and language, checked for sense
+    and level. This extends task 4.
 
 ## E. Tests and docs
 
-17. **Tests and docs.** Unit tests and screenshots for the new screens, like `QuizScreenshotTest`;
+16. **Tests and docs.** Unit tests and screenshots for the new screens, like `QuizScreenshotTest`;
     DECISIONS.md and ROADMAP.md updated as decisions are made.

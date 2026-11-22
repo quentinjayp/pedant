@@ -158,7 +158,7 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
 - **One scale for every language.** The CEFR is the scale for every language, with its three bands.
 - **One set of task shapes per band, for every language.** The conversation tasks for each band come
   from the oral exams' shapes, generalised once and applied to every language, not taken from each
-  language's own exam. Only the test labels and the setting of each scene differ by language. See
+  language's own exam. Only the setting of each scene differs by language. See
   [docs/research/bands.md](docs/research/bands.md).
 
 ## Development

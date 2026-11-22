@@ -86,11 +86,10 @@ The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/
 
 - **Research the bands first.** The band descriptors and the oral exams' task shapes are done; see
   [docs/research/bands.md](docs/research/bands.md). The bands' topics (the CEFR's themes, one list
-  for every language) and per-language test labels are still to do. Before building, study what
-  each band actually asks of a speaker: the CEFR's descriptors (its 2020 Companion Volume has
-  detailed ones for speaking and interaction) and the oral parts of the tests (DELF, DELE, Goethe,
-  TYS and the others, from their free sample papers). That gives the band's task lists, and what to
-  measure.
+  for every language) are still to do. Before building, study what each band actually asks of a
+  speaker: the CEFR's descriptors (its 2020 Companion Volume has detailed ones for speaking and
+  interaction) and the oral parts of the tests (DELF, DELE, Goethe, TYS and the others, from their
+  free sample papers). That gives the band's task lists, and what to measure.
 - **Evals of whether the models can do each band.** A pipeline like the translation evals, testing
   Gemma (E2B and E4B) per band and language: whether it keeps to short, common language at Basic,
   and whether it can hold a Proficient conversation at all (nuance, idiom, persuading, handling a
@@ -101,10 +100,6 @@ The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/
   written to be language-neutral and is used for non-European languages too (Turkey's TYS,
   Indonesia's BIPA framework, Russia's TORFL mapping). You choose the band to practise at; nothing
   places you in one or tracks progress through them.
-- **Test labels per language.** Each band shows the local test it corresponds to where that test
-  maps onto the CEFR ("A1–A2 · DELF A1–A2 · NCLC 1–4" for French). Where a language's own scale
-  doesn't map cleanly (Indonesian's UKBI) or there's no recognised test (Hindi, Swahili), only the
-  CEFR is shown, never a made-up equivalence.
 - **The band shapes the whole conversation.** Gemma speaks at the band's level (short, common words
   at Basic; no simplifying at Proficient), and acts as the listener the band assumes: at Basic it
   speaks slowly, repeats, rephrases and helps; at Proficient it doesn't adjust its language at all.

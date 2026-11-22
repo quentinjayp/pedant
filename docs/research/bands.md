@@ -2,8 +2,8 @@
 
 Research for [the levels and scenarios plan](../plans/levels-and-scenarios.md): task 1, the band
 descriptors, and task 2, the oral exams' task shapes (in
-[Oral exam task shapes](#oral-exam-task-shapes-task-2)). Tasks 3 and 4 (topics, test labels)
-will add their own sections.
+[Oral exam task shapes](#oral-exam-task-shapes-task-2)). Task 3 (topics) will add its own
+section.
 
 ## Source
 
@@ -58,7 +58,7 @@ text, mediating concepts and mediating communication.
 **Qualitative features of spoken language** (Appendix 3, pages 183–185): how a speaker at each level
 sounds, in six aspects: range, accuracy, fluency, interaction, coherence and phonology. These matter
 twice for Pedant. They describe how Gemma should speak at each band, and what the band evals
-(task 5) can measure.
+(task 4) can measure.
 
 ## The bands
 
@@ -493,7 +493,7 @@ up, an accent from the learner's other languages is expected and acceptable as l
 in the way of being understood. Pedant grades sounds against one voice's pronunciation, by design;
 the bands could set how lenient that grading is (see Phonology above).
 
-## What this means for the evals (task 5)
+## What this means for the evals (task 4)
 
 The qualitative features give each band things to check in Gemma's speech:
 
@@ -516,7 +516,7 @@ The qualitative features give each band things to check in Gemma's speech:
   - well-structured longer turns;
   - diplomacy (reservations, conditions, tact).
 
-The Independent and Proficient features need a judge (tasks 5a and 5b).
+The Independent and Proficient features need a judge (tasks 4a and 4b).
 
 Gemma also needs to behave like the interlocutor each band assumes:
 - **Basic:** the A-level descriptors keep saying "provided the other person helps", "addressed
@@ -696,9 +696,8 @@ The progression matches the Companion Volume's:
 
 The official French and German exams, every level of both, confirm the pattern the secondary sources
 showed for Spanish, Turkish, Russian and Indonesian. So Pedant uses one set of task shapes per band,
-for every language, without consulting each language's own exam. Only two things differ by language:
-which test the band corresponds to (task 4), and the setting each scene takes where the language is
-spoken (task 10).
+for every language, without consulting each language's own exam. Only the setting of each scene
+differs by language: it takes place where the language is spoken (task 9).
 
 **Basic (A1–A2):**
 - **Interview about you:** Gemma asks about the learner, their family, tastes, activities and town,
@@ -739,7 +738,7 @@ spoken (task 10).
 - **Report on an audio source, develop it, debate it** (C2).
 - **Plain exchanges of facts are not Proficient tasks** (see the Companion Volume above).
 
-These shapes are what the scenario ingredient lists (plan task 9) draw on, alongside the can-do tasks
+These shapes are what the scenario ingredient lists (plan task 8) draw on, alongside the can-do tasks
 from task 1. Which ones need something new in the app is below.
 
 ### Which shapes can be instructions to Gemma
@@ -788,7 +787,7 @@ DELF B1's own grading criteria include:
 
 ## Open questions
 
-**For tasks 3 and 4:**
+**For task 3:**
 
 - Which of the CEFR's themes go with each band (task 3)?
 **From this research, for later decisions:**
