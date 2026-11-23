@@ -12,9 +12,7 @@ No data is collected, and all models are local.
 - **Text-to-speech:** Piper
 - **Text to phonemes:** espeak-ng
 - **Word dictionaries:** English Wiktionary, via kaikki.org (Wiktextract)
-- **Lesson structure:** CEFR levels
-- **Review scheduling:** FSRS
-- **Answer checking:** LanguageTool, Hunspell, UniMorph, Universal Dependencies
+- **Language scaffolding:** CEFR levels
 
 ## License
 
