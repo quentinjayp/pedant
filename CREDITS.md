@@ -1,4 +1,4 @@
-# Acknowledgements
+# Credits
 
 Third-party work Pedant uses, and the licenses it's used under.
 

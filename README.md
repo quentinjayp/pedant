@@ -17,4 +17,4 @@ Offline AI language learning app for Android.
 ## License
 
 GPL-3.0-or-later; see [LICENSE](LICENSE). Third-party work is credited in
-[ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).
+[CREDITS.md](CREDITS.md).
