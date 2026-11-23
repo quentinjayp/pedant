@@ -12,7 +12,6 @@ Offline AI language learning app for Android.
 - **Word dictionaries:** English Wiktionary, via kaikki.org (Wiktextract)
 - **Lesson structure:** CEFR levels
 - **Review scheduling:** FSRS
-- **Lesson content:** FSI courses, Peace Corps language manuals, Tatoeba, Wiktionary, UniMorph, frequency lists
 - **Answer checking:** LanguageTool, Hunspell, UniMorph, Universal Dependencies
 
 ## License
