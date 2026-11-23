@@ -1,6 +1,6 @@
 # pedant
 
-Pedant is a free, offline language learning app, for Android. You hold a conversation with an AI tutor in one of 25 languages. The goal is replicating conversations with a 'native speaker' while giving you aids to learn pronunciation, vocabulary and grammar organically through conversation instead of rote learning. [CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) is used as the basis for structuring conversation levels and learning aids and there is ongoing work to give this more structure.
+Pedant is a free, offline language learning app for Android. You hold a conversation with an AI tutor in one of 25 languages. The goal is replicating conversations with a 'native speaker' while giving you aids to learn pronunciation, vocabulary and grammar organically through conversation instead of rote learning. [CEFR](https://www.coe.int/en/web/common-european-framework-reference-languages/level-descriptions) is used as the basis for structuring conversation levels and learning aids and there is ongoing work to give this more structure.
 
 No data is collected, and all models are local.
 
