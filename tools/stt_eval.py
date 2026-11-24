@@ -1,4 +1,4 @@
-"""A one-off eval: how well Gemma 4 does speech recognition, against Omnilingual (the app's
+"""A one-off eval: how well other speech recognizers do, against Omnilingual 300M (the app's
 recognizer), in the app's languages. Run by .github/workflows/stt-eval.yml, on demand only. It
 reports once, to help decide whether Free talk should use a different recognizer; it isn't one of
 the permanent evals.
@@ -11,11 +11,19 @@ Three tests:
   correct it?
 - Long speech: about a minute of FLEURS recordings joined together, as a talk would be.
 
-Gemma is asked two ways: plainly ("Transcribe this audio"), and told to keep mistakes (verbatim).
+The recognizers:
+- omnilingual: an Omnilingual CTC model (300M, 1B; v1 or v2), as sherpa-onnx runs it.
+- omnilingual-dictionary: Omnilingual 300M, allowed to write only words in the language's dictionary
+  (the app's, with inflected forms), each as likely as any other, so it can't prefer "la" to "le".
+- parakeet: NVIDIA Parakeet TDT 0.6B v3, in the 19 of the app's languages it has.
+- gemma: Gemma 4 through LiteRT-LM, asked two ways: plainly ("Transcribe this audio"), and told to
+  keep mistakes (verbatim).
 
     python3 tools/stt_eval.py prepare --fleurs DIR --voices DIR --out clips
-    python3 tools/stt_eval.py run --recognizer omnilingual --model DIR --clips clips --out out.json
-    python3 tools/stt_eval.py run --recognizer gemma --model FILE --name NAME --clips clips --out out.json
+    python3 tools/stt_eval.py run --recognizer omnilingual --model DIR --name NAME --clips clips --out out.json
+    python3 tools/stt_eval.py run --recognizer omnilingual-dictionary --model DIR --dictionaries DIR ...
+    python3 tools/stt_eval.py run --recognizer parakeet --model DIR ...
+    python3 tools/stt_eval.py run --recognizer gemma --model FILE ...
     python3 tools/stt_eval.py report out1.json out2.json ...
 """
 
@@ -65,11 +73,11 @@ SERBIAN = dict(zip("абвгдђежзијклљмнњопрстћуфхцчџш
 
 def words(text, code):
     """[text] as words to compare: lower case, without punctuation, Serbian in Latin."""
-    text = unicodedata.normalize("NFC", text).lower()
+    text = unicodedata.normalize("NFC", text).lower().replace("’", "'")
     if code == "sr":
         text = "".join(SERBIAN.get(c, c) for c in text)
-    text = "".join(c if c.isalnum() or c.isspace() or c in "'’-" else " " for c in text)
-    return [w.strip("'’-") for w in text.split() if w.strip("'’-")]
+    text = "".join(c if c.isalnum() or c.isspace() or c in "'-" else " " for c in text)
+    return [w.strip("'-") for w in text.split() if w.strip("'-")]
 
 
 def edits(a, b):
@@ -190,13 +198,146 @@ def omnilingual(model_dir):
     import sherpa_onnx
     d = glob.glob(f"{model_dir}/sherpa-onnx-omnilingual-*")[0]
     rec = sherpa_onnx.OfflineRecognizer.from_omnilingual_asr_ctc(
-        model=f"{d}/model.int8.onnx", tokens=f"{d}/tokens.txt", num_threads=4)
+        model=glob.glob(f"{d}/model*.onnx")[0], tokens=f"{d}/tokens.txt", num_threads=4)
 
-    def hear(path, language, prompt):
+    def hear(path, code, language, prompt):
         s = rec.create_stream()
         s.accept_waveform(RATE, load_wav(path))
         rec.decode_stream(s)
         return s.result.text
+
+    return hear, [None]
+
+
+# NVIDIA Parakeet TDT 0.6B v3's languages that are also the app's.
+PARAKEET = {"cs", "da", "de", "el", "en", "es", "fi", "fr", "hu", "it", "nl", "pl", "pt", "ro", "ru", "sk", "sl",
+            "sv", "uk"}
+
+
+def parakeet(model_dir):
+    import sherpa_onnx
+    d = glob.glob(f"{model_dir}/sherpa-onnx-nemo-parakeet-*")[0]
+    rec = sherpa_onnx.OfflineRecognizer.from_transducer(
+        encoder=f"{d}/encoder.int8.onnx", decoder=f"{d}/decoder.int8.onnx", joiner=f"{d}/joiner.int8.onnx",
+        tokens=f"{d}/tokens.txt", model_type="nemo_transducer", num_threads=4)
+
+    def hear(path, code, language, prompt):
+        s = rec.create_stream()
+        s.accept_waveform(RATE, load_wav(path))
+        rec.decode_stream(s)
+        return s.result.text
+
+    return hear, [None]
+
+
+def dictionary_words(db_path, vocab):
+    """The dictionary's words (inflected forms included) that the recognizer can spell, sorted. Not
+    affixes ("-ac") or phrases."""
+    import sqlite3
+    out = set()
+    for (key,) in sqlite3.connect(db_path).execute("SELECT DISTINCT key FROM entries"):
+        w = unicodedata.normalize("NFC", key.lower()).replace("’", "'")
+        if w and " " not in w and w[0] != "-" and w[-1] != "-" and all(c in vocab for c in w):
+            out.add(w)
+    return sorted(out)
+
+
+def lse(a, b):
+    import math
+    if a == -math.inf:
+        return b
+    if b == -math.inf:
+        return a
+    m = max(a, b)
+    return m + math.log(math.exp(a - m) + math.exp(b - m))
+
+
+def dictionary_decode(logp, tokens, lexicon, beam=10, top=10):
+    """CTC prefix beam search that writes only [lexicon]'s words, with no language model: every word
+    is as likely as any other, so only the sound decides between them. A word ending in an
+    apostrophe ("l'") can run straight into the next, and words can be joined by hyphens."""
+    import bisect
+    import math
+    import numpy as np
+    memo = {}
+
+    def kind(w):  # 0: no word starts so, 1: some word starts so, 2: a word
+        if w not in memo:
+            i = bisect.bisect_left(lexicon, w)
+            memo[w] = 0 if i == len(lexicon) or not lexicon[i].startswith(w) else 2 if lexicon[i] == w else 1
+        return memo[w]
+
+    def extend(text, part, t):
+        """The ways to add token [t] to [text], whose word so far is [part]: (text, new word so far)."""
+        if t == " ":
+            return [(text + " ", "")] if part and kind(part) == 2 else []
+        out = [(text + t, part + t)] if kind(part + t) else []
+        if part and kind(part) == 2:
+            if t == "-":
+                out.append((text + t, ""))
+            elif part.endswith("'") and kind(t):
+                out.append((text + t, t))
+        return out
+
+    inf = -math.inf
+    beams = {("", ""): [0.0, inf, -1]}  # (text, word so far): [log p ending in blank, log p not, last token]
+    for frame in logp:
+        order = np.argsort(frame)[::-1]
+        cands = [int(c) for c in order[:top + 4] if c > 3][:top]
+        nxt = {}
+
+        def get(key, last):
+            if key not in nxt:
+                nxt[key] = [inf, inf, last]
+            return nxt[key]
+
+        for (text, part), (pb, pnb, last) in beams.items():
+            total = lse(pb, pnb)
+            n = get((text, part), last)
+            n[0] = lse(n[0], total + frame[0])
+            for c in cands:
+                lp = float(frame[c])
+                if c == last:
+                    n[1] = lse(n[1], pnb + lp)
+                    score = pb + lp
+                else:
+                    score = total + lp
+                for key in extend(text, part, tokens[c]):
+                    m = get(key, c)
+                    m[1] = lse(m[1], score)
+        beams = dict(sorted(nxt.items(), key=lambda kv: -lse(kv[1][0], kv[1][1]))[:beam])
+    # The likeliest that ends on a whole word; failing that, the likeliest without its unfinished word.
+    ends = [(lse(pb, pnb), text) for (text, part), (pb, pnb, _) in beams.items()
+            if (part == "" and not text.endswith("-")) or kind(part) == 2]
+    if ends:
+        return max(ends)[1].strip()
+    score, text, part = max((lse(pb, pnb), text, part) for (text, part), (pb, pnb, _) in beams.items())
+    return text[:len(text) - len(part)].strip(" -")
+
+
+def omnilingual_dictionary(model_dir, dictionaries):
+    """Omnilingual's own outputs, decoded with only the dictionary's words."""
+    import numpy as np
+    import onnxruntime as ort
+    d = glob.glob(f"{model_dir}/sherpa-onnx-omnilingual-*")[0]
+    tokens = {}
+    for line in open(f"{d}/tokens.txt", encoding="utf-8"):
+        t, i = line.rstrip("\n").rsplit(" ", 1)
+        tokens[int(i)] = t
+    vocab = {t for i, t in tokens.items() if i > 3 and len(t) == 1}
+    session = ort.InferenceSession(glob.glob(f"{d}/model*.onnx")[0])
+    loaded = {}
+
+    def hear(path, code, language, prompt):
+        if code not in loaded:
+            loaded.clear()  # One language's words at a time.
+            loaded[code] = dictionary_words(f"{dictionaries}/{code}.db", vocab)
+        x = load_wav(path)
+        x = (x - x.mean()) / np.sqrt(x.var() + 1e-5)
+        logits = session.run(None, {"x": x[None]})[0][0]
+        logp = logits - logits.max(-1, keepdims=True)
+        logp = logp - np.log(np.exp(logp).sum(-1, keepdims=True))
+        return dictionary_decode(logp, tokens, loaded[code])
 
     return hear, [None]
 
@@ -207,7 +348,7 @@ def gemma(path):
                               max_num_tokens=4096)
     exact = litert_lm.SamplerConfig(top_k=1, top_p=1.0, temperature=0.0)
 
-    def hear(file, language, prompt):
+    def hear(file, code, language, prompt):
         message = {"role": "user", "content": [
             {"type": "audio", "path": os.path.abspath(file)},
             {"type": "text", "text": PROMPTS[prompt].format(language=language)},
@@ -228,13 +369,20 @@ def run(args):
     if args.only:
         keep = set(args.only.split(","))
         clips = [c for c in clips if c["lang"] in keep]
-    hear, prompts = omnilingual(args.model) if args.recognizer == "omnilingual" else gemma(args.model)
+    if args.recognizer == "parakeet":
+        clips = [c for c in clips if c["lang"] in PARAKEET]
+    hear, prompts = {
+        "omnilingual": lambda: omnilingual(args.model),
+        "omnilingual-dictionary": lambda: omnilingual_dictionary(args.model, args.dictionaries),
+        "parakeet": lambda: parakeet(args.model),
+        "gemma": lambda: gemma(args.model),
+    }[args.recognizer]()
     results = []
     for c in clips:
         for prompt in prompts:
             start = time.time()
             try:
-                heard, error = hear(os.path.join(args.clips, c["file"]), names[c["lang"]], prompt), None
+                heard, error = hear(os.path.join(args.clips, c["file"]), c["lang"], names[c["lang"]], prompt), None
             except Exception as e:  # A clip the recognizer can't take is reported, not fatal.
                 heard, error = "", f"{type(e).__name__}: {e}"
             results.append({**c, "prompt": prompt, "heard": heard, "error": error,
@@ -288,16 +436,21 @@ def report(args):
     for test, title in (("accuracy", "Accuracy: word error rate, % (lower is better)"),
                         ("long", "Long speech, about a minute: word error rate, %")):
         lines += [f"## {title}", "", head, rule]
-        sums = [[] for _ in cols]
-        for lang in langs:
+        table = {lang: [rate(r, p, lang, test) for r, p in cols] for lang in langs}
+        for lang, vs in table.items():
+            lines.append(f"| {lang} | " + " | ".join("" if v is None else f"{v:.0f}" for v in vs) + " |")
+
+        def average(rows):
             cells = []
-            for i, (r, p) in enumerate(cols):
-                v = rate(r, p, lang, test)
-                if v is not None:
-                    sums[i].append(v)
-                cells.append("" if v is None else f"{v:.0f}")
-            lines.append(f"| {lang} | " + " | ".join(cells) + " |")
-        lines.append("| **Average** | " + " | ".join(f"**{sum(s) / len(s):.0f}**" if s else "" for s in sums) + " |")
+            for i in range(len(cols)):
+                vs = [row[i] for row in rows if row[i] is not None]
+                cells.append(f"**{sum(vs) / len(vs):.0f}**" if vs else "")
+            return " | ".join(cells)
+
+        lines.append("| **Average** | " + average(table.values()) + " |")
+        shared = [vs for vs in table.values() if None not in vs]
+        if len(shared) < len(table):
+            lines.append(f"| **Average, the {len(shared)} languages all have** | " + average(shared) + " |")
         lines.append("")
 
     lines += ["## Faithfulness: a wrong article, kept as said or corrected", "",
@@ -342,9 +495,10 @@ def main():
     a.add_argument("--voices", required=True)
     a.add_argument("--out", required=True)
     b = sub.add_parser("run")
-    b.add_argument("--recognizer", choices=["omnilingual", "gemma"], required=True)
+    b.add_argument("--recognizer", choices=["omnilingual", "omnilingual-dictionary", "parakeet", "gemma"], required=True)
     b.add_argument("--model", required=True)
     b.add_argument("--name", default="Omnilingual")
+    b.add_argument("--dictionaries", help="the app's dictionaries, as <code>.db (omnilingual-dictionary)")
     b.add_argument("--clips", required=True)
     b.add_argument("--out", required=True)
     b.add_argument("--only", help="comma-separated language codes")
