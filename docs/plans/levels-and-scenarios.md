@@ -6,11 +6,11 @@ yet.
 ## Context
 
 The section adds a second dimension beside the help modes: how hard the language is, on the CEFR's
-three bands, Basic (A1–A2), Independent (B1–B2) and Proficient (C1–C2). It replaces the fixed
+first two bands, Basic (A1–A2) and Independent (B1–B2). The Proficient band (C1–C2) is on the roadmap
+only, with models other than the phone's. It replaces the fixed
 scenario list with scenarios made for each band: generated from random ingredients, Gemma asking the
 learner for the scene, the learner's own, or talk about whatever. The roadmap says to research the
-bands first, and to measure whether Gemma can do each band, since E2B and E4B may not hold the
-Proficient band in every language.
+bands first, and to measure whether Gemma can do each band in each language.
 
 ## Order
 
@@ -90,7 +90,7 @@ Investigation only. Output: `docs/research/bands.md`.
    `Mode` in `app/src/main/java/com/pedant/app/Scenarios.kt` only; Free talk itself is a separate
    roadmap item.
 7. **Band setting.**
-   - **Choosing:** a `Band` (Basic, Independent, Proficient), chosen first in New conversation and
+   - **Choosing:** a `Band` (Basic, Independent), chosen first in New conversation and
      remembered.
    - **Saving:** saved with the conversation (`SavedConversation.kt`).
    - **Gemma:** a `{band}` placeholder in `instructions.json` (read by `Instructions.kt` and
@@ -123,18 +123,16 @@ Investigation only. Output: `docs/research/bands.md`.
     - **Saving:** the card is saved with the conversation, for Continue and the quiz.
 10. **Gemma asks for the scene.** This is the interview shape with the topic left to the learner:
     Gemma asks the learner to fill it in, and the answer becomes the scene. At Basic it asks in the
-    learner's own language; at Independent and Proficient, in the language being learned.
+    learner's own language; at Independent, in the language being learned.
 11. **Your own scenarios.** The learner describes a situation, and Gemma builds the scene at the band.
 12. **Talk about whatever** in every band: the conversation shape with no topic, today's Default with
     the band applied.
 13. **New conversation flow.** Language → band → two drawn cards, your own, or talk about whatever →
     Gemma's question, if the shape has one → the scene. This changes `LanguageScreen` in
     `MainActivity.kt` and `startSession` in `AppViewModel.kt`.
-14. **Openings.**
-    - **Removed:** the shipped openings (`openings.json`, `OpeningCache.kt`,
-      `tools/build_openings.py`, `.github/workflows/openings.yml`).
-    - **Instead:** when a conversation ends, the next random scenario is prepared in the background,
-      to cover Gemma writing the opening on the phone.
+14. **Openings.** The shipped openings are removed (`openings.json`, `OpeningCache.kt`,
+    `tools/build_openings.py`, `.github/workflows/openings.yml`): Gemma writes each opening on the
+    phone.
 15. **Generated-scene evals.** A sample of generated scenes per band and language, checked for sense
     and level. This extends task 4.
 

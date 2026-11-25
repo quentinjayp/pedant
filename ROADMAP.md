@@ -99,25 +99,30 @@ The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/
   others, from their free sample papers). That gives the band's task lists, and what to measure.
 - **Evals of whether the models can do each band.** A pipeline like the translation evals, testing
   Gemma (E2B and E4B) per band and language: whether it keeps to short, common language at Basic,
-  and whether it can hold a Proficient conversation at all (nuance, idiom, persuading, handling a
-  delicate subject). If a model can't do the Proficient band in a language, that band isn't offered
-  for it, rather than offered badly.
-- **Bands.** The CEFR's three bands, under its own names: **Basic** (A1–A2), **Independent**
-  (B1–B2) and **Proficient** (C1–C2). The CEFR is the internal scale for every language: it was
+  and to connected everyday language, with opinions and reasons, at Independent. If a model can't do
+  a band in a language, that band isn't offered for it, rather than offered badly.
+- **Bands.** The CEFR's first two bands, under its own names: **Basic** (A1–A2) and **Independent**
+  (B1–B2). The CEFR is the internal scale for every language: it was
   written to be language-neutral and is used for non-European languages too (Turkey's TYS,
   Indonesia's BIPA framework, Russia's TORFL mapping). You choose the band to practise at; nothing
   places you in one or tracks progress through them.
+- **Investigate the Proficient band (C1–C2) with models other than the phone's.** A learner at
+  C1–C2 can already talk with a general assistant such as Claude directly. In a first French test,
+  Gemma E4B's language reached C1 (idiom, register, structured turns), but it agreed with every
+  point the learner made instead of challenging them, and it had little of C2's humour, irony and
+  allusion. See "Investigate models other than the phone's" under Models.
 - **The band shapes the whole conversation.** Gemma speaks at the band's level (short, common words
-  at Basic; no simplifying at Proficient), and acts as the listener the band assumes: at Basic it
-  speaks slowly, repeats, rephrases and helps; at Proficient it doesn't adjust its language at all.
+  at Basic; connected everyday language at Independent), and acts as the listener the band assumes:
+  at Basic it speaks slowly, repeats, rephrases and helps; at Independent it still rephrases when the
+  learner is lost.
   What the learner says is translated into something they can say at that level, with the meaning
   kept over simplicity; and the quiz's word limits follow the band rather than the help mode.
 - **Generated scenarios.** The app draws a scenario's ingredients at random from lists in a data
   file, in two layers:
   - **Shape:** one of the band's task shapes, the same for every language, generalised from the oral
     exams. Basic: an interview about you, an everyday transaction, planning together. Independent: an
-    unusual everyday situation, defending a view then debating it. Proficient: a controversial
-    question where the learner tries to convince Gemma. The shape decides who leads and Gemma's role.
+    unusual everyday situation, defending a view then debating it. The shape decides who leads and
+    Gemma's role.
   - **Content:** a topic, a place or relationship, and sometimes a twist.
 
   Gemma writes the scene from them, set where the language is spoken (a warung, not a Parisian café,
@@ -129,7 +134,7 @@ The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/
 - **Gemma asks for the scene.** For the kind of situation picked, Gemma asks the learner to fill it
   in ("Where do you usually get food or drinks?"), and the answer becomes the scene, so the
   conversation is about the learner's own life. At Basic it's asked in the learner's own language;
-  at Independent and Proficient in the language being learned, as the conversation's first exchange.
+  at Independent in the language being learned, as the conversation's first exchange.
 - **Your own scenarios.** The learner describes a situation ("my landlord is late fixing the
   heating") and Gemma builds the scene around it at the chosen band.
 - **Talk about whatever.** Kept in every band, as the option with no scene. It and "Gemma asks for
@@ -138,19 +143,18 @@ The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/
   about whatever; Gemma asks its question if the shape has one; the scene starts.
 - **What it costs.** Openings are no longer written ahead and shipped, so a conversation no longer
   opens instantly: Gemma writes the scene and opening on the phone (a few seconds with E2B, more
-  with E4B). Its question to the learner covers part of that, and the next random scenario can be
-  prepared in the background when a conversation ends. The saved conversation stores the scene
-  itself, for Continue and the quiz. The evals pipeline would check a sample of generated scenes per
-  band and language for sense and level, and whether Gemma holds each band's level at all (E2B at
-  Basic, both models at Proficient).
+  with E4B). Its question to the learner covers part of that. The saved conversation stores the
+  scene itself, for Continue and the quiz. The evals pipeline would check a sample of generated
+  scenes per band and language for sense and level, and whether Gemma holds each band's level at
+  all.
 
 ## Models
 
-- **Explore running the model on your own computer.** For what Gemma on the phone may not manage
-  (the Proficient band, if the evals show E4B can't hold it in a language), explore letting Pedant
-  use a bigger model served from the learner's own computer: Ollama or llama.cpp's server (both
-  speak the same OpenAI-style API), reached from the phone anywhere over Tailscale, behind HTTPS
-  with `tailscale serve`, with no ports opened to the internet. Nothing goes to a company and
+- **Investigate models other than the phone's.** For what Gemma on the phone doesn't manage, such
+  as the Proficient band, investigate letting Pedant use a bigger model served from the learner's
+  own computer: Ollama or llama.cpp's server (both speak the same OpenAI-style API), reached from
+  the phone anywhere over Tailscale, behind HTTPS with `tailscale serve`, with no ports opened to
+  the internet. Nothing goes to a company and
   nothing is paid per use. Speech, sounds, the voice and grading stay on the phone; only text goes
   to the server. When the computer can't be reached, Pedant falls back to Gemma, or to the bands
   Gemma can do. The evals would gain a third engine, "an OpenAI-style server at this address", so
