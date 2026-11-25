@@ -16,7 +16,8 @@ Three tests:
   also given one at a time, to show what the cutting costs.
 
 The recognizers:
-- omnilingual: an Omnilingual CTC model (300M, 1B; v1 or v2), as sherpa-onnx runs it.
+- omnilingual: an Omnilingual CTC model (300M, v1 or v2), as sherpa-onnx runs it. (1B v2 was tested
+  and dropped: more accurate, but about three times slower than 300M on long speech.)
 - omnilingual-dictionary: Omnilingual 300M, allowed to write only words in the language's dictionary
   (the app's, with inflected forms), each as likely as any other, so it can't prefer "la" to "le".
 - parakeet: NVIDIA Parakeet TDT 0.6B v3, in the 19 of the app's languages it has.
@@ -724,7 +725,9 @@ def label(run_name, prompt):
 
 
 def report(args):
-    runs = [json.load(open(p, encoding="utf-8")) for p in args.files]
+    leave_out = set(filter(None, (args.leave_out or "").split(",")))
+    runs = [r for r in (json.load(open(p, encoding="utf-8")) for p in args.files)
+            if not any(r["name"] == n or r["name"].startswith(n + ",") for n in leave_out)]
     lines = ["# Speech recognition eval", ""]
     cols = [(r, p) for r in runs for p in sorted({x["prompt"] for x in r["results"]}, key=lambda p: p or "")]
 
@@ -839,6 +842,7 @@ def main():
     d.add_argument("--out", required=True)
     d.add_argument("files", nargs="+")
     c = sub.add_parser("report")
+    c.add_argument("--leave-out", help="comma-separated recognizer names whose results (and snapped copies) to leave out")
     c.add_argument("files", nargs="+")
     args = p.parse_args()
     {"prepare": prepare, "run": run, "snap": snap, "report": report}[args.cmd](args)

@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
     inputs:
       recognizers:
-        description: "Comma-separated: omnilingual, gemma-e2b, gemma-e4b, omnilingual-v2, omnilingual-1b, parakeet, omnilingual-dictionary, omnilingual-zipa, omnilingual-zipa-unknown"
-        default: "omnilingual,gemma-e2b,gemma-e4b,omnilingual-v2,omnilingual-1b,parakeet,omnilingual-dictionary,omnilingual-zipa,omnilingual-zipa-unknown"
+        description: "Comma-separated: omnilingual, gemma-e2b, gemma-e4b, omnilingual-v2, parakeet, omnilingual-dictionary, omnilingual-zipa, omnilingual-zipa-unknown"
+        default: "omnilingual,gemma-e2b,gemma-e4b,omnilingual-v2,parakeet,omnilingual-dictionary,omnilingual-zipa,omnilingual-zipa-unknown"
       tests:
         description: "Comma-separated: accuracy, faithful, long, four-minutes, four-minutes-sentences (empty for all)"
         default: ""
@@ -24,7 +24,7 @@ on:
         default: ""
       snap:
         description: "Comma-separated names of the recognizers whose results to snap to dictionary words (optional)"
-        default: "Omnilingual,Omnilingual 300M,Omnilingual 1B v2"
+        default: "Omnilingual,Omnilingual 300M"
 
 permissions:
   contents: read
@@ -79,7 +79,6 @@ jobs:
           - {key: gemma-e4b, name: Gemma 4 E4B, recognizer: gemma, hf: litert-community/gemma-4-E4B-it-litert-lm, files: gemma-4-E4B-it.litertlm}
           # v2 has no published int8 model, so this one isn't quantized.
           - {key: omnilingual-v2, name: Omnilingual 300M v2, recognizer: omnilingual, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-v2-2026-02-05, files: model.onnx tokens.txt}
-          - {key: omnilingual-1b, name: Omnilingual 1B v2, recognizer: omnilingual, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-1B-ctc-v2-int8-2026-02-05, files: model.int8.onnx tokens.txt}
           - {key: parakeet, name: Parakeet TDT 0.6B v3, recognizer: parakeet, hf: csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8, files: encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt}
           - {key: omnilingual-dictionary, name: "Omnilingual 300M, dictionary words", recognizer: omnilingual-dictionary, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12, files: model.int8.onnx tokens.txt}
           - {key: omnilingual-zipa, name: "Omnilingual 300M + ZIPA, every word", recognizer: omnilingual-zipa, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12, files: model.int8.onnx tokens.txt}
@@ -173,7 +172,7 @@ jobs:
       - name: Report
         run: |
           shopt -s nullglob globstar
-          python tools/stt_eval.py report earlier/**/*.json out/*.json snapped/*.json
+          python tools/stt_eval.py report --leave-out "Omnilingual 1B v2" earlier/**/*.json out/*.json snapped/*.json
       - uses: actions/upload-artifact@v4
         with:
           name: report
