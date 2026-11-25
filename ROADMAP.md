@@ -60,6 +60,13 @@ Beginner and Intermediate are built. A third mode is planned.
   order because its only treebank is licensed for non-commercial use. Other sources of counts.
 - **Investigate the word bubble scrolling on small phones.** The meanings scroll on their own, but the
   whole bubble can still scroll when it's taller than the screen.
+- **Investigate supplemental dictionaries.** Sources of more words for languages whose English
+  Wiktionary dictionary is small: Slovenian (about 45,000 entries) and Slovak (about 54,000), against
+  hundreds of thousands for most languages. Their forms would link to Wiktionary's entries for
+  meanings. Candidates: for Slovenian, Sloleks 3.0 (about 365,000 base words with all their forms,
+  CC BY-SA 4.0); for Slovak, the Slovak National Corpus's morphological database (licence unclear)
+  and MorfFlex SK (non-commercial, so ruled out). Also whether Turkish, Hindi and Swahili lack words,
+  since checking recognized words against their dictionaries made recognition worse.
 - **Investigate inflected forms for Finnish.** Ways to include them without the dictionary growing to
   about 485 MB. Every other language's dictionary includes its inflected forms.
 
