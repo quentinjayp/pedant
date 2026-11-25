@@ -24,6 +24,11 @@ Beginner and Intermediate are built. A third mode is planned.
     Gemma's corrections of the grammar and word use in what you typed.
   - **Asking about the language as you go.** Ask the tutor in English mid-conversation ("What does
     that mean?", "How do I say…?", "Why this word and not that one?"), then carry on.
+- **Investigate long turns (3–5 minutes).** Cutting the recording at its pauses, found by
+  sherpa-onnx's voice activity detector (Silero VAD), into pieces of up to 20 seconds, and giving
+  Omnilingual 300M one piece at a time, during the turn. In the speech recognition eval (FLEURS, 25
+  languages), four minutes in such pieces had a 29% word error rate, against 69% for one minute
+  given whole and 24% for the same sentences one at a time. To add if long turns in Free talk fail.
 
 ## Learning
 
