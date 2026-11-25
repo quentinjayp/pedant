@@ -31,6 +31,7 @@ import os
 import re
 import sqlite3
 import sys
+import unicodedata
 
 from app_languages import dictionary_key, languages
 
@@ -227,6 +228,39 @@ SKIP_TABLE_TAGS = {"table-tags", "inflection-template", "canonical", "romanizati
 NO_TABLE_FORMS = {"fi"}
 
 
+# Languages whose inflection tables mark stress or tone with accents that normal writing leaves out
+# ("за́мка", Slovene "ravȃn"). Text the app looks up is written normally, so these forms are filed
+# under their plain spelling; the entry's word keeps the marks, to show. Per language, the marks
+# dropped: for Russian and Ukrainian the stress marks (not ё, й or ї, which are letters); for Serbian
+# the tone and length marks on vowels and syllabic r (not ć's acute, or č, š, ž); for Slovene every
+# mark but the caron (č, š, ž), and the schwa written as e.
+STRESS_MARKS = {"\u0300", "\u0301"}
+TONE_MARKS = {"\u0300", "\u0301", "\u0302", "\u0303", "\u0304", "\u0306", "\u030b", "\u030f", "\u0311", "\u0323"}
+TONE_BEARERS = set("aeiouAEIOUrRаеиоуАЕИОУрР")
+PLAIN_SPELLING = {"ru", "uk", "sr", "sl"}
+
+
+def plain_spelling(word, code):
+    """[word] as it's normally written, without the stress or tone marks [code]'s tables add."""
+    if code not in PLAIN_SPELLING:
+        return word
+    out, base = [], ""
+    for c in unicodedata.normalize("NFD", word):
+        if not unicodedata.combining(c):
+            base = c
+        elif code in ("ru", "uk") and c in STRESS_MARKS:
+            continue
+        elif code == "sr" and c in TONE_MARKS and base in TONE_BEARERS:
+            continue
+        elif code == "sl" and c != "\u030c":
+            continue
+        out.append(c)
+    plain = "".join(out)
+    if code == "sl":
+        plain = plain.replace("ə", "e").replace("Ə", "E")
+    return unicodedata.normalize("NFC", plain)
+
+
 def table_forms(entry):
     """(form, description) for each form in [entry]'s inflection table."""
     word = entry.get("word") or ""
@@ -239,15 +273,30 @@ def table_forms(entry):
     return out
 
 
-def add_table_forms(db, freq):
-    """Adds the noted table forms the dictionary has no entry for, one per spelling and part of speech."""
+def plain_form_links(db, code):
+    """Writes each "form of" link with its base word's plain spelling ("за́мок" as "замок"), so the
+    app finds the base word's entries; the meaning still names it as Wiktionary writes it."""
+    if code not in PLAIN_SPELLING:
+        return 0
+    rows = [(plain_spelling(base, code), row) for row, base in
+            db.execute("SELECT rowid, form_of FROM entries WHERE form_of IS NOT NULL").fetchall()
+            if plain_spelling(base, code) != base]
+    db.executemany("UPDATE entries SET form_of = ? WHERE rowid = ?", rows)
+    return len(rows)
+
+
+def add_table_forms(db, freq, code):
+    """Adds the noted table forms whose spelling the dictionary has no entry for, one per spelling,
+    part of speech and base word: a spelling that is a form of two words gets an entry for each, so
+    both words' meanings are shown. (A spelling with an entry is left to it: the tables also list
+    related words, such as an adjective made from a noun, that have entries of their own.)"""
     rows = db.execute(
         "SELECT key, word, pos, description, base FROM table_forms "
-        "WHERE key NOT IN (SELECT key FROM entries) GROUP BY key, pos ORDER BY key"
+        "WHERE key NOT IN (SELECT key FROM entries) GROUP BY key, pos, base ORDER BY key"
     ).fetchall()
     db.executemany(
         "INSERT INTO entries VALUES (?, ?, ?, NULL, ?, ?, ?)",
-        [(k, w, pos, d, base, freq.get((k, pos), 0)) for k, w, pos, d, base in rows],
+        [(k, w, pos, d, plain_spelling(base, code), freq.get((k, pos), 0)) for k, w, pos, d, base in rows],
     )
     db.execute("DROP TABLE table_forms")
     return len(rows)
@@ -316,7 +365,7 @@ def main():
         if args.forms and form_of is None and code not in NO_TABLE_FORMS:
             dbs[code].executemany(
                 "INSERT INTO table_forms VALUES (?, ?, ?, ?, ?)",
-                [(dictionary_key(f), f, entry.get("pos"), d, word) for f, d in table_forms(entry)],
+                [(dictionary_key(plain_spelling(f, code)), f, entry.get("pos"), d, word) for f, d in table_forms(entry)],
             )
         key = dictionary_key(word)
         ipa = pick_ipa(entry.get("sounds"), code)
@@ -332,8 +381,10 @@ def main():
     built = {}
     for code, db in dbs.items():
         db.execute("CREATE INDEX entries_key ON entries (key)")
+        print(f"{code}: {plain_form_links(db, code):,} form links written without stress or tone marks",
+              file=sys.stderr)
         print(f"{code}: {fix_form_links(db):,} form links cut back to their word", file=sys.stderr)
-        added = add_table_forms(db, freq[code])
+        added = add_table_forms(db, freq[code], code)
         stats[code]["entries"] += added
         print(f"{code}: {added:,} forms added from inflection tables", file=sys.stderr)
         db.executemany(

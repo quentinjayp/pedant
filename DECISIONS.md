@@ -141,6 +141,8 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   - Meanings longer than 160 characters are cut.
 - **Splitting words:** a word the dictionary doesn't have is looked up in parts, split at an apostrophe or hyphens. Words with their own entries aren't split.
 - **Inflected forms:** added for every language except Finnish.
+  - In Russian, Ukrainian, Serbian and Slovenian, Wiktionary's inflection tables mark stress or tone, which normal writing leaves out. Those forms are filed under their plain spelling, so text finds them, and are shown with their marks.
+  - Every word under a spelling is shown: a spelling that is a form of two words ("замка", of за́мок and замо́к) shows both.
 - **Kept and left out:** definitions aren't removed to tidy entries; phrase-level definitions aren't used.
 
 ## Look and feel

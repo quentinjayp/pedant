@@ -43,19 +43,26 @@ class Dictionary(file: File) : Closeable {
      * [word]'s entries, spelled as it is ("eu", not the initialism "EU"). A word capitalised only at
      * the start ("Dobrý", maybe the start of a sentence) also takes its lower-case entries, the
      * most common first ("dobrý", good, before the surname). Failing that, however they're spelled.
+     *
+     * The entries under one key are spelled the same but for case, or for the stress and tone marks
+     * of forms tools/build_dictionaries.py files under their plain spelling ("за́мка" under
+     * "замка"), so only case tells them apart, and every word under the key is shown.
      */
     private fun matching(word: String): List<Entry> {
         val all = entries(word)
-        val exact = spelling(word)
+        val exact = caseOf(word)
         val lower = exact.lowercase(Locale.ROOT)
         val capitalised = exact != lower && exact.drop(1) == lower.drop(1)
         val wanted = if (capitalised) setOf(exact, lower) else setOf(exact)
-        return all.filter { spelling(it.word) in wanted }
-            .ifEmpty { all.filter { spelling(it.word) == lower } }
+        return all.filter { caseOf(it.word) in wanted }
+            .ifEmpty { all.filter { caseOf(it.word) == lower } }
             .ifEmpty { all }
     }
 
-    private fun spelling(word: String) = Normalizer.normalize(word, Normalizer.Form.NFC).replace('’', '\'')
+    /** [word]'s case, a letter at a time, without its marks: "Aaaaa" for "Dobrý", "AA" for "EU". */
+    private fun caseOf(word: String): String =
+        Normalizer.normalize(word, Normalizer.Form.NFD).replace(MARKS, "").map { if (it.isUpperCase()) 'A' else 'a' }
+            .joinToString("")
 
     fun entries(word: String): List<Entry> =
         db.rawQuery(
@@ -136,6 +143,8 @@ class Dictionary(file: File) : Closeable {
         /** The lookup key; build_dictionaries.py normalizes words the same way. */
         fun key(word: String): String =
             Normalizer.normalize(word, Normalizer.Form.NFC).lowercase(Locale.ROOT).replace('’', '\'')
+
+        private val MARKS = Regex("\\p{Mn}+")
 
         private val POS_NAMES = mapOf(
             "adj" to "adjective", "adv" to "adverb", "prep" to "preposition", "conj" to "conjunction",
