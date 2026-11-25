@@ -18,6 +18,11 @@ separate from the language level (see Levels and scenarios), and every mode work
     Gemma's corrections of the grammar and word use in what you typed.
   - **Asking about the language as you go.** Ask the tutor in English mid-conversation ("What does
     that mean?", "How do I say…?", "Why this word and not that one?"), then carry on.
+  - **Investigate sentence starters (Pre-A1).** For the very start of the Basic band: about ten
+    common sentence starters in the language ("Where is…", "Can I have…", "How much is…", "My name
+    is…"). Tap one to put it into the conversation, then add the words after it: practice in the bare
+    minimum of a conversation. Which starters, and how many, is still to be found. The CEFR's
+    Companion Volume has a Pre-A1 level, below A1, that may help.
 - **Investigate long turns (3–5 minutes).** Cutting the recording at its pauses, found by
   sherpa-onnx's voice activity detector (Silero VAD), into pieces of up to 20 seconds, and giving
   Omnilingual 300M one piece at a time, during the turn. In the speech recognition eval (FLEURS, 25
