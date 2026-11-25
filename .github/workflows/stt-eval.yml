@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
     inputs:
       recognizers:
-        description: "Comma-separated: omnilingual, gemma-e2b, gemma-e4b, omnilingual-v2, omnilingual-1b, parakeet, omnilingual-dictionary"
-        default: "omnilingual,gemma-e2b,gemma-e4b,omnilingual-v2,omnilingual-1b,parakeet,omnilingual-dictionary"
+        description: "Comma-separated: omnilingual, gemma-e2b, gemma-e4b, omnilingual-v2, omnilingual-1b, parakeet, omnilingual-dictionary, omnilingual-zipa, omnilingual-zipa-unknown"
+        default: "omnilingual,gemma-e2b,gemma-e4b,omnilingual-v2,omnilingual-1b,parakeet,omnilingual-dictionary,omnilingual-zipa,omnilingual-zipa-unknown"
       tests:
         description: "Comma-separated: accuracy, faithful, long, four-minutes, four-minutes-sentences (empty for all)"
         default: ""
@@ -82,6 +82,8 @@ jobs:
           - {key: omnilingual-1b, name: Omnilingual 1B v2, recognizer: omnilingual, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-1B-ctc-v2-int8-2026-02-05, files: model.int8.onnx tokens.txt}
           - {key: parakeet, name: Parakeet TDT 0.6B v3, recognizer: parakeet, hf: csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8, files: encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt}
           - {key: omnilingual-dictionary, name: "Omnilingual 300M, dictionary words", recognizer: omnilingual-dictionary, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12, files: model.int8.onnx tokens.txt}
+          - {key: omnilingual-zipa, name: "Omnilingual 300M + ZIPA, every word", recognizer: omnilingual-zipa, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12, files: model.int8.onnx tokens.txt}
+          - {key: omnilingual-zipa-unknown, name: "Omnilingual 300M + ZIPA, words not in the dictionary", recognizer: omnilingual-zipa-unknown, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12, files: model.int8.onnx tokens.txt}
     name: recognize (${{ matrix.name }})
     env:
       WANTED: ${{ contains(format(',{0},', inputs.recognizers), format(',{0},', matrix.key)) }}
@@ -110,14 +112,24 @@ jobs:
           for f in ${{ matrix.files }}; do
             curl -fsSL --retry 3 -o $d/$f "https://huggingface.co/${{ matrix.hf }}/resolve/main/$f"
           done
-          if [ "${{ matrix.recognizer }}" = omnilingual-dictionary ]; then tools/download_dictionaries.sh dict; fi
+          case "${{ matrix.recognizer }}" in
+            omnilingual-dictionary) tools/download_dictionaries.sh dict ;;
+            omnilingual-zipa*)
+              tools/download_dictionaries.sh dict
+              pip install --quiet rapidfuzz
+              sudo apt-get install -y -qq espeak-ng >/dev/null
+              mkdir -p zipa
+              for f in model.int8.onnx tokens.txt; do
+                curl -fsSL --retry 3 -o zipa/$f https://huggingface.co/anyspeech/zipa-large-crctc-500k/resolve/main/$f
+              done ;;
+          esac
           curl -fsSL --retry 3 -o silero_vad.onnx https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx
       - name: Recognize
         if: env.WANTED == 'true'
         run: |
           if [ "${{ matrix.recognizer }}" = gemma ]; then model=model/$(basename ${{ matrix.hf }})/${{ matrix.files }}; else model=model; fi
           python tools/stt_eval.py run --recognizer ${{ matrix.recognizer }} --model "$model" --dictionaries dict \
-            --name "${{ matrix.name }}" --clips clips --tests "${{ inputs.tests }}" --vad silero_vad.onnx \
+            --name "${{ matrix.name }}" --clips clips --tests "${{ inputs.tests }}" --vad silero_vad.onnx --zipa zipa \
             --out "out/${{ matrix.key }}.json"
       - uses: actions/upload-artifact@v4
         if: always() && env.WANTED == 'true'
