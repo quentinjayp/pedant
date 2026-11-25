@@ -1,0 +1,182 @@
+name: Speech recognition eval
+
+# A one-off eval (tools/stt_eval.py): other speech recognizers against Omnilingual 300M's, in the
+# app's languages, on accuracy, keeping a learner's mistakes, and a minute of speech. Run on demand
+# only. It reports once, in the run's summary, and never blocks a build.
+#
+# To add recognizers or tests to earlier runs' results: give the run whose clips to reuse (or none, to
+# make new ones), and the runs whose results to report beside the new ones.
+
+on:
+  workflow_dispatch:
+    inputs:
+      recognizers:
+        description: "Comma-separated: omnilingual, gemma-e2b, gemma-e4b, omnilingual-v2, parakeet, omnilingual-dictionary, omnilingual-zipa, omnilingual-zipa-unknown"
+        default: "omnilingual,gemma-e2b,gemma-e4b,omnilingual-v2,parakeet,omnilingual-dictionary,omnilingual-zipa,omnilingual-zipa-unknown"
+      tests:
+        description: "Comma-separated: accuracy, faithful, long, four-minutes, four-minutes-sentences (empty for all)"
+        default: ""
+      clips_run:
+        description: "An earlier run's ID, to reuse its clips (empty to make new ones)"
+        default: ""
+      report_runs:
+        description: "Comma-separated IDs of earlier runs whose results to report too (optional)"
+        default: ""
+      snap:
+        description: "Comma-separated names of the recognizers whose results to snap to dictionary words (optional)"
+        default: "Omnilingual,Omnilingual 300M"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  prepare:
+    if: inputs.clips_run == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download FLEURS and the voices
+        run: |
+          set -eu
+          # Real speech: FLEURS (Google, CC-BY), people reading sentences, its dev split.
+          for code in $(python3 -c "import sys; sys.path.insert(0, 'tools'); import stt_eval; print(' '.join(stt_eval.FLEURS.values()))"); do
+            mkdir -p fleurs/$code
+            base=https://huggingface.co/datasets/google/fleurs/resolve/main/data/$code
+            curl -fsSL --retry 3 -o fleurs/$code/dev.tsv "$base/dev.tsv"
+            curl -fsSL --retry 3 "$base/audio/dev.tar.gz" | tar xz -C fleurs/$code
+          done
+          # The voices of the languages whose articles show gender, for the faithfulness test.
+          mkdir -p voices && cd voices
+          for v in $(python3 -c "import json; print(' '.join(l['piperVoice'] for l in json.load(open('../app/src/main/assets/languages.json'))['languages'] if l.get('articles')))"); do
+            curl -fsSL --retry 3 "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-$v.tar.bz2" | tar xj
+          done
+      - name: Pick the clips
+        run: |
+          pip install --quiet sherpa-onnx==1.13.8 soundfile numpy
+          python tools/stt_eval.py prepare --fleurs fleurs --voices voices --out clips
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clips
+          path: clips/
+
+  recognize:
+    needs: prepare
+    if: always() && (needs.prepare.result == 'success' || needs.prepare.result == 'skipped')
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {key: omnilingual, name: Omnilingual 300M, recognizer: omnilingual, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12, files: model.int8.onnx tokens.txt}
+          - {key: gemma-e2b, name: Gemma 4 E2B, recognizer: gemma, hf: litert-community/gemma-4-E2B-it-litert-lm, files: gemma-4-E2B-it.litertlm}
+          - {key: gemma-e4b, name: Gemma 4 E4B, recognizer: gemma, hf: litert-community/gemma-4-E4B-it-litert-lm, files: gemma-4-E4B-it.litertlm}
+          # v2 has no published int8 model, so this one isn't quantized.
+          - {key: omnilingual-v2, name: Omnilingual 300M v2, recognizer: omnilingual, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-v2-2026-02-05, files: model.onnx tokens.txt}
+          - {key: parakeet, name: Parakeet TDT 0.6B v3, recognizer: parakeet, hf: csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8, files: encoder.int8.onnx decoder.int8.onnx joiner.int8.onnx tokens.txt}
+          - {key: omnilingual-dictionary, name: "Omnilingual 300M, dictionary words", recognizer: omnilingual-dictionary, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12, files: model.int8.onnx tokens.txt}
+          - {key: omnilingual-zipa, name: "Omnilingual 300M + ZIPA, every word", recognizer: omnilingual-zipa, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12, files: model.int8.onnx tokens.txt}
+          - {key: omnilingual-zipa-unknown, name: "Omnilingual 300M + ZIPA, words not in the dictionary", recognizer: omnilingual-zipa-unknown, hf: csukuangfj2/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-int8-2025-11-12, files: model.int8.onnx tokens.txt}
+    name: recognize (${{ matrix.name }})
+    env:
+      WANTED: ${{ contains(format(',{0},', inputs.recognizers), format(',{0},', matrix.key)) }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.WANTED == 'true'
+      - uses: actions/setup-python@v5
+        if: env.WANTED == 'true'
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        if: env.WANTED == 'true'
+        with:
+          name: clips
+          path: clips/
+          run-id: ${{ inputs.clips_run || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Download the model
+        if: env.WANTED == 'true'
+        run: |
+          set -eu
+          pip install --quiet sherpa-onnx==1.13.8 soundfile numpy onnxruntime litert-lm-api==0.19.1
+          # Each model in a folder named after its repository, as tools/stt_eval.py looks for it.
+          d=model/$(basename ${{ matrix.hf }})
+          mkdir -p $d
+          for f in ${{ matrix.files }}; do
+            curl -fsSL --retry 3 -o $d/$f "https://huggingface.co/${{ matrix.hf }}/resolve/main/$f"
+          done
+          case "${{ matrix.recognizer }}" in
+            omnilingual-dictionary) tools/download_dictionaries.sh dict ;;
+            omnilingual-zipa*)
+              tools/download_dictionaries.sh dict
+              pip install --quiet rapidfuzz
+              sudo apt-get install -y -qq espeak-ng >/dev/null
+              mkdir -p zipa
+              for f in model.int8.onnx tokens.txt; do
+                curl -fsSL --retry 3 -o zipa/$f https://huggingface.co/anyspeech/zipa-large-crctc-500k/resolve/main/$f
+              done ;;
+          esac
+          curl -fsSL --retry 3 -o silero_vad.onnx https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx
+      - name: Recognize
+        if: env.WANTED == 'true'
+        run: |
+          if [ "${{ matrix.recognizer }}" = gemma ]; then model=model/$(basename ${{ matrix.hf }})/${{ matrix.files }}; else model=model; fi
+          python tools/stt_eval.py run --recognizer ${{ matrix.recognizer }} --model "$model" --dictionaries dict \
+            --name "${{ matrix.name }}" --clips clips --tests "${{ inputs.tests }}" --vad silero_vad.onnx --zipa zipa \
+            --out "out/${{ matrix.key }}.json"
+      - uses: actions/upload-artifact@v4
+        if: always() && env.WANTED == 'true'
+        with:
+          name: heard-${{ matrix.key }}
+          path: out/
+
+  report:
+    needs: recognize
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download the earlier results
+        if: inputs.report_runs != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUNS: ${{ inputs.report_runs }}
+        run: |
+          set -eu
+          for id in ${RUNS//,/ }; do
+            gh run download "$id" --repo "$GITHUB_REPOSITORY" --pattern 'heard-*' --dir "earlier/$id"
+          done
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: heard-*
+          path: out/
+          merge-multiple: true
+      - name: Snap to dictionary words
+        if: inputs.snap != ''
+        env:
+          NAMES: ${{ inputs.snap }}
+        run: |
+          shopt -s nullglob globstar
+          pip install --quiet rapidfuzz
+          tools/download_dictionaries.sh dict
+          python tools/stt_eval.py snap --dictionaries dict --names "$NAMES" --out snapped earlier/**/*.json out/*.json
+      - name: Report
+        run: |
+          shopt -s nullglob globstar
+          python tools/stt_eval.py report --leave-out "Omnilingual 1B v2" earlier/**/*.json out/*.json snapped/*.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: report
+          path: |
+            earlier/
+            out/
+            snapped/
