@@ -81,6 +81,8 @@ data class WordLookup(
 sealed interface ChatItem {
     /** What the learner typed, in English. */
     data class User(val text: String) : ChatItem
+    /** What the learner said in the language, as the speech recognizer heard it (Free talk). */
+    data class Spoken(val text: String) : ChatItem
     data class Tutor(val reply: String, val english: String? = null) : ChatItem
     /** The phrase to say, translated from what the learner wanted to say. */
     data class Say(val english: String, val phrase: String, val note: TutorNote? = null) : ChatItem
@@ -861,6 +863,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     target != null -> practiceTry(target, audio)
                     quizzing -> quizTry(audio)
                     walking -> walkTry(audio)
+                    d == null && mode == Mode.FreeTalk -> {
+                        // Free talk: what was heard goes straight to the tutor, nothing to repeat.
+                        val heard = withContext(Dispatchers.Default) { checkNotNull(stt).transcribe(audio.samples) }
+                        if (heard.isNotBlank()) freeTalk(heard)
+                    }
                     d == null -> {
                         // Waiting for English: only the words matter here.
                         val english = withContext(Dispatchers.Default) { checkNotNull(stt).transcribe(audio.samples) }
@@ -878,8 +885,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** The learner typed what they want to say. */
     fun submitEnglish(text: String) {
-        if (busy != Busy.Idle || drill != null || text.isBlank()) return
+        if (busy != Busy.Idle || drill != null || mode == Mode.FreeTalk || text.isBlank()) return
         launchAction(Busy.Thinking) { translate(text.trim()) }
+    }
+
+    /** Free talk: the learner said [heard] in the language, and the tutor answers it. */
+    private suspend fun freeTalk(heard: String) {
+        chat += ChatItem.Spoken(heard)
+        queueLookups(heard)
+        runTurn(Instructions.said(heard, register))
     }
 
     /** Plays the phrase again. */

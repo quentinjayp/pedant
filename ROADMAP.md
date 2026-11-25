@@ -4,17 +4,11 @@ Ideas for later. Nothing here is being built yet.
 
 ## Modes
 
-Beginner and Intermediate are built. A third mode is planned.
+Repeat word, Repeat phrase and Free talk are built. They form a ladder from the most help to none,
+separate from the language level (see Levels and scenarios), and every mode works at every level.
 
-- **Rename the modes for the help they give.** The modes are how much help the app gives, not how
-  good the learner is, so they're named for what they do: **Repeat word** (each word, then the whole
-  phrase; today's Beginner), **Repeat phrase** (the whole phrase until it's right; today's
-  Intermediate) and **Free talk** (say it and move on; the planned mode below). They form a ladder
-  from the most help to none, separate from the language level (see Levels and scenarios), and
-  every mode works at every level.
-- **Free talk** (planned as "Advanced"). Free conversation in the language, with no English first. The tutor never makes
-  you repeat a phrase until it's right, as Beginner and Intermediate do. This mode may use a
-  different speech recognizer (undecided).
+- **More for Free talk.** Free talk is built as free conversation in the language: what you say goes
+  straight to the tutor, with nothing to repeat. Still to come:
   - **Reaching for a missing word.** Say a sentence in the language with the one word you don't
     know in English, and get back just that word.
   - **Tutor's note.** After you say something, and before the tutor's reply, a correction or

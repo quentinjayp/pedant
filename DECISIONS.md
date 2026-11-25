@@ -55,10 +55,12 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   3. The learner repeats it until it's right.
   4. The tutor replies.
 - **Modes:**
-  - **Beginner:** word by word first, on a full-screen page with the phrase at the top, each word's IPA, its "sounds like" respelling and its meaning. Skip is offered after 2 failed tries at a word. Then the whole phrase.
-  - **Intermediate:** the whole phrase straight away.
-  - **Conversation-only mode:** removed; free conversation is planned as its own mode.
-  - **Renaming:** planned, to Repeat word, Repeat phrase and Free talk.
+  - **Named for the help they give,** from the most to none: Repeat word, Repeat phrase and Free talk (Repeat word and Repeat phrase were Beginner and Intermediate).
+  - **Repeat word:** word by word first, on a full-screen page with the phrase at the top, each word's IPA, its "sounds like" respelling and its meaning. Skip is offered after 2 failed tries at a word. Then the whole phrase.
+  - **Repeat phrase:** the whole phrase straight away.
+  - **Free talk:** the learner says what they want in the language. What the speech recognizer heard is shown, its words tappable, and goes straight to the tutor, who replies. Nothing is repeated or graded, there's no text box, and the quiz isn't made from it.
+    - The speech recognizer is Omnilingual 300M, as in the other modes. A long turn is recorded and heard whole; cutting it at pauses is on the roadmap, for if long turns fail.
+  - **Conversation-only mode:** removed.
 - **Skip:** offered after 2 failed tries at a phrase.
 - **Failed tries:** only the latest one is kept in the conversation.
 - **Practice window (tapping a try):**
@@ -95,10 +97,10 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   - what does this word mean;
   - put it in order: the first word is lower-cased, except in German;
   - say it from memory;
-  - spot the mistake: Intermediate only;
+  - spot the mistake: Repeat phrase only;
   - said or silent: final consonants and liaisons, French only.
 - **Rejected:** "pick the reply".
-- **Word limits:** put it in order and say it from memory use 5 words or fewer in Beginner and 8 or fewer in Intermediate.
+- **Word limits:** put it in order and say it from memory use 5 words or fewer in Repeat word and 8 or fewer in Repeat phrase.
 - **No score at the end.** Each question shows Right or Not quite.
 
 ## Grading

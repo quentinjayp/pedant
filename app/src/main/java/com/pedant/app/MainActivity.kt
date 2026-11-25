@@ -895,7 +895,7 @@ private fun <T> SegmentedChoice(
     }
 }
 
-/** Beginner or Intermediate. */
+/** Repeat word, Repeat phrase or Free talk. */
 @Composable
 private fun ModeChoice(vm: AppViewModel, modifier: Modifier = Modifier, track: Color = Pastel.White.copy(alpha = 0.85f)) =
     SegmentedChoice(Mode.entries, vm.mode, { it.title }, vm::chooseMode, modifier, track)
@@ -1156,6 +1156,13 @@ private fun ConversationScreen(vm: AppViewModel) {
                             ),
                         )
                     }
+                    // What the learner said in the language, as it was heard: tappable, like the tutor's.
+                    is ChatItem.Spoken -> Bubble(
+                        item.text,
+                        mine = true,
+                        label = "You said in ${vm.language?.englishName ?: "the language"}",
+                        onWord = vm::openWord,
+                    )
                     is ChatItem.Tutor -> if (item.reply.isNotEmpty()) {
                         Bubble(item.reply, mine = false, label = "Tutor", detail = item.english, onWord = vm::openWord)
                     }
@@ -2204,10 +2211,14 @@ private fun OwnLanguageField(
     )
 }
 
-/** The English text box, or Hear again / Skip while practising a phrase. */
+/**
+ * The English text box, or Hear again / Skip while practising a phrase. Free talk has no text box:
+ * the learner speaks in the language.
+ */
 @Composable
 private fun LearningControls(vm: AppViewModel) {
     if (vm.busy != Busy.Idle) return
+    if (vm.drillPhrase == null && vm.mode == Mode.FreeTalk) return
     if (vm.drillPhrase == null) {
         var text by remember { mutableStateOf("") }
         Row(

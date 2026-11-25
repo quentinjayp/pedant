@@ -86,9 +86,9 @@ Investigation only. Output: `docs/research/bands.md`.
 
 ## C. Foundations in the app
 
-6. **Rename the help modes** to Repeat word, Repeat phrase and Free talk. This changes the titles of
-   `Mode` in `app/src/main/java/com/pedant/app/Scenarios.kt` only; Free talk itself is a separate
-   roadmap item.
+6. **Rename the help modes** to Repeat word, Repeat phrase and Free talk. **Done**, with Free talk
+   itself: the titles of `Mode` in `app/src/main/java/com/pedant/app/Scenarios.kt` changed (its
+   names stay, as the saved choice and saved quizzes use them), and Free talk was added.
 7. **Band setting.**
    - **Choosing:** a `Band` (Basic, Independent), chosen first in New conversation and
      remembered.

@@ -7,12 +7,16 @@ enum class Register(val title: String) {
 }
 
 /**
- * How much help the learner gets with a phrase. In [Beginner] they're taken through it one word at a
- * time before saying it whole; in [Intermediate] they say it whole straight away.
+ * How much help the learner gets, from the most to none. In [Beginner] (Repeat word) they're taken
+ * through each phrase one word at a time before saying it whole; in [Intermediate] (Repeat phrase)
+ * they say it whole straight away; in [FreeTalk] they say what they want in the language and the
+ * tutor replies, with nothing to repeat. The names are kept from before the modes were renamed, as
+ * the saved choice and saved quizzes use them.
  */
 enum class Mode(val title: String, val about: String) {
-    Beginner("Beginner", "Say what you want in your own language, then say it one word at a time before the whole phrase."),
-    Intermediate("Intermediate", "Say what you want in your own language, then repeat it back in the language until you get it right."),
+    Beginner("Repeat word", "Say what you want in your own language, then say it one word at a time before the whole phrase."),
+    Intermediate("Repeat phrase", "Say what you want in your own language, then repeat it back in the language until you get it right."),
+    FreeTalk("Free talk", "Say what you want in the language, and the tutor replies. There's nothing to repeat."),
 }
 
 /**
