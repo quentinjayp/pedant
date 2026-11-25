@@ -23,11 +23,17 @@ The recognizers:
 - gemma: Gemma 4 through LiteRT-LM, asked two ways: plainly ("Transcribe this audio"), and told to
   keep mistakes (verbatim).
 
+Snapping, done afterwards on a recognizer's results: every word it wrote that isn't in the language's
+dictionary is replaced by the dictionary word closest in spelling (the most common one, on a tie),
+either always or only when it's close (see SNAP_CLOSE). Words that are in the dictionary are kept,
+so a wrong article stays wrong.
+
     python3 tools/stt_eval.py prepare --fleurs DIR --voices DIR --out clips
     python3 tools/stt_eval.py run --recognizer omnilingual --model DIR --name NAME --clips clips --out out.json
     python3 tools/stt_eval.py run --recognizer omnilingual-dictionary --model DIR --dictionaries DIR ...
     python3 tools/stt_eval.py run --recognizer parakeet --model DIR ...
     python3 tools/stt_eval.py run --recognizer gemma --model FILE ...
+    python3 tools/stt_eval.py snap --dictionaries DIR --names "Omnilingual 300M,..." --out DIR out1.json ...
     python3 tools/stt_eval.py report out1.json out2.json ...
 """
 
@@ -465,6 +471,67 @@ def run(args):
               open(args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
 
+# ---- snap ----
+
+def snap_close(word):
+    """The most letters a snap may change in [word], for "only when it's close": a quarter of them."""
+    return max(1, round(len(word) / 4))
+
+
+def dictionary_by_use(db_path):
+    """The dictionary's words (inflected forms included), most common first. Not affixes or phrases."""
+    import sqlite3
+    use = {}
+    for key, freq in sqlite3.connect(db_path).execute("SELECT key, freq FROM entries"):
+        w = unicodedata.normalize("NFC", key.lower()).replace("’", "'")
+        if w and " " not in w and w[0] != "-" and w[-1] != "-":
+            use[w] = max(use.get(w, 0), freq or 0)
+    return sorted(use, key=lambda w: -use[w])
+
+
+def snap_text(text, code, lexicon, known, close):
+    """[text] with each word not in the dictionary replaced by the nearest one in spelling. A word is
+    known if it's in the dictionary, or each of its parts at an apostrophe or hyphen is (as the app
+    looks words up)."""
+    from rapidfuzz import process
+    from rapidfuzz.distance import Levenshtein
+    out = []
+    for w in words(text, code):
+        parts = [p for p in re.split(r"(?<=')|-", w) if p]
+        if w in known or all(p in known for p in parts) or any(c.isdigit() for c in w):
+            out.append(w)
+            continue
+        found = process.extractOne(w, lexicon, scorer=Levenshtein.distance,
+                                   score_cutoff=snap_close(w) if close else None)
+        out.append(found[0] if found else w)
+    return " ".join(out)
+
+
+def snap(args):
+    """Writes a snapped copy of each result whose recognizer is in --names: always, and when close."""
+    wanted = set(args.names.split(","))
+    os.makedirs(args.out, exist_ok=True)
+    for path in args.files:
+        run = json.load(open(path, encoding="utf-8"))
+        if run["name"] not in wanted:
+            continue
+        for close, suffix in ((False, "unknown words snapped"), (True, "unknown words snapped when close")):
+            results, lexicon, lang = [], None, None
+            for x in run["results"]:
+                if x["lang"] != lang:
+                    lang = x["lang"]
+                    lexicon = dictionary_by_use(f"{args.dictionaries}/{lang}.db")
+                    known = set(lexicon)
+                start = time.time()
+                heard = snap_text(x["heard"], lang, lexicon, known, close)
+                results.append({**x, "heard": heard, "seconds_taken": round(x["seconds_taken"] + time.time() - start, 2)})
+            name = f"{run['name']}, {suffix}"
+            out = os.path.join(args.out, re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") + ".json")
+            json.dump({**run, "name": name, "results": results}, open(out, "w", encoding="utf-8"),
+                      ensure_ascii=False, indent=1)
+            print(f"{name}: {len(results)} results", flush=True)
+
+
 # ---- report ----
 
 def faithful_verdict(r):
@@ -595,10 +662,15 @@ def main():
     b.add_argument("--tests", help="comma-separated: accuracy, faithful, long, four-minutes, "
                                    "four-minutes-sentences (default all)")
     b.add_argument("--vad", help="Silero VAD's model, silero_vad.onnx (for four-minutes)")
+    d = sub.add_parser("snap")
+    d.add_argument("--dictionaries", required=True, help="the app's dictionaries, as <code>.db")
+    d.add_argument("--names", required=True, help="comma-separated recognizer names, as in the results")
+    d.add_argument("--out", required=True)
+    d.add_argument("files", nargs="+")
     c = sub.add_parser("report")
     c.add_argument("files", nargs="+")
     args = p.parse_args()
-    {"prepare": prepare, "run": run, "report": report}[args.cmd](args)
+    {"prepare": prepare, "run": run, "snap": snap, "report": report}[args.cmd](args)
 
 
 if __name__ == "__main__":

@@ -22,6 +22,9 @@ on:
       report_runs:
         description: "Comma-separated IDs of earlier runs whose results to report too (optional)"
         default: ""
+      snap:
+        description: "Comma-separated names of the recognizers whose results to snap to dictionary words (optional)"
+        default: "Omnilingual,Omnilingual 300M,Omnilingual 1B v2"
 
 permissions:
   contents: read
@@ -146,14 +149,23 @@ jobs:
           pattern: heard-*
           path: out/
           merge-multiple: true
+      - name: Snap to dictionary words
+        if: inputs.snap != ''
+        env:
+          NAMES: ${{ inputs.snap }}
+        run: |
+          shopt -s nullglob globstar
+          pip install --quiet rapidfuzz
+          tools/download_dictionaries.sh dict
+          python tools/stt_eval.py snap --dictionaries dict --names "$NAMES" --out snapped earlier/**/*.json out/*.json
       - name: Report
         run: |
-          shopt -s nullglob
-          shopt -s globstar
-          python tools/stt_eval.py report earlier/**/*.json out/*.json
+          shopt -s nullglob globstar
+          python tools/stt_eval.py report earlier/**/*.json out/*.json snapped/*.json
       - uses: actions/upload-artifact@v4
         with:
           name: report
           path: |
             earlier/
             out/
+            snapped/
