@@ -4,8 +4,8 @@ name: Speech recognition eval
 # app's languages, on accuracy, keeping a learner's mistakes, and a minute of speech. Run on demand
 # only. It reports once, in the run's summary, and never blocks a build.
 #
-# To add recognizers to an earlier run's results, give that run's ID: its clips are reused, and its
-# results are reported beside the new ones.
+# To add recognizers or tests to earlier runs' results: give the run whose clips to reuse (or none, to
+# make new ones), and the runs whose results to report beside the new ones.
 
 on:
   workflow_dispatch:
@@ -13,8 +13,14 @@ on:
       recognizers:
         description: "Comma-separated: omnilingual, gemma-e2b, gemma-e4b, omnilingual-v2, omnilingual-1b, parakeet, omnilingual-dictionary"
         default: "omnilingual,gemma-e2b,gemma-e4b,omnilingual-v2,omnilingual-1b,parakeet,omnilingual-dictionary"
-      reuse_run:
-        description: "An earlier run's ID, to reuse its clips and report its results too (optional)"
+      tests:
+        description: "Comma-separated: accuracy, faithful, long, four-minutes, four-minutes-sentences (empty for all)"
+        default: ""
+      clips_run:
+        description: "An earlier run's ID, to reuse its clips (empty to make new ones)"
+        default: ""
+      report_runs:
+        description: "Comma-separated IDs of earlier runs whose results to report too (optional)"
         default: ""
 
 permissions:
@@ -23,7 +29,7 @@ permissions:
 
 jobs:
   prepare:
-    if: inputs.reuse_run == ''
+    if: inputs.clips_run == ''
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -88,7 +94,7 @@ jobs:
         with:
           name: clips
           path: clips/
-          run-id: ${{ inputs.reuse_run || github.run_id }}
+          run-id: ${{ inputs.clips_run || github.run_id }}
           github-token: ${{ github.token }}
       - name: Download the model
         if: env.WANTED == 'true'
@@ -102,12 +108,14 @@ jobs:
             curl -fsSL --retry 3 -o $d/$f "https://huggingface.co/${{ matrix.hf }}/resolve/main/$f"
           done
           if [ "${{ matrix.recognizer }}" = omnilingual-dictionary ]; then tools/download_dictionaries.sh dict; fi
+          curl -fsSL --retry 3 -o silero_vad.onnx https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx
       - name: Recognize
         if: env.WANTED == 'true'
         run: |
           if [ "${{ matrix.recognizer }}" = gemma ]; then model=model/$(basename ${{ matrix.hf }})/${{ matrix.files }}; else model=model; fi
           python tools/stt_eval.py run --recognizer ${{ matrix.recognizer }} --model "$model" --dictionaries dict \
-            --name "${{ matrix.name }}" --clips clips --out "out/${{ matrix.key }}.json"
+            --name "${{ matrix.name }}" --clips clips --tests "${{ inputs.tests }}" --vad silero_vad.onnx \
+            --out "out/${{ matrix.key }}.json"
       - uses: actions/upload-artifact@v4
         if: always() && env.WANTED == 'true'
         with:
@@ -123,14 +131,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - uses: actions/download-artifact@v4
-        if: inputs.reuse_run != ''
-        with:
-          pattern: heard-*
-          path: earlier/
-          merge-multiple: true
-          run-id: ${{ inputs.reuse_run }}
-          github-token: ${{ github.token }}
+      - name: Download the earlier results
+        if: inputs.report_runs != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUNS: ${{ inputs.report_runs }}
+        run: |
+          set -eu
+          for id in ${RUNS//,/ }; do
+            gh run download "$id" --repo "$GITHUB_REPOSITORY" --pattern 'heard-*' --dir "earlier/$id"
+          done
       - uses: actions/download-artifact@v4
         with:
           pattern: heard-*
@@ -139,7 +149,8 @@ jobs:
       - name: Report
         run: |
           shopt -s nullglob
-          python tools/stt_eval.py report earlier/*.json out/*.json
+          shopt -s globstar
+          python tools/stt_eval.py report earlier/**/*.json out/*.json
       - uses: actions/upload-artifact@v4
         with:
           name: report

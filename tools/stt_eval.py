@@ -9,7 +9,11 @@ Three tests:
 - Faithfulness: sentences with one wrong article ("le voiture"), read by the language's Piper voice,
   in the languages whose articles show gender. Does the recognizer write the mistake as said, or
   correct it?
-- Long speech: about a minute of FLEURS recordings joined together, as a talk would be.
+- Long speech: about a minute of FLEURS recordings joined together, given to the recognizer whole.
+- Four minutes: about four minutes of FLEURS recordings joined together, as a long turn in Free talk
+  would be, cut at the pauses found by a voice activity detector (Silero VAD, as sherpa-onnx runs
+  it) into pieces of up to 20 seconds, given to the recognizer one at a time. The same sentences are
+  also given one at a time, to show what the cutting costs.
 
 The recognizers:
 - omnilingual: an Omnilingual CTC model (300M, 1B; v1 or v2), as sherpa-onnx runs it.
@@ -52,6 +56,8 @@ ACCURACY_CLIPS = 15
 FAITHFUL_CLIPS = 8
 MIN_WORDS, MAX_WORDS = 5, 14
 LONG_SECONDS = 60
+FOUR_MINUTES = 240
+PIECE_SECONDS = 20
 RATE = 16000
 
 PROMPTS = {
@@ -151,18 +157,25 @@ def prepare(args):
             name = f"{code}-accuracy-{i}.wav"
             save_wav(os.path.join(args.out, name), load_wav(path))
             clips.append({"lang": code, "test": "accuracy", "file": name, "text": text})
-        # Long speech: recordings after the short ones, joined with a short pause, to about a minute.
-        parts, texts, length = [], [], 0
-        for path, text in (r for r in rows if r not in short):
-            x = load_wav(path)
-            parts += [x, np.zeros(RATE // 2, dtype="float32")]
-            texts.append(text)
-            length += len(x) / RATE + 0.5
-            if length >= LONG_SECONDS:
-                break
-        name = f"{code}-long.wav"
-        save_wav(os.path.join(args.out, name), np.concatenate(parts))
-        clips.append({"lang": code, "test": "long", "file": name, "text": " ".join(texts), "seconds": round(length)})
+        # Long speech and four minutes: recordings after the short ones, each used once, joined with a
+        # short pause.
+        rest = iter([r for r in rows if r not in short])
+        for test, seconds in (("long", LONG_SECONDS), ("four-minutes", FOUR_MINUTES)):
+            parts, texts, length = [], [], 0
+            for path, text in rest:
+                x = load_wav(path)
+                parts += [x, np.zeros(RATE // 2, dtype="float32")]
+                texts.append(text)
+                length += len(x) / RATE + 0.5
+                if test == "four-minutes":  # Each sentence on its own too, to compare with.
+                    name = f"{code}-four-minutes-{len(texts) - 1}.wav"
+                    save_wav(os.path.join(args.out, name), x)
+                    clips.append({"lang": code, "test": "four-minutes-sentences", "file": name, "text": text})
+                if length >= seconds:
+                    break
+            name = f"{code}-{test}.wav"
+            save_wav(os.path.join(args.out, name), np.concatenate(parts))
+            clips.append({"lang": code, "test": test, "file": name, "text": " ".join(texts), "seconds": round(length)})
         # Faithfulness: one article swapped for another, read by the language's voice.
         articles = lang.get("articles")
         if articles:
@@ -363,6 +376,49 @@ def gemma(path):
     return hear, list(PROMPTS)
 
 
+def pieces(path, vad_model, longest=PIECE_SECONDS):
+    """The recording in [path], cut into pieces of at most [longest] seconds. Silero VAD only finds the
+    pauses: each cut is in the middle of one, and the pieces keep all of the audio between them, so
+    nothing at the start or end of a sentence is lost. Speech with no pause for [longest] seconds is
+    cut where it reaches it."""
+    import sherpa_onnx
+    config = sherpa_onnx.VadModelConfig()
+    config.silero_vad.model = vad_model
+    config.silero_vad.min_silence_duration = 0.25
+    config.silero_vad.min_speech_duration = 0.25
+    config.silero_vad.max_speech_duration = longest
+    config.sample_rate = RATE
+    vad = sherpa_onnx.VoiceActivityDetector(config, buffer_size_in_seconds=FOUR_MINUTES * 2)
+    x = load_wav(path)
+    window = config.silero_vad.window_size
+    speech = []  # (start, end) in samples
+
+    def take():
+        while not vad.empty():
+            speech.append((vad.front.start, vad.front.start + len(vad.front.samples)))
+            vad.pop()
+
+    for i in range(0, len(x), window):
+        vad.accept_waveform(x[i:i + window])
+        take()
+    vad.flush()
+    take()
+    limit = longest * RATE
+    pauses = [(end + nxt) // 2 for (_, end), (nxt, _) in zip(speech, speech[1:])]
+    # Cut at the last pause before each piece would pass [longest] seconds.
+    out, start, last = [], 0, 0
+    for c in pauses + [len(x)]:
+        if c - start > limit and last > start:
+            out.append(x[start:last])
+            start = last
+        while c - start > limit:  # No pause in [longest] seconds.
+            out.append(x[start:start + limit])
+            start += limit
+        last = c
+    out.append(x[start:])
+    return [p for p in out if len(p) > RATE // 10]
+
+
 def run(args):
     names = {l["code"]: l["englishName"] for l in app_languages()}
     clips = json.load(open(os.path.join(args.clips, "clips.json"), encoding="utf-8"))["clips"]
@@ -377,15 +433,30 @@ def run(args):
         "parakeet": lambda: parakeet(args.model),
         "gemma": lambda: gemma(args.model),
     }[args.recognizer]()
+    if args.tests:
+        keep = set(args.tests.split(","))
+        clips = [c for c in clips if c["test"] in keep]
+    piece_file = os.path.join(os.path.dirname(os.path.abspath(args.out)), "piece.wav")
+    os.makedirs(os.path.dirname(piece_file), exist_ok=True)
     results = []
     for c in clips:
         for prompt in prompts:
             start = time.time()
+            extra = {}
             try:
-                heard, error = hear(os.path.join(args.clips, c["file"]), c["lang"], names[c["lang"]], prompt), None
+                path = os.path.join(args.clips, c["file"])
+                if c["test"] == "four-minutes":
+                    heard_pieces = []
+                    for piece in pieces(path, args.vad):
+                        save_wav(piece_file, piece)
+                        heard_pieces.append(hear(piece_file, c["lang"], names[c["lang"]], prompt))
+                    heard, extra = " ".join(heard_pieces), {"pieces": len(heard_pieces)}
+                else:
+                    heard = hear(path, c["lang"], names[c["lang"]], prompt)
+                error = None
             except Exception as e:  # A clip the recognizer can't take is reported, not fatal.
                 heard, error = "", f"{type(e).__name__}: {e}"
-            results.append({**c, "prompt": prompt, "heard": heard, "error": error,
+            results.append({**c, **extra, "prompt": prompt, "heard": heard, "error": error,
                             "seconds_taken": round(time.time() - start, 2)})
             print(f"{c['file']} {prompt or ''}: {heard[:100]}{' ERROR ' + error if error else ''}", flush=True)
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024
@@ -421,8 +492,9 @@ def report(args):
     runs = [json.load(open(p, encoding="utf-8")) for p in args.files]
     lines = ["# Speech recognition eval", ""]
     cols = [(r, p) for r in runs for p in sorted({x["prompt"] for x in r["results"]}, key=lambda p: p or "")]
-    head = "| Language | " + " | ".join(label(r["name"], p) for r, p in cols) + " |"
-    rule = "|---|" + "---|" * len(cols)
+
+    def has(r, p, test):
+        return any(x["prompt"] == p and x["test"] == test for x in r["results"])
 
     def rate(r, prompt, lang, test):
         rows = [x for x in r["results"] if x["prompt"] == prompt and x["lang"] == lang and x["test"] == test]
@@ -434,15 +506,23 @@ def report(args):
 
     langs = sorted({x["lang"] for r in runs for x in r["results"]})
     for test, title in (("accuracy", "Accuracy: word error rate, % (lower is better)"),
-                        ("long", "Long speech, about a minute: word error rate, %")):
-        lines += [f"## {title}", "", head, rule]
-        table = {lang: [rate(r, p, lang, test) for r, p in cols] for lang in langs}
+                        ("long", "Long speech, about a minute, given whole: word error rate, %"),
+                        ("four-minutes", f"Four minutes, cut at the pauses into pieces of up to {PIECE_SECONDS} seconds: "
+                                         "word error rate, %"),
+                        ("four-minutes-sentences", "The same four minutes, one sentence at a time: word error rate, %")):
+        tcols = [(r, p) for r, p in cols if has(r, p, test)]
+        if not tcols:
+            continue
+        lines += [f"## {title}", "", "| Language | " + " | ".join(label(r["name"], p) for r, p in tcols) + " |",
+                  "|---|" + "---|" * len(tcols)]
+        table = {lang: [rate(r, p, lang, test) for r, p in tcols] for lang in langs}
+        table = {lang: vs for lang, vs in table.items() if any(v is not None for v in vs)}
         for lang, vs in table.items():
             lines.append(f"| {lang} | " + " | ".join("" if v is None else f"{v:.0f}" for v in vs) + " |")
 
         def average(rows):
             cells = []
-            for i in range(len(cols)):
+            for i in range(len(tcols)):
                 vs = [row[i] for row in rows if row[i] is not None]
                 cells.append(f"**{sum(vs) / len(vs):.0f}**" if vs else "")
             return " | ".join(cells)
@@ -453,31 +533,41 @@ def report(args):
             lines.append(f"| **Average, the {len(shared)} languages all have** | " + average(shared) + " |")
         lines.append("")
 
-    lines += ["## Faithfulness: a wrong article, kept as said or corrected", "",
-              "| Language | " + " | ".join(label(r["name"], p) + " kept / corrected / other" for r, p in cols) + " |",
-              rule]
-    flangs = sorted({x["lang"] for r in runs for x in r["results"] if x["test"] == "faithful"})
-    totals = [[0, 0, 0] for _ in cols]
-    for lang in flangs:
-        cells = []
-        for i, (r, p) in enumerate(cols):
-            v = [faithful_verdict(x) for x in r["results"] if x["prompt"] == p and x["lang"] == lang and x["test"] == "faithful"]
-            k, c, o = v.count("kept"), v.count("corrected"), v.count("other")
-            totals[i] = [totals[i][0] + k, totals[i][1] + c, totals[i][2] + o]
-            cells.append(f"{k} / {c} / {o}")
-        lines.append(f"| {lang} | " + " | ".join(cells) + " |")
-    lines.append("| **All** | " + " | ".join(f"**{k} / {c} / {o}**" for k, c, o in totals) + " |")
-    lines.append("")
+    fcols = [(r, p) for r, p in cols if has(r, p, "faithful")]
+    if fcols:
+        lines += ["## Faithfulness: a wrong article, kept as said or corrected", "",
+                  "| Language | " + " | ".join(label(r["name"], p) + " kept / corrected / other" for r, p in fcols) + " |",
+                  "|---|" + "---|" * len(fcols)]
+        flangs = sorted({x["lang"] for r in runs for x in r["results"] if x["test"] == "faithful"})
+        totals = [[0, 0, 0] for _ in fcols]
+        for lang in flangs:
+            cells = []
+            for i, (r, p) in enumerate(fcols):
+                v = [faithful_verdict(x) for x in r["results"] if x["prompt"] == p and x["lang"] == lang and x["test"] == "faithful"]
+                k, c, o = v.count("kept"), v.count("corrected"), v.count("other")
+                totals[i] = [totals[i][0] + k, totals[i][1] + c, totals[i][2] + o]
+                cells.append(f"{k} / {c} / {o}")
+            lines.append(f"| {lang} | " + " | ".join(cells) + " |")
+        lines.append("| **All** | " + " | ".join(f"**{k} / {c} / {o}**" for k, c, o in totals) + " |")
+        lines.append("")
 
     lines += ["## Time and memory (CI machine, not a phone)", "",
-              "| Recognizer | Seconds per short clip | Seconds per long clip | Peak memory, MB | Errors |", "|---|---|---|---|---|"]
+              "| Recognizer | Seconds per short clip | Seconds per minute, whole | Seconds per four minutes, "
+              "in pieces | Pieces per four minutes | Peak memory over its run, MB | Errors |",
+              "|---|---|---|---|---|---|---|"]
+
+    def mean(vs):
+        return f"{sum(vs) / len(vs):.1f}" if vs else ""
+
     for r, p in cols:
         rows = [x for x in r["results"] if x["prompt"] == p]
-        short = [x["seconds_taken"] for x in rows if x["test"] != "long"]
-        long_ = [x["seconds_taken"] for x in rows if x["test"] == "long"]
         errors = sum(1 for x in rows if x["error"])
-        lines.append(f"| {label(r['name'], p)} | {sum(short) / max(len(short), 1):.1f} | "
-                     f"{sum(long_) / max(len(long_), 1):.1f} | {r['peak_mb']} | {errors} |")
+        lines.append(f"| {label(r['name'], p)} | "
+                     + mean([x["seconds_taken"] for x in rows if x["test"] in ("accuracy", "faithful")]) + " | "
+                     + mean([x["seconds_taken"] for x in rows if x["test"] == "long"]) + " | "
+                     + mean([x["seconds_taken"] for x in rows if x["test"] == "four-minutes"]) + " | "
+                     + mean([x["pieces"] for x in rows if x["test"] == "four-minutes" and "pieces" in x]) + " | "
+                     + f"{r['peak_mb']} | {errors} |")
     lines.append("")
     lines.append("Faithfulness: \"other\" is a different word, or nothing, where the article was said.")
     text = "\n".join(lines) + "\n"
@@ -502,6 +592,9 @@ def main():
     b.add_argument("--clips", required=True)
     b.add_argument("--out", required=True)
     b.add_argument("--only", help="comma-separated language codes")
+    b.add_argument("--tests", help="comma-separated: accuracy, faithful, long, four-minutes, "
+                                   "four-minutes-sentences (default all)")
+    b.add_argument("--vad", help="Silero VAD's model, silero_vad.onnx (for four-minutes)")
     c = sub.add_parser("report")
     c.add_argument("files", nargs="+")
     args = p.parse_args()
