@@ -172,7 +172,11 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   - **Independent:** connected sentences and some complex ones, familiar topics and now and then something less routine, asking for opinions and reasons and giving its own. It rephrases briefly when the learner is lost. Two to four sentences a reply.
   - **Names:** where a scene needs one, Gemma makes up a plausible name, never a placeholder.
   - **Tested** in French, in a session: two conversations per band with E4B, judged against the band descriptors in docs/research/bands.md.
-- **Translations follow the band:** the learner's lines are translated into what they can say at it, keeping the meaning even where that makes the sentence less simple.
+- **Translations follow the band:** the learner's lines are translated into what they can say at it, keeping the whole meaning.
+  - **How:** each band's instructions say how to translate at it, with five examples shown in English, the same for every language.
+  - **Tested in French** (the 20 eval sentences, judged by Claude in a session): at Basic, 16 of 20 translations were at the level with the examples, against 9 without. But a detail was lost in 12 of 20, against 5 without, even though the instructions say not to leave anything out.
+  - **French examples** did no better than the English ones. Telling Gemma to say it "as simply as you would explain it to a child, but as an adult speaking to adults" added little, with or without the examples.
+- **Gemma isn't the judge of translations at a band.** Gemma E4B judged the same French translations as Claude, against the same criteria from the CEFR descriptors, with and without examples of judgments. It missed most of the meaning lost and the unnatural French that Claude found, marked Basic translations down for what A1–A2 allows (the passé composé), and sometimes judged the English instead of the French.
 - **Openings:** the shipped openings are written for each band.
 - **One set of task shapes per band, for every language.** The conversation tasks for each band come
   from the oral exams' shapes, generalised once and applied to every language, not taken from each

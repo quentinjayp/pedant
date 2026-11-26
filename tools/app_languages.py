@@ -36,10 +36,11 @@ def instruction(text, language, own="English"):
 
 
 def with_band(ins, text, band):
-    """[text] with the band's parts (assets/instructions.json's bands) in place of {band}, {reply}
-    and {translation}, as the app's Instructions fills them in."""
+    """[text] with the band's parts (assets/instructions.json's bands) in place of {band}, {reply},
+    {translation} and {translationGuide}, as the app's Instructions fills them in."""
     b = ins["bands"][band]
-    return text.replace("{band}", b["band"]).replace("{reply}", b["reply"]).replace("{translation}", b["translation"])
+    return (text.replace("{band}", b["band"]).replace("{reply}", b["reply"]).replace("{translation}", b["translation"])
+            .replace("{translationGuide}", b["translationGuide"]))
 
 
 def dictionary_key(word):

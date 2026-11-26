@@ -86,6 +86,13 @@ Investigation only. Output: `docs/research/bands.md`.
      - If not, the permanent eval keeps only the measurable parts (sentence length, word commonness).
 5. **Band-aware translation evals.** Extend the translation evals: translations told a band are
    checked for keeping the meaning (chrF against references, as now) and, at Basic, for simplicity.
+   - **Tested in French, in a session:** E4B translated the 20 eval sentences at each band, Claude
+     judged them against the CEFR descriptors (meaning kept, at the level, natural French), and Gemma
+     E4B judged the same translations. This is 4a and 4b, for translations.
+   - **The translation instructions** gained each band's guide, with five examples shown in English:
+     at Basic, 16 of 20 at the level against 9, but a detail lost in 12 against 5.
+   - **Gemma as judge failed** (see DECISIONS.md), so by 4b the CI eval keeps only what can be
+     counted. Not built yet: translating at both bands in CI, and the simplicity measures.
 
 ## C. Foundations in the app
 

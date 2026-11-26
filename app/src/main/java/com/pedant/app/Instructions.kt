@@ -24,11 +24,11 @@ object Instructions {
         .replace("{anOwn}", own.withArticle)
         .replace("{own}", own.englishName)
 
-    /** [text] with [band]'s parts in place of {band}, {reply} and {translation}. */
+    /** [text] with [band]'s parts in place of {band}, {reply}, {translation} and {translationGuide}. */
     private fun withBand(text: String, band: Band): String {
         val b = json.getJSONObject("bands").getJSONObject(band.name)
         return text.replace("{band}", b.getString("band")).replace("{reply}", b.getString("reply"))
-            .replace("{translation}", b.getString("translation"))
+            .replace("{translation}", b.getString("translation")).replace("{translationGuide}", b.getString("translationGuide"))
     }
 
     fun start(register: Register) = json.getString("start").replace("{register}", register.name.lowercase())
