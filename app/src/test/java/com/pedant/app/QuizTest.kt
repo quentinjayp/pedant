@@ -24,7 +24,7 @@ class QuizTest {
         assertEquals(1, Quiz.length(QuizSamples.chat(phrases(3))))
         assertEquals(4, Quiz.length(QuizSamples.chat(phrases(8))))
         assertEquals(10, Quiz.length(QuizSamples.chat(phrases(30))))
-        val quiz = Quiz.start(QuizSamples.chat(phrases(8)), Mode.Beginner, Random(1))
+        val quiz = Quiz.start(QuizSamples.chat(phrases(8)), Mode.Beginner, Band.Basic, Random(1))
         assertEquals(4, quiz.plan.size)
         assertEquals("each question on a different phrase", 4, quiz.plan.toSet().size)
     }
@@ -40,30 +40,30 @@ class QuizTest {
     }
 
     @Test
-    fun orderAndSpeakKeepToTheModesWordLimits() {
+    fun orderAndSpeakKeepToTheBandsWordLimits() {
         val five = QuizSource("Nous allons jouer au parc.", "x")
         val six = QuizSource("Nous allons jouer au parc demain.", "x")
-        assertNotNull(QuizMaker.speak(five, Quiz.BEGINNER_WORDS))
-        assertNull(QuizMaker.speak(six, Quiz.BEGINNER_WORDS))
-        assertNotNull(QuizMaker.speak(six, Quiz.INTERMEDIATE_WORDS))
-        assertNull(QuizMaker.order(six, Quiz.BEGINNER_WORDS))
-        val order = checkNotNull(QuizMaker.order(six, Quiz.INTERMEDIATE_WORDS))
+        assertNotNull(QuizMaker.speak(five, Quiz.BASIC_WORDS))
+        assertNull(QuizMaker.speak(six, Quiz.BASIC_WORDS))
+        assertNotNull(QuizMaker.speak(six, Quiz.INDEPENDENT_WORDS))
+        assertNull(QuizMaker.order(six, Quiz.BASIC_WORDS))
+        val order = checkNotNull(QuizMaker.order(six, Quiz.INDEPENDENT_WORDS))
         assertNotEquals("doesn't start in order", order.words, order.start.map { order.words[it] })
     }
 
     @Test
     fun orderPicksASentenceThatFits() {
         val source = QuizSource("Bonjour. Je voudrais un café noir, s'il vous plaît, avec du sucre.", "x")
-        val order = checkNotNull(QuizMaker.order(QuizSource("Je suis là. " + source.phrase, "x"), Quiz.BEGINNER_WORDS))
+        val order = checkNotNull(QuizMaker.order(QuizSource("Je suis là. " + source.phrase, "x"), Quiz.BASIC_WORDS))
         assertEquals("the first word's capital doesn't give it away", listOf("je", "suis", "là"), order.words)
         assertNull("no own line for one sentence of several", order.hint)
     }
 
     @Test
     fun orderKeepsCapitalsThatArentTheSentencesStart() {
-        val german = checkNotNull(QuizMaker.order(QuizSource("Kaffee ist gut.", "x"), Quiz.BEGINNER_WORDS, capitalNouns = true))
+        val german = checkNotNull(QuizMaker.order(QuizSource("Kaffee ist gut.", "x"), Quiz.BASIC_WORDS, capitalNouns = true))
         assertEquals(listOf("Kaffee", "ist", "gut"), german.words)
-        val english = checkNotNull(QuizMaker.order(QuizSource("I like coffee.", "x"), Quiz.BEGINNER_WORDS))
+        val english = checkNotNull(QuizMaker.order(QuizSource("I like coffee.", "x"), Quiz.BASIC_WORDS))
         assertEquals(listOf("I", "like", "coffee"), english.words)
     }
 
@@ -146,17 +146,18 @@ class QuizTest {
 
     @Test
     fun aQuizIsSavedAndLoadedWhole() {
-        val quiz = Quiz(Mode.Intermediate, QuizSamples.phrases, listOf(0, 1, 2, 3), QuizSamples.all, position = 3)
+        val quiz = Quiz(Mode.Intermediate, QuizSamples.phrases, listOf(0, 1, 2, 3), QuizSamples.all, position = 3, band = Band.Independent)
         assertEquals(quiz, Quiz.fromJson(quiz.toJson()))
         val saved = SavedConversation(
             "fr", Scenario.Default, Register.Formal, QuizSamples.chat(QuizSamples.phrases), emptyList(), null, emptyList(), 0, null,
-            quiz = quiz, quizOfferedAt = 2,
+            quiz = quiz, quizOfferedAt = 2, band = Band.Independent,
         )
         val dir = kotlin.io.path.createTempDirectory().toFile()
         saved.save(dir)
         val loaded = checkNotNull(SavedConversation.load(dir))
         assertEquals(quiz, loaded.quiz)
         assertEquals(2, loaded.quizOfferedAt)
+        assertEquals(Band.Independent, loaded.band)
     }
 
     @Test

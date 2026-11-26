@@ -65,7 +65,10 @@ Investigation only. Output: `docs/research/bands.md`.
 
 ## B. Measuring the models
 
-4. **Band evals.** Extend the evals pipeline (`tools/evals.py`, `.github/workflows/evals*.yml`,
+4. **Band evals.** **Done for French**, in a session: Claude held two conversations per band with
+   E4B and judged Gemma's replies against the band descriptors. The band texts were adjusted from it
+   (a length limit, and no placeholder names), and the Proficient band moved to the roadmap. The
+   pipeline in CI and 4b weren't built. As planned: extend the evals pipeline (`tools/evals.py`, `.github/workflows/evals*.yml`,
    non-blocking, models from `evals/models.json`). Gemma, told a band, holds short conversations in
    each language.
    - **Measured:** at Basic, short sentences and common words (sentence length, and the share of
@@ -89,7 +92,8 @@ Investigation only. Output: `docs/research/bands.md`.
 6. **Rename the help modes** to Repeat word, Repeat phrase and Free talk. **Done**, with Free talk
    itself: the titles of `Mode` in `app/src/main/java/com/pedant/app/Scenarios.kt` changed (its
    names stay, as the saved choice and saved quizzes use them), and Free talk was added.
-7. **Band setting.**
+7. **Band setting.** **Done.** The shipped openings are written for each band, and the translation
+   evals translate at Basic until task 5.
    - **Choosing:** a `Band` (Basic, Independent), chosen first in New conversation and
      remembered.
    - **Saving:** saved with the conversation (`SavedConversation.kt`).

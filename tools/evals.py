@@ -36,7 +36,7 @@ import json
 import os
 import time
 
-from app_languages import instruction as fill, languages
+from app_languages import instruction as fill, languages, with_band
 from evals_promptfoo import answer, labelled, parts, replied_labelled, score
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -101,7 +101,8 @@ def instruction(ins, kind, source, target):
     own = source if kind == "line" else target
     learned = target if kind == "line" else source
     text = ins["translate"] if kind == "line" else ins["replyTranslate"]
-    return fill(text, n[learned], n[own]).replace("{register}", "formal")
+    # Translations are evaluated at the Basic band until the evals measure each band.
+    return fill(with_band(ins, text, "Basic"), n[learned], n[own]).replace("{register}", "formal")
 
 
 def references(fleurs):

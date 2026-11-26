@@ -100,7 +100,7 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   - spot the mistake: Repeat phrase only;
   - said or silent: final consonants and liaisons, French only.
 - **Rejected:** "pick the reply".
-- **Word limits:** put it in order and say it from memory use 5 words or fewer in Repeat word and 8 or fewer in Repeat phrase.
+- **Word limits:** put it in order and say it from memory use 5 words or fewer at the Basic band and 8 or fewer at Independent.
 - **No score at the end.** Each question shows Right or Not quite.
 
 ## Grading
@@ -157,7 +157,7 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
 - **Battery:** a notice asks for unrestricted battery use and opens that setting.
 - **Footer:** the conversation footer folds away with a chevron, leaving Hold to talk.
 
-## Levels and scenarios (planned)
+## Levels and scenarios
 
 - **One scale for every language: the CEFR.** Pedant's levels are modelled on the CEFR's bands, the
   same for every language. They structure the conversations and give the app guidance and goals at
@@ -165,6 +165,15 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
 - **Two bands: Basic (A1–A2) and Independent (B1–B2).** The Proficient band (C1–C2) is on the
   roadmap only: a learner at that level can talk with a general assistant such as Claude directly,
   and it would need models other than the phone's.
+  - The CEFR was written to be language-neutral and is used for non-European languages too (Turkey's TYS, Indonesia's BIPA framework, Russia's TORFL mapping).
+- **Choosing the band:** first in New conversation ("Level"), remembered for the next one, and saved with the conversation. Nothing places the learner in a band or tracks progress through them.
+- **Gemma at each band** (instructions.json's bands):
+  - **Basic:** short sentences of common everyday words and set phrases, mostly the present tense, simple linking, everyday topics, one question at a time. It helps: asked to repeat, it says it again more slowly and simply; after a mistake, it answers what was meant. One or two short sentences a reply.
+  - **Independent:** connected sentences and some complex ones, familiar topics and now and then something less routine, asking for opinions and reasons and giving its own. It rephrases briefly when the learner is lost. Two to four sentences a reply.
+  - **Names:** where a scene needs one, Gemma makes up a plausible name, never a placeholder.
+  - **Tested** in French, in a session: two conversations per band with E4B, judged against the band descriptors in docs/research/bands.md.
+- **Translations follow the band:** the learner's lines are translated into what they can say at it, keeping the meaning even where that makes the sentence less simple.
+- **Openings:** the shipped openings are written for each band.
 - **One set of task shapes per band, for every language.** The conversation tasks for each band come
   from the oral exams' shapes, generalised once and applied to every language, not taken from each
   language's own exam. Only the setting of each scene differs by language. See

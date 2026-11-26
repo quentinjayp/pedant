@@ -35,6 +35,13 @@ def instruction(text, language, own="English"):
     return text.replace("{language}", language).replace("{anOwn}", with_article(own)).replace("{own}", own)
 
 
+def with_band(ins, text, band):
+    """[text] with the band's parts (assets/instructions.json's bands) in place of {band}, {reply}
+    and {translation}, as the app's Instructions fills them in."""
+    b = ins["bands"][band]
+    return text.replace("{band}", b["band"]).replace("{reply}", b["reply"]).replace("{translation}", b["translation"])
+
+
 def dictionary_key(word):
     """A word's lookup key in the dictionaries, as the app's Dictionary.key makes it."""
     return unicodedata.normalize("NFC", word).lower().replace("’", "'")

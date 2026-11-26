@@ -7,6 +7,17 @@ enum class Register(val title: String) {
 }
 
 /**
+ * How hard the language is: the CEFR's first two bands, the same for every language. Gemma speaks at
+ * the band, acts as the listener it assumes, and translates the learner's lines into what they can
+ * say at it (instructions.json's bands); the quiz's word limits follow it. Chosen for each
+ * conversation, first in New conversation, and remembered.
+ */
+enum class Band(val title: String, val about: String) {
+    Basic("Basic", "A1–A2: short sentences and everyday words. The tutor speaks simply and helps."),
+    Independent("Independent", "B1–B2: connected sentences, opinions and reasons, and the less routine."),
+}
+
+/**
  * How much help the learner gets, from the most to none. In [Beginner] (Repeat word) they're taken
  * through each phrase one word at a time before saying it whole; in [Intermediate] (Repeat phrase)
  * they say it whole straight away; in [FreeTalk] they say what they want in the language and the

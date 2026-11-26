@@ -129,23 +129,26 @@ data class Quiz(
     val plan: List<Int>,
     val questions: List<QuizQuestion> = emptyList(),
     val position: Int = 0,
+    /** The conversation's band, which sets the word limits. */
+    val band: Band = Band.Basic,
 ) {
     val current: QuizQuestion? get() = questions.getOrNull(position)
     val finished: Boolean get() = position >= plan.size
 
     /** The longest sentence put in order or said from memory, in words. */
-    val wordLimit: Int get() = if (mode == Mode.Beginner) BEGINNER_WORDS else INTERMEDIATE_WORDS
+    val wordLimit: Int get() = if (band == Band.Basic) BASIC_WORDS else INDEPENDENT_WORDS
 
     fun toJson(): JSONObject = JSONObject()
         .put("mode", mode.name)
+        .put("band", band.name)
         .put("phrases", JSONArray(phrases.map { JSONObject().put("phrase", it.phrase).put("english", it.english) }))
         .put("plan", JSONArray(plan))
         .put("questions", JSONArray(questions.map(::questionJson)))
         .put("position", position)
 
     companion object {
-        const val BEGINNER_WORDS = 5
-        const val INTERMEDIATE_WORDS = 8
+        const val BASIC_WORDS = 5
+        const val INDEPENDENT_WORDS = 8
 
         /** The most questions a quiz has: one for every [PHRASES_PER_QUESTION] phrases said, up to this. */
         const val MAX_QUESTIONS = 10
@@ -164,9 +167,9 @@ data class Quiz(
         fun length(chat: List<ChatItem>): Int = minOf(phrases(chat).size / PHRASES_PER_QUESTION, MAX_QUESTIONS)
 
         /** A new quiz on [chat]: each question on a different phrase, picked at random. */
-        fun start(chat: List<ChatItem>, mode: Mode, random: Random = Random.Default): Quiz {
+        fun start(chat: List<ChatItem>, mode: Mode, band: Band, random: Random = Random.Default): Quiz {
             val phrases = phrases(chat)
-            return Quiz(mode, phrases, phrases.indices.shuffled(random).take(length(chat)))
+            return Quiz(mode, phrases, phrases.indices.shuffled(random).take(length(chat)), band = band)
         }
 
         fun fromJson(o: JSONObject) = Quiz(
@@ -177,6 +180,9 @@ data class Quiz(
             plan = o.getJSONArray("plan").ints(),
             questions = o.getJSONArray("questions").let { a -> (0 until a.length()).map { question(a.getJSONObject(it)) } },
             position = o.getInt("position"),
+            // A quiz saved before the bands keeps the word limits its mode gave it.
+            band = o.optString("band").let { b -> Band.entries.firstOrNull { it.name == b } }
+                ?: if (Mode.valueOf(o.getString("mode")) == Mode.Beginner) Band.Basic else Band.Independent,
         )
 
         private fun JSONArray.ints() = (0 until length()).map { getInt(it) }

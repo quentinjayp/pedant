@@ -45,6 +45,9 @@ class Tutor(context: Context, modelFile: File) {
     /** The learner's own language in the conversation under way: what translations and explanations are in. */
     private var own: Language = LANGUAGES.first { it.code == DEFAULT_OWN }
 
+    /** The conversation's band, which its translations follow too. */
+    private var band: Band = Band.Basic
+
     /**
      * What has been said in the main conversation, in the language being learned only (no English
      * translations), so it can be picked up again later.
@@ -55,8 +58,9 @@ class Tutor(context: Context, modelFile: File) {
      * Starts a new conversation. [earlier] (a saved opening, or a conversation being continued) is
      * given to Gemma as already said: as much of the most recent part as fits.
      */
-    fun startConversation(language: Language, scenario: Scenario, own: Language, earlier: List<Turn> = emptyList()) {
+    fun startConversation(language: Language, scenario: Scenario, own: Language, band: Band, earlier: List<Turn> = emptyList()) {
         this.own = own
+        this.band = band
         conversation?.close()
         conversation = null
         val kept = fitting(earlier.map { if (it.fromLearner) it else Turn(false, compact(it.text)) })
@@ -65,14 +69,14 @@ class Tutor(context: Context, modelFile: File) {
             turns += kept
         }
         // The instructions don't depend on formal or casual (each message carries it), so neither does this.
-        val key = "${language.code}|${own.code}|${scenario.name}|${kept.hashCode()}"
+        val key = "${language.code}|${own.code}|${scenario.name}|${band.name}|${kept.hashCode()}"
         val base = ready?.takeIf { it.first == key }?.second ?: run {
             ready?.second?.close()
             ready = null
             // Gemma reads the instructions (and what was said before) now, not on the first message.
             engine.createConversation(
                 ConversationConfig(
-                    systemInstruction = Contents.of(Instructions.system(language, scenario, own)),
+                    systemInstruction = Contents.of(Instructions.system(language, scenario, own, band)),
                     initialMessages = kept.map { if (it.fromLearner) Message.user(it.text) else Message.model(it.text) },
                     samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.7),
                     prefillPrefaceOnInit = true,
@@ -123,7 +127,7 @@ class Tutor(context: Context, modelFile: File) {
      * ever holds the language being learned. [onText] gets the answer as it is written.
      */
     suspend fun translate(language: Language, register: Register, said: String, onText: (String) -> Unit): String =
-        ask(Instructions.translate(language, register, own), said, onText)
+        ask(Instructions.translate(language, register, own, band), said, onText)
 
     /**
      * Translates Gemma's [reply] into the learner's own language, in its own short conversation: the
@@ -220,9 +224,9 @@ class Tutor(context: Context, modelFile: File) {
          * differs for each own language (the openings that ship with the app are for English).
          * tools/build_openings.py names the openings that ship with the app the same way.
          */
-        fun openingKey(language: Language, scenario: Scenario, register: Register, own: Language): String {
-            val hash = (Instructions.system(language, scenario, own) + Instructions.start(register)).hashCode()
-            return "${language.code}-${scenario.name}-${register.name}-${Integer.toHexString(hash)}"
+        fun openingKey(language: Language, scenario: Scenario, register: Register, own: Language, band: Band): String {
+            val hash = (Instructions.system(language, scenario, own, band) + Instructions.start(register)).hashCode()
+            return "${language.code}-${scenario.name}-${register.name}-${band.name}-${Integer.toHexString(hash)}"
         }
 
         /** Splits a sentence lookup into word (lower case) → meaning. */

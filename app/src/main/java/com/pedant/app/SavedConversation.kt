@@ -32,6 +32,8 @@ data class SavedConversation(
      * offered again only once more have been said.
      */
     val quizOfferedAt: Int = 0,
+    /** The conversation's band; Basic for one saved before the bands. */
+    val band: Band = Band.Basic,
 ) {
     companion object {
         fun file(dir: File) = File(dir, "conversation.json")
@@ -53,6 +55,7 @@ data class SavedConversation(
             languageCode = o.getString("language"),
             scenario = Scenario.valueOf(o.getString("scenario")),
             register = Register.valueOf(o.getString("register")),
+            band = o.optString("band").let { b -> Band.entries.firstOrNull { it.name == b } } ?: Band.Basic,
             chat = o.getJSONArray("chat").objects().map(::chatItem),
             history = o.getJSONArray("history").objects().map { Tutor.Turn(it.getBoolean("learner"), it.getString("text")) },
             drillPhrase = o.optStringOrNull("drillPhrase"),
@@ -111,6 +114,7 @@ data class SavedConversation(
             .put("language", languageCode)
             .put("scenario", scenario.name)
             .put("register", register.name)
+            .put("band", band.name)
             .put("chat", JSONArray(chat.map { json(it) }))
             .put("history", JSONArray(history.map { JSONObject().put("learner", it.fromLearner).put("text", it.text) }))
             .put("drillPhrase", drillPhrase)

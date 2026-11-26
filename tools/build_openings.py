@@ -1,6 +1,7 @@
 """
 Writes the openings that ship with the app (app/src/main/assets/openings.json): Gemma's first line
-for every language, built-in scenario and register (formal, casual), plus its English translation.
+for every language, band, built-in scenario and register (formal, casual), plus its English
+translation.
 
 Gemma is told exactly what the app tells it, from app/src/main/assets/instructions.json, and each
 opening is stored under the same key the app looks it up by (Tutor.openingKey). Openings whose key
@@ -23,7 +24,7 @@ import re
 import sqlite3
 import time
 
-from app_languages import dictionary_key, instruction, languages
+from app_languages import dictionary_key, instruction, languages, with_band
 
 ROOT = "app/src/main"
 INSTRUCTIONS = f"{ROOT}/assets/instructions.json"
@@ -41,24 +42,25 @@ def java_hash_hex(text):
     return format(h, "x")
 
 
-def system_prompt(ins, name, scenario):
+def system_prompt(ins, name, scenario, band):
     role = ins["roles"][scenario]
     opening = ins["openDefault"] if role is None else ins["openRole"].replace("{role}", role)
     # The openings that ship with the app are for learners whose own language is English.
-    return instruction(ins["learning"] + "\n\n" + opening, name)
+    return instruction(with_band(ins, ins["learning"], band) + "\n\n" + opening, name)
 
 
 def jobs(ins):
     """(key, language name, system prompt, start message) for every opening, in a fixed order."""
     out = []
     for code, name in ((lang.code, lang.name) for lang in languages()):
-        for scenario in ins["roles"]:
-            system = system_prompt(ins, name, scenario)
-            for register in REGISTERS:
-                start = ins["start"].replace("{register}", register.lower())
-                # As the app names openings (Tutor.openingKey).
-                key = f"{code}-{scenario}-{register}-{java_hash_hex(system + start)}"
-                out.append((key, name, system, start))
+        for band in ins["bands"]:
+            for scenario in ins["roles"]:
+                system = system_prompt(ins, name, scenario, band)
+                for register in REGISTERS:
+                    start = ins["start"].replace("{register}", register.lower())
+                    # As the app names openings (Tutor.openingKey).
+                    key = f"{code}-{scenario}-{register}-{band}-{java_hash_hex(system + start)}"
+                    out.append((key, name, system, start))
     return out
 
 

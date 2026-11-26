@@ -895,6 +895,11 @@ private fun <T> SegmentedChoice(
     }
 }
 
+/** Basic or Independent. */
+@Composable
+private fun BandChoice(vm: AppViewModel, modifier: Modifier = Modifier, track: Color = Pastel.White.copy(alpha = 0.85f)) =
+    SegmentedChoice(Band.entries, vm.band, { it.title }, vm::chooseBand, modifier, track)
+
 /** Repeat word, Repeat phrase or Free talk. */
 @Composable
 private fun ModeChoice(vm: AppViewModel, modifier: Modifier = Modifier, track: Color = Pastel.White.copy(alpha = 0.85f)) =
@@ -965,6 +970,16 @@ private fun LanguageScreen(vm: AppViewModel) {
         },
     ) {
         Column(Modifier.fillMaxSize().padding(top = 14.dp)) {
+            SmallLabel("Level", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
+            Spacer(Modifier.height(6.dp))
+            BandChoice(vm, Modifier.padding(horizontal = 16.dp))
+            Text(
+                vm.band.about,
+                fontSize = 12.sp,
+                color = Pastel.InkSoft,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 6.dp),
+            )
+            Spacer(Modifier.height(12.dp))
             SmallLabel("Mode", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(6.dp))
             ModeChoice(vm, Modifier.padding(horizontal = 16.dp))

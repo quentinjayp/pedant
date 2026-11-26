@@ -135,6 +135,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val uiPrefs = app.getSharedPreferences("ui", Context.MODE_PRIVATE)
 
     /**
+     * Basic or Independent: the conversation's band. Chosen in New conversation and remembered for
+     * the next one; a continued conversation keeps its own.
+     */
+    var band by mutableStateOf(Band.entries.firstOrNull { it.name == uiPrefs.getString("band", null) } ?: Band.Basic)
+        private set
+
+    /** Chooses the band for a new conversation. */
+    fun chooseBand(chosen: Band) {
+        band = chosen
+        uiPrefs.edit().putString("band", chosen.name).apply()
+    }
+
+    /**
      * The learner's own language, chosen in Settings (English unless chosen otherwise): what they
      * say before it's translated, and what translations, meanings from Gemma and notes are in.
      * A new conversation takes it; one under way keeps the own language it started with ([own]).
@@ -455,6 +468,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         scenario = saved.scenario
         register = saved.register
+        band = saved.band
         startSession(lang, resume = saved)
     }
 
@@ -486,6 +500,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             languageCode = lang.code,
             scenario = scenario,
             register = register,
+            band = band,
             chat = chat.toList(),
             history = tutor?.history.orEmpty(),
             drillPhrase = d?.phrase,
@@ -552,7 +567,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val start = when {
                     resume != null -> Start.Continue(resume)
                     else -> {
-                        val key = Tutor.openingKey(lang, scenario, register, own)
+                        val key = Tutor.openingKey(lang, scenario, register, own, band)
                         withContext(Dispatchers.IO) { openings.get(key) }?.let { Start.Opened(key, it) } ?: Start.Fresh(key)
                     }
                 }
@@ -572,7 +587,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                                 )
                                 is Start.Fresh -> emptyList()
                             }
-                            checkNotNull(tutor).startConversation(lang, scenario, own, earlier)
+                            checkNotNull(tutor).startConversation(lang, scenario, own, band, earlier)
                             diagnostics.log("Gemma ready for the ${lang.englishName} session")
                         }
                         loadVoice(lang, voice)
@@ -1956,7 +1971,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val saved = given ?: currentConversation() ?: return@launch
             val lang = LANGUAGES.firstOrNull { it.code == saved.languageCode } ?: return@launch
             quizBase = saved
-            quiz = saved.quiz ?: Quiz.start(saved.chat, mode)
+            quiz = saved.quiz ?: Quiz.start(saved.chat, mode, saved.band)
             quizAnswer = null
             quizRefWords = null
             quizMeanings.clear()

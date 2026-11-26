@@ -94,6 +94,7 @@ separate from the language level (see Levels and scenarios), and every mode work
 A second dimension beside the help modes: how hard the language is, on the scale the international
 proficiency tests use. The fixed list of scenarios is replaced by scenarios made for each level.
 The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/levels-and-scenarios.md).
+The two bands, Basic and Independent, are built (see DECISIONS.md); the scenarios aren't yet.
 
 - **Research the bands first.** The band descriptors, the oral exams' task shapes and the topics
   (the CEFR's themes, one list for every language) are done; see
@@ -101,26 +102,11 @@ The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/
   actually asks of a speaker: the CEFR's descriptors (its 2020 Companion Volume has detailed ones
   for speaking and interaction) and the oral parts of the tests (DELF, DELE, Goethe, TYS and the
   others, from their free sample papers). That gives the band's task lists, and what to measure.
-- **Evals of whether the models can do each band.** A pipeline like the translation evals, testing
-  Gemma (E2B and E4B) per band and language: whether it keeps to short, common language at Basic,
-  and to connected everyday language, with opinions and reasons, at Independent. If a model can't do
-  a band in a language, that band isn't offered for it, rather than offered badly.
-- **Bands.** The CEFR's first two bands, under its own names: **Basic** (A1–A2) and **Independent**
-  (B1–B2). The CEFR is the internal scale for every language: it was
-  written to be language-neutral and is used for non-European languages too (Turkey's TYS,
-  Indonesia's BIPA framework, Russia's TORFL mapping). You choose the band to practise at; nothing
-  places you in one or tracks progress through them.
 - **Investigate the Proficient band (C1–C2) with models other than the phone's.** A learner at
   C1–C2 can already talk with a general assistant such as Claude directly. In a first French test,
   Gemma E4B's language reached C1 (idiom, register, structured turns), but it agreed with every
   point the learner made instead of challenging them, and it had little of C2's humour, irony and
   allusion. See "Investigate models other than the phone's" under Models.
-- **The band shapes the whole conversation.** Gemma speaks at the band's level (short, common words
-  at Basic; connected everyday language at Independent), and acts as the listener the band assumes:
-  at Basic it speaks slowly, repeats, rephrases and helps; at Independent it still rephrases when the
-  learner is lost.
-  What the learner says is translated into something they can say at that level, with the meaning
-  kept over simplicity; and the quiz's word limits follow the band rather than the help mode.
 - **Generated scenarios.** The app draws a scenario's ingredients at random from lists in a data
   file, in two layers:
   - **Shape:** one of the band's task shapes, the same for every language, generalised from the oral
