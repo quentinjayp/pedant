@@ -42,6 +42,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
@@ -70,7 +71,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -95,6 +95,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -103,16 +104,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
@@ -910,20 +908,6 @@ private fun ModeChoice(vm: AppViewModel, modifier: Modifier = Modifier, track: C
 private fun RegisterChoice(vm: AppViewModel, modifier: Modifier = Modifier, track: Color = Pastel.White.copy(alpha = 0.85f)) =
     SegmentedChoice(Register.entries, vm.register, { it.title }, { vm.register = it }, modifier, track)
 
-/** Fades this away at its right edge while there is [more] to scroll to, to show that there is. */
-private fun Modifier.fadeAtEnd(more: Boolean): Modifier = if (!more) this else this
-    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-    .drawWithContent {
-        drawContent()
-        val width = 40.dp.toPx()
-        drawRect(
-            brush = Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = size.width - width, endX = size.width),
-            topLeft = Offset(size.width - width, 0f),
-            size = Size(width, size.height),
-            blendMode = BlendMode.DstIn,
-        )
-    }
-
 /** The conversation's settings, from the gear in its header. */
 @Composable
 private fun ConversationSettings(vm: AppViewModel, onClose: () -> Unit) {
@@ -949,7 +933,7 @@ private fun GearButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun LanguageScreen(vm: AppViewModel) {
+internal fun LanguageScreen(vm: AppViewModel) {
     BackHandler(onBack = vm::goHome)
     AppScreen(
         header = {
@@ -969,7 +953,7 @@ private fun LanguageScreen(vm: AppViewModel) {
             )
         },
     ) {
-        Column(Modifier.fillMaxSize().padding(top = 14.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 14.dp, bottom = 16.dp)) {
             SmallLabel("Level", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(6.dp))
             BandChoice(vm, Modifier.padding(horizontal = 16.dp))
@@ -990,18 +974,42 @@ private fun LanguageScreen(vm: AppViewModel) {
             Spacer(Modifier.height(12.dp))
             SmallLabel("Scenario", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(6.dp))
-            val scenarios = rememberScrollState()
-            Row(
-                Modifier.fadeAtEnd(scenarios.canScrollForward).horizontalScroll(scenarios).padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Scenario.entries.forEach { sc -> ChoiceChip(sc.title, vm.scenario == sc, { vm.scenario = sc }) }
-            }
+            SearchDropdown(
+                Scenario.entries,
+                vm.scenario,
+                placeholder = "Choose a scenario",
+                title = { it.title },
+                searchText = { it.title + " " + it.scene },
+                onChoose = { vm.scenario = it },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
             Text(
-                vm.scenario.scene + " Then pick a language.",
+                vm.scenario.scene,
                 fontSize = 12.sp,
                 color = Pastel.InkSoft,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 6.dp),
+            )
+            Spacer(Modifier.height(12.dp))
+            SmallLabel("Language", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
+            Spacer(Modifier.height(6.dp))
+            val language = vm.newLanguage
+            SearchDropdown(
+                LANGUAGES.filter { it.code != vm.ownSetting.code },
+                language,
+                placeholder = "Choose a language",
+                title = { it.englishName },
+                detail = { it.nativeName },
+                searchText = { "${it.englishName} ${it.nativeName} ${it.code}" },
+                onChoose = vm::chooseNewLanguage,
+                modifier = Modifier.padding(horizontal = 16.dp),
+                enabled = vm.progress == null,
+            )
+            Spacer(Modifier.height(16.dp))
+            CtaButton(
+                "Start",
+                onClick = { language?.let(vm::pickLanguage) },
+                modifier = Modifier.padding(horizontal = 16.dp),
+                enabled = language != null && vm.progress == null,
             )
             vm.progress?.let {
                 BackHandler(onBack = vm::cancelVoiceDownload)
@@ -1019,31 +1027,102 @@ private fun LanguageScreen(vm: AppViewModel) {
                 }
             }
             vm.error?.let { PeachNotice(it, Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp)) }
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                items(LANGUAGES.filter { it.code != vm.ownSetting.code }) { lang ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .card(Pastel.White.copy(alpha = 0.9f), shape = RoundedCornerShape(16.dp))
-                            .clickable(enabled = vm.progress == null) { vm.pickLanguage(lang) }
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Box(
-                            Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(Pastel.VioletContainer),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(lang.code.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Pastel.VioletDark)
-                        }
-                        Text(lang.englishName, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text(lang.nativeName, fontSize = 14.sp, color = Pastel.InkSoft)
-                    }
+        }
+    }
+}
+
+/**
+ * A choice among many [options]: a row showing the chosen one, which opens a menu of them under
+ * it, with a search box at the top that narrows the menu to what matches, ignoring accents.
+ */
+@Composable
+private fun <T> SearchDropdown(
+    options: List<T>,
+    chosen: T?,
+    placeholder: String,
+    title: (T) -> String,
+    searchText: (T) -> String,
+    onChoose: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    /** A second, quieter text beside the title, like a language's own name for itself. */
+    detail: (T) -> String? = { null },
+    enabled: Boolean = true,
+) {
+    var open by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    var width by remember { mutableIntStateOf(0) }
+    Box(modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .onSizeChanged { width = it.width }
+                .card(Pastel.White.copy(alpha = 0.9f), shape = RoundedCornerShape(16.dp))
+                .clickable(enabled = enabled) {
+                    query = ""
+                    open = true
                 }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                chosen?.let(title) ?: placeholder,
+                fontSize = 15.sp,
+                fontWeight = if (chosen != null) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (chosen != null) Pastel.Ink else Pastel.InkSoft,
+                modifier = Modifier.weight(1f),
+            )
+            chosen?.let(detail)?.let { Text(it, fontSize = 14.sp, color = Pastel.InkSoft) }
+            Text("▾", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Pastel.InkSoft)
+        }
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            modifier = Modifier.width(with(LocalDensity.current) { width.toDp() }).heightIn(max = 420.dp),
+            shape = RoundedCornerShape(16.dp),
+            containerColor = Pastel.White,
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text("Search", color = Pastel.InkSoft) },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Pastel.White,
+                    unfocusedContainerColor = Pastel.White,
+                    focusedBorderColor = Pastel.Primary,
+                    unfocusedBorderColor = Pastel.OutlineSoft,
+                    cursorColor = Pastel.PrimaryDark,
+                ),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+            val words = Matching.normalize(query).split(' ').filter { it.isNotEmpty() }
+            val shown = options.filter { option -> Matching.normalize(searchText(option)).let { text -> words.all { it in text } } }
+            if (shown.isEmpty()) {
+                Text("Nothing matches", fontSize = 14.sp, color = Pastel.InkSoft, modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+            }
+            shown.forEach { option ->
+                val selected = option == chosen
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                title(option),
+                                fontSize = 15.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                                color = if (selected) Pastel.VioletInk else Pastel.Ink,
+                                modifier = Modifier.weight(1f),
+                            )
+                            detail(option)?.let { Text(it, fontSize = 13.sp, color = Pastel.InkSoft) }
+                        }
+                    },
+                    onClick = {
+                        onChoose(option)
+                        open = false
+                    },
+                    modifier = if (selected) Modifier.background(Pastel.VioletContainer) else Modifier,
+                )
             }
         }
     }

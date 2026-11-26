@@ -64,7 +64,7 @@ jobs:
           curl -fsSL -o app/libs/sherpa-onnx-1.13.8.aar \
             https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
       - name: Run the tests and draw the screenshots
-        run: ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.pedant.app.Quiz*' --tests 'com.pedant.app.WordMeaning*' -Proborazzi.test.record=true
+        run: ./gradlew --no-daemon :app:testDebugUnitTest --tests 'com.pedant.app.Quiz*' --tests 'com.pedant.app.WordMeaning*' --tests 'com.pedant.app.NewConversation*' -Proborazzi.test.record=true
       - name: Package them
         if: always()
         run: |

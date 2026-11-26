@@ -153,6 +153,9 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
 - **Mockups:** used for style only. They add no functionality (no streaks).
 - **Logo:** the capital P from Potta One, in white, with an even shadow on all sides, on a vibrant three-way gradient (violet top left, cyan top right, orange at the bottom). The logo is vibrant; the app is pastel.
 - **Home page:** Continue conversation (greyed out when there's none), New conversation and Settings. The Settings button says only "Settings".
+- **New conversation:** the mode's description at the top; below it, the whole page scrolls: Level, Mode, Style, Scenario, Language, then Start.
+  - **Dropdowns:** a choice with more than three options is a dropdown, with a search box at the top of its menu. Scenario and Language are.
+  - **Language:** chosen, then started with Start, and remembered for the next conversation.
 - **Loading:** an estimated loading bar. The app opens without a loading screen while the models load behind it.
 - **Battery:** a notice asks for unrestricted battery use and opens that setting.
 - **Footer:** the conversation footer folds away with a chevron, leaving Hold to talk.

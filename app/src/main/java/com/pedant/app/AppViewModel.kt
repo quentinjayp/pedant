@@ -162,6 +162,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         uiPrefs.edit().putString("ownLanguage", lang.code).apply()
     }
 
+    /**
+     * The language chosen in New conversation, remembered for the next one: null until one is
+     * chosen, or when it's now the learner's own language.
+     */
+    private var newLanguageSetting by mutableStateOf(LANGUAGES.firstOrNull { it.code == uiPrefs.getString("newLanguage", null) })
+    val newLanguage: Language? get() = newLanguageSetting?.takeIf { it.code != ownSetting.code }
+
+    fun chooseNewLanguage(lang: Language) {
+        newLanguageSetting = lang
+        uiPrefs.edit().putString("newLanguage", lang.code).apply()
+    }
+
     /** The learner's own language in the conversation on screen. */
     var own by mutableStateOf(ownSetting)
         private set
