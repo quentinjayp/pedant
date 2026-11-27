@@ -115,7 +115,9 @@ Investigation only. Output: `docs/research/bands.md`.
    the oral exams' scenarios in the research (and the CEFR's tasks where the exams give one
    example), each with its situation, Gemma's role and the card's prompts, and its setting for each
    of the 25 languages, where the language is spoken. Written by Claude in a session, not by Gemma.
-   For review:
+   **Done:** `app/src/main/assets/scenarios.json`, 28 scenarios: the two that suit both bands
+   (getting to know you, planning something together) are one entry each, in both lists. Still to
+   be reviewed. The lists:
    - **Basic (A1–A2):**
      1. Getting to know you: the tutor asks about you, your family, tastes and activities (DELF
         A1–A2, Goethe A1).
