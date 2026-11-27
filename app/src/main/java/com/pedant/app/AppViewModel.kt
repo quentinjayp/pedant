@@ -49,6 +49,8 @@ sealed interface Screen {
 
 enum class Busy(val label: String) {
     Idle(""),
+    /** From a tap on a talk button until the microphone is recording. */
+    MicStarting("Getting the microphone ready…"),
     Listening("Listening…"),
     Transcribing("Working out what you said…"),
     Thinking("Thinking…"),
@@ -109,7 +111,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val store = ModelStore(app)
     private val diagnostics = Diagnostics(app)
     private val openings = OpeningCache(app.filesDir, app.assets)
-    private val recorder = MicRecorder()
+    private val recorder = MicRecorder(app.assets)
     private var tutor: Tutor? = null
     private var stt: SpeechToText? = null
     private var zipa: SoundRecognizer? = null
@@ -240,7 +242,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Whether the voice says the phrase: after it's translated, after a failed try, and on request. */
     val phraseSpoken: Boolean get() = phraseGuide != PhraseGuide.TextOnly
 
-    /** Whether the conversation's footer is folded away, leaving only Hold to talk. Remembered. */
+    /** Whether the conversation's footer is folded away, leaving only the talk button. Remembered. */
     var dockCollapsed by mutableStateOf(uiPrefs.getBoolean("dockCollapsed", false))
         private set
 
@@ -288,8 +290,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val hint: String
         get() = when {
             busy != Busy.Idle -> busy.label
-            drillPhrase == null -> "Hold the button and say in ${own.englishName} what you want to say, or type it"
-            else -> "Hold the button and say the phrase"
+            drillPhrase == null && mode == Mode.FreeTalk -> "Tap the button and say what you want in ${language?.englishName ?: "the language"}"
+            drillPhrase == null -> "Tap the button and say in ${own.englishName} what you want to say, or type it"
+            else -> "Tap the button and say the phrase"
         }
 
     fun dismissCrash() {
@@ -821,7 +824,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // A question for the quiz may be being made.
         tutor?.cancelLookup()
         tts?.stopPlayback()
-        if (busy == Busy.Listening) {
+        if (busy == Busy.Listening || busy == Busy.MicStarting) {
             withContext(Dispatchers.Default) {
                 recorder.stop()
                 // Loaded when the talking started, and now not needed.
@@ -838,10 +841,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         progress = null
     }
 
+    /**
+     * A tap on a talk button: the microphone is set up, a beep says it's listening, and it listens
+     * until the button is tapped again ([stopTalking]) or there's been no speech for a while.
+     */
     fun startTalking() {
         if (busy != Busy.Idle) return
-        busy = Busy.Listening
-        recorder.start()
+        busy = Busy.MicStarting
+        recorder.start(
+            onListening = { viewModelScope.launch { if (busy == Busy.MicStarting) busy = Busy.Listening } },
+            onSilence = { viewModelScope.launch { stopTalking() } },
+        )
         // The speech recognizer loads while the learner talks, ready for when they've finished.
         stt?.expectSpeech()
         // So does ZIPA, if it was released after long audio.
@@ -871,6 +881,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 diagnostics.step = null
                 busy = Busy.Idle
             }
+        }
+    }
+
+    /** A second tap before the microphone was ready: nothing is kept or heard. */
+    fun cancelTalking() {
+        if (busy != Busy.MicStarting) return
+        practiceTarget = null
+        walkTalking = false
+        quizTalking = false
+        viewModelScope.launch {
+            withContext(Dispatchers.Default) {
+                recorder.stop()
+                stt?.release()
+            }
+            busy = Busy.Idle
+        }
+    }
+
+    /** What a tap on a talk button does now: starts talking ([start]), stops, or cancels. */
+    fun tapTalk(start: () -> Unit) {
+        when (busy) {
+            Busy.Idle -> start()
+            Busy.Listening -> stopTalking()
+            Busy.MicStarting -> cancelTalking()
+            else -> {}
         }
     }
 
@@ -919,7 +954,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Free talk: the learner said [heard] in the language, and the tutor answers it. */
     private suspend fun freeTalk(heard: String) {
         chat += ChatItem.Spoken(heard)
-        queueLookups(heard)
         runTurn(Instructions.said(heard, register))
     }
 
@@ -1135,7 +1169,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Gemma explains only the words the dictionary lacks. When they're few it's asked about each
         // one on its own, since for a whole sentence it writes a line for every word; when most are
         // missing (as with no dictionary), the whole sentence at once is less work.
-        val missing = words.filter { known[it] == null }
+        val missing = words.filter { known[it] == null && lookupCache[it.lowercase() to sentence]?.meaning == null }
         val meanings: Map<String, String> = try {
             when {
                 missing.isEmpty() -> emptyMap()
@@ -1164,9 +1198,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         for (w in words) {
             val d = known[w]
             val wordSounds = sounds[w]
+            val earlier = lookupCache[w.lowercase() to sentence]
             lookupCache[w.lowercase() to sentence] = if (d != null) dictionaryLookup(w, sentence, d, wordSounds) else WordLookup(
                 w, sentence,
-                meaning = meanings[w.lowercase()],
+                meaning = meanings[w.lowercase()] ?: earlier?.meaning,
                 sounds = wordSounds,
                 loading = false,
             )
@@ -1249,20 +1284,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * in that sentence) and its IPA (the dictionary's, or espeak-ng's), with an English-style respelling.
      */
     fun lookUp(word: String, sentence: String) {
+        val key = word.lowercase() to sentence
         val d = fromDictionary(word)
         if (d != null) {
-            lookup = lookupCache[word.lowercase() to sentence] ?: dictionaryLookup(word, sentence, d)
-            // Everything is from the dictionary already; only missing IPA needs the background work.
-            if (d.ipa != null) return
-        } else {
-            lookup = WordLookup(word, sentence)
+            lookup = lookupCache[key] ?: dictionaryLookup(word, sentence, d)
+            // Only the IPA can be missing: espeak-ng's, made now. Gemma isn't asked about anything.
+            val lang = language
+            if (d.ipa == null && lookupCache[key] == null && lang != null) {
+                viewModelScope.launch {
+                    val sounds = withContext(Dispatchers.Default) { wordIpa(lang, word) }
+                    lookupCache[key] = dictionaryLookup(word, sentence, d, sounds)
+                    refreshOpenLookup()
+                }
+            }
+            return
         }
-        if (sentence in doneSentences) {
-            refreshOpenLookup()
-            startBackground()
-        } else {
-            queueLookups(sentence, first = true)
-        }
+        // Not in the dictionary: Gemma explains this word on its own first, then the other words of
+        // the sentence the dictionary lacks.
+        lookup = lookupCache[key] ?: WordLookup(word, sentence)
+        if (lookupCache[key] == null && key !in triedAlone) pendingWord = word to sentence
+        queueLookups(sentence, first = true)
+        refreshOpenLookup()
+        startBackground()
     }
 
     /** A word tapped in the conversation: opens its bubble and says it at normal speed. */
@@ -1388,7 +1431,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             busy = Busy.Speaking
             withContext(Dispatchers.Default) { voice.play(audio) }
         }
-        queueLookups(phrase)
         if (mode == Mode.Beginner) {
             // Word by word first: it needs each word's expected sounds, so it waits for them.
             busy = Busy.Preparing
@@ -1480,13 +1522,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 show(found, true)
             }
+            queueLookups(sentence, first = true)
             return
         }
         viewModelScope.launch {
             val d = withContext(Dispatchers.IO) { fromDictionary(word) }
             val sounds = if (d?.ipa != null) null else withContext(Dispatchers.Default) { wordIpa(lang, word) }
             show(if (d != null) dictionaryLookup(word, sentence, d, sounds) else WordLookup(word, sentence, sounds = sounds), false)
-            if (d == null) queueLookups(sentence, first = true)
+            if (d == null && key !in triedAlone) pendingWord = word to sentence
+            queueLookups(sentence, first = true)
         }
     }
 
@@ -1583,7 +1627,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val audio = openings.audio(key, voice) ?: engine.synthesize(reply).also { openings.saveAudio(key, voice, it) }
             engine.play(audio)
         }
-        queueLookups(reply)
     }
 
     /**
@@ -1679,7 +1722,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 openings.saveAudio(saveOpening.first, saveOpening.second, Audio(whole, spoken.first().sampleRate))
             }
-            queueLookups(reply)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -2034,7 +2076,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val at = q.questions.size
             if (at >= q.plan.size) return
             // Not while the learner is talking or their answer is being heard: that needs the phone.
-            snapshotFlow { busy }.first { it != Busy.Listening && it != Busy.Transcribing }
+            snapshotFlow { busy }.first { it != Busy.MicStarting && it != Busy.Listening && it != Busy.Transcribing }
             val question = makeQuizQuestion(q, q.phrases[q.plan[at]])
             val now = quiz ?: return
             // A question that can't be made is dropped.

@@ -183,7 +183,7 @@ class Tutor(context: Context, modelFile: File) {
     private suspend fun ask(instruction: String, question: String, onText: (String) -> Unit = {}): String {
         // Setting up and closing a conversation reserves and frees memory, which can take seconds when
         // the phone is short of it, so neither is done on the main thread, where it would hold up the
-        // screen and touches (Hold to talk). Not cancellable, so a conversation made is always closed.
+        // screen and touches (the talk button). Not cancellable, so a conversation made is always closed.
         val conv = withContext(NonCancellable + Dispatchers.Default) {
             engine.createConversation(
                 ConversationConfig(

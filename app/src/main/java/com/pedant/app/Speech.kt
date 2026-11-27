@@ -1,11 +1,14 @@
 package com.pedant.app
 
 import android.annotation.SuppressLint
+import android.content.res.AssetManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
+import android.media.ToneGenerator
 import com.k2fsa.sherpa.onnx.GeneratedAudio
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineOmnilingualAsrCtcModelConfig
@@ -17,6 +20,9 @@ import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineZipformerCtcModelConfig
+import com.k2fsa.sherpa.onnx.SileroVadModelConfig
+import com.k2fsa.sherpa.onnx.Vad
+import com.k2fsa.sherpa.onnx.VadModelConfig
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
@@ -27,20 +33,31 @@ const val SAMPLE_RATE = 16_000
 /** Audio as floats in [-1, 1] at [sampleRate]. */
 class Audio(val samples: FloatArray, val sampleRate: Int)
 
-/** Records 16 kHz mono audio from the microphone while the talk button is held. */
-class MicRecorder {
+/**
+ * Records 16 kHz mono audio from the microphone, from a tap on a talk button until a second tap or
+ * [SILENCE_SECONDS] without speech. Silero VAD (silero_vad.onnx, in the app's assets) tells speech
+ * from silence; if it can't be loaded, only the second tap stops the recording.
+ */
+class MicRecorder(private val assets: AssetManager) {
     @Volatile private var recording = false
     private var thread: Thread? = null
     private val buffer = ByteArrayOutputStream()
 
-    /** Starts recording. The microphone is set up on the recording's own thread, not the caller's (the main thread). */
+    /**
+     * Starts recording on a thread of its own, where the microphone is set up. Once it's recording,
+     * a short beep plays (and isn't kept in the recording), then [onListening] is called; [onSilence]
+     * is called once, after [SILENCE_SECONDS] with no speech since the beep or since the last speech.
+     * Both are called on the recording's thread.
+     */
     @SuppressLint("MissingPermission")
-    fun start() {
+    fun start(onListening: () -> Unit, onSilence: () -> Unit) {
         if (recording) return
         synchronized(buffer) { buffer.reset() }
         recording = true
         thread = Thread {
             var record: AudioRecord? = null
+            var vad: Vad? = null
+            var beep: ToneGenerator? = null
             try {
                 val minSize = AudioRecord.getMinBufferSize(
                     SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
@@ -49,20 +66,61 @@ class MicRecorder {
                     MediaRecorder.AudioSource.VOICE_RECOGNITION, SAMPLE_RATE,
                     AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minSize * 4,
                 )
+                vad = runCatching { speechDetector() }.getOrNull()
                 val chunk = ByteArray(minSize)
                 record.startRecording()
+                beep = runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, BEEP_VOLUME) }.getOrNull()
+                beep?.startTone(ToneGenerator.TONE_PROP_BEEP, BEEP_MS)
+                // The beep is left out of the recording.
+                var skipped = 0
+                while (recording && skipped < BEEP_SKIP_BYTES) {
+                    val n = record.read(chunk, 0, chunk.size)
+                    if (n > 0) skipped += n
+                }
+                if (!recording) return@Thread
+                onListening()
+                var lastSpeech = System.nanoTime()
+                var silenceTold = false
                 while (recording) {
                     val n = record.read(chunk, 0, chunk.size)
-                    if (n > 0) synchronized(buffer) { buffer.write(chunk, 0, n) }
+                    if (n <= 0) continue
+                    synchronized(buffer) { buffer.write(chunk, 0, n) }
+                    vad?.let { detector ->
+                        detector.acceptWaveform(floatsOf(chunk, n))
+                        if (detector.isSpeechDetected()) lastSpeech = System.nanoTime()
+                        // Only whether there's speech now matters, not the pieces it finds.
+                        while (!detector.empty()) detector.pop()
+                        if (!silenceTold && System.nanoTime() - lastSpeech > SILENCE_SECONDS * 1_000_000_000L) {
+                            silenceTold = true
+                            onSilence()
+                        }
+                    }
                 }
                 record.stop()
             } catch (_: Exception) {
                 // The microphone was unavailable; an empty recording is returned.
             } finally {
+                beep?.release()
+                vad?.release()
                 record?.release()
             }
         }.also { it.start() }
     }
+
+    private fun speechDetector() = Vad(
+        assets,
+        VadModelConfig(
+            sileroVadModelConfig = SileroVadModelConfig(
+                model = "silero_vad.onnx",
+                threshold = 0.5f,
+                minSilenceDuration = 0.25f,
+                minSpeechDuration = 0.25f,
+                windowSize = 512,
+            ),
+            sampleRate = SAMPLE_RATE,
+            numThreads = 1,
+        ),
+    )
 
     /** Stops recording and returns the audio as floats in [-1, 1]. */
     fun stop(): FloatArray {
@@ -70,8 +128,23 @@ class MicRecorder {
         thread?.join()
         thread = null
         val bytes = synchronized(buffer) { buffer.toByteArray() }
-        val shorts = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+        return floatsOf(bytes, bytes.size)
+    }
+
+    private fun floatsOf(bytes: ByteArray, length: Int): FloatArray {
+        val shorts = ByteBuffer.wrap(bytes, 0, length).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
         return FloatArray(shorts.remaining()) { shorts.get(it) / 32768f }
+    }
+
+    companion object {
+        /** How long without speech stops the recording, in seconds. */
+        const val SILENCE_SECONDS = 5
+
+        private const val BEEP_MS = 120
+        private const val BEEP_VOLUME = 60
+
+        /** How much is left out of the recording at its start, for the beep: 0.2 s of 16-bit samples. */
+        private const val BEEP_SKIP_BYTES = SAMPLE_RATE / 5 * 2
     }
 }
 

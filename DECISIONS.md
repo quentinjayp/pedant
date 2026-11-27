@@ -25,7 +25,7 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   - One voice per language.
   - Ukrainian uses tetiana; lada was removed and is deleted on startup if present.
 - **Phonemes:** espeak-ng, compiled into the app, for the expected sounds shown.
-- **Downloads:** the models are downloaded on first run from Hugging Face, not bundled in the APK.
+- **Downloads:** the models are downloaded on first run from Hugging Face, not bundled in the APK. The exception is Silero VAD (under 1 MB), which tells when the learner has stopped talking.
 - **Memory:**
   - The speech recognizer loads only while the learner talks.
   - ZIPA is released after long audio.
@@ -124,6 +124,7 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
 ## Words and dictionary
 
 - **Tappable words:** every word can be tapped, with a dotted underline.
+- **When Gemma explains words:** only for words the dictionary lacks, and only when asked for: a tapped word, then the other words of its sentence the dictionary lacks; and the phrase's words as the word-by-word page or the practice window opens, the word shown first. Nothing is looked up ahead for new sentences. The Tutor's note still looks for an expression in the background.
 - **The word bubble:**
   - shows the meaning, the IPA and an English-style "sounds like" respelling;
   - plays the word at normal speed on opening and on switching words;
@@ -158,7 +159,10 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   - **Language:** chosen, then started with Start, and remembered for the next conversation.
 - **Loading:** an estimated loading bar. The app opens without a loading screen while the models load behind it.
 - **Battery:** a notice asks for unrestricted battery use and opens that setting.
-- **Footer:** the conversation footer folds away with a chevron, leaving Hold to talk.
+- **Footer:** the conversation footer folds away with a chevron, leaving the talk button.
+- **Talk buttons:** a tap starts listening and a second tap stops it, on every talk button (the conversation's, the practice window's, the word-by-word page's and the quiz's).
+  - **Getting ready:** a spinner shows from the tap until the microphone is recording, then a short beep says it's listening. The beep isn't kept in the recording.
+  - **Stopping on its own:** after 5 seconds with no speech, since the beep or since the learner last spoke. Silero VAD tells speech from silence.
 
 ## Levels and scenarios
 

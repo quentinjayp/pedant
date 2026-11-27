@@ -44,7 +44,6 @@ import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.zIndex
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,6 +80,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -266,7 +266,7 @@ private fun AppScreen(
     }
 }
 
-/** How long the conversation's footer takes to fold away or come back, and Hold to talk to fade. */
+/** How long the conversation's footer takes to fold away or come back, and the talk button to fade. */
 private const val FOOTER_FADE_MS = 200
 
 /** A filled, optionally outlined, rounded surface. */
@@ -1141,7 +1141,7 @@ private fun ConversationScreen(vm: AppViewModel) {
         if (vm.chat.isNotEmpty()) listState.animateScrollToItem(vm.chat.size - 1)
     }
 
-    // Folding the footer: it goes, then Hold to talk fades in on its own. Unfolding: that fades out
+    // Folding the footer: it goes, then the talk button fades in on its own. Unfolding: that fades out
     // first, then the footer comes back with it.
     var dockShown by remember { mutableStateOf(!vm.dockCollapsed) }
     var floatingShown by remember { mutableStateOf(vm.dockCollapsed) }
@@ -1207,7 +1207,7 @@ private fun ConversationScreen(vm: AppViewModel) {
             MicButton(vm)
         },
         overlay = {
-            // Folded away: Hold to talk alone, where it sits in the footer, and a chevron to unfold it.
+            // Folded away: the talk button alone, where it sits in the footer, and a chevron to unfold it.
             AnimatedVisibility(
                 floatingShown,
                 Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
@@ -1230,7 +1230,7 @@ private fun ConversationScreen(vm: AppViewModel) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            // Room at the bottom for Hold to talk when it floats over the conversation.
+            // Room at the bottom for the talk button when it floats over the conversation.
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = if (dockShown) 16.dp else 120.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -1287,13 +1287,16 @@ private fun ConversationScreen(vm: AppViewModel) {
     }
 }
 
-/** The hold-to-talk button: apricot when ready, pressed in while listening, pale while the app is busy. */
+/**
+ * The talk button: apricot when ready, a spinner from the tap until the microphone is recording,
+ * pressed in while listening (a second tap stops it), pale while the app is busy.
+ */
 @Composable
 private fun MicButton(vm: AppViewModel, onStart: () -> Unit = vm::startTalking) {
-    val context = LocalContext.current
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val askPermission = rememberMicPermission()
     val listening = vm.busy == Busy.Listening
-    val enabled = vm.busy == Busy.Idle || listening
+    val starting = vm.busy == Busy.MicStarting
+    val enabled = vm.busy == Busy.Idle || listening || starting
     val scale by animateFloatAsState(if (listening) 0.92f else 1f, label = "mic")
     val shape = RoundedCornerShape(28.dp)
     val content = if (enabled) Pastel.CtaInk else Pastel.Outline
@@ -1311,27 +1314,43 @@ private fun MicButton(vm: AppViewModel, onStart: () -> Unit = vm::startTalking) 
                 shape = shape,
                 borderWidth = 2.dp,
             )
-            .pointerInput(enabled) {
-                detectTapGestures(onPress = {
-                    val granted = ContextCompat.checkSelfPermission(
-                        context, Manifest.permission.RECORD_AUDIO,
-                    ) == PackageManager.PERMISSION_GRANTED
-                    if (!granted) {
-                        permission.launch(Manifest.permission.RECORD_AUDIO)
-                        return@detectTapGestures
-                    }
-                    if (!enabled) return@detectTapGestures
-                    onStart()
-                    tryAwaitRelease()
-                    vm.stopTalking()
-                })
-            },
+            .clickable(enabled = enabled) { if (askPermission()) vm.tapTalk(onStart) },
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        MicIcon(content, Modifier.size(30.dp))
-        Spacer(Modifier.height(2.dp))
-        Text(if (listening) "Release" else "Hold to talk", color = content, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        if (starting) {
+            CircularProgressIndicator(Modifier.size(26.dp), color = content, strokeWidth = 3.dp)
+            Spacer(Modifier.height(6.dp))
+        } else {
+            MicIcon(content, Modifier.size(30.dp))
+            Spacer(Modifier.height(2.dp))
+        }
+        Text(
+            when {
+                starting -> "Wait…"
+                listening -> "Tap to stop"
+                else -> "Tap to talk"
+            },
+            color = content,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+/**
+ * Asks for the microphone if it isn't allowed yet. Returns a check to call on a tap: true if the
+ * microphone may be used now, false if it has just been asked for.
+ */
+@Composable
+private fun rememberMicPermission(): () -> Boolean {
+    val context = LocalContext.current
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    return {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted) permission.launch(Manifest.permission.RECORD_AUDIO)
+        granted
     }
 }
 
@@ -1669,16 +1688,16 @@ private fun PracticeWindow(vm: AppViewModel, p: AppViewModel.Practice) {
         }
         // Practise: the picked word on its own, or the whole phrase again.
         Text(
-            if (idle) "Hold a button and speak" else vm.busy.label,
+            if (idle) "Tap a button and speak" else vm.busy.label,
             fontSize = 12.sp,
             color = Pastel.InkSoft,
             modifier = Modifier.align(Alignment.CenterHorizontally),
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            HoldToTalk(
+            TapToTalk(
                 "Say “${w.word}”", Pastel.Cta, Pastel.CtaInk, vm, Modifier.weight(1f),
             ) { vm.startPracticeTalking(AppViewModel.PracticeTarget.Word) }
-            HoldToTalk(
+            TapToTalk(
                 "Say the phrase", Pastel.Primary, Pastel.PrimaryInk, vm, Modifier.weight(1f),
             ) { vm.startPracticeTalking(AppViewModel.PracticeTarget.Phrase) }
         }
@@ -1716,7 +1735,7 @@ private fun WordWalkScreen(vm: AppViewModel, w: AppViewModel.WordWalk) {
         },
         dock = {
             Text(
-                if (idle) "Hold the button and say “${word.word}”" else vm.busy.label,
+                if (idle) "Tap the button and say “${word.word}”" else vm.busy.label,
                 fontSize = 12.sp,
                 color = Pastel.InkSoft,
                 modifier = Modifier.padding(top = 6.dp, bottom = 6.dp),
@@ -1800,20 +1819,26 @@ private fun WordWalkScreen(vm: AppViewModel, w: AppViewModel.WordWalk) {
     }
 }
 
-/** A hold-to-talk button for the practice window: speaks while held, then [vm] grades it. */
+/**
+ * A talk button for the practice window: a tap starts listening (with a spinner until the
+ * microphone is recording), a second tap stops it, then [vm] grades it. Of the window's buttons,
+ * only the one tapped shows that it's listening.
+ */
 @Composable
-private fun HoldToTalk(label: String, fill: Color, ink: Color, vm: AppViewModel, modifier: Modifier, onStart: () -> Unit) {
-    val context = LocalContext.current
-    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    var held by remember { mutableStateOf(false) }
-    val enabled = vm.busy == Busy.Idle || (held && vm.busy == Busy.Listening)
+private fun TapToTalk(label: String, fill: Color, ink: Color, vm: AppViewModel, modifier: Modifier, onStart: () -> Unit) {
+    val askPermission = rememberMicPermission()
+    var mine by remember { mutableStateOf(false) }
+    LaunchedEffect(vm.busy) { if (vm.busy != Busy.MicStarting && vm.busy != Busy.Listening) mine = false }
+    val listening = mine && vm.busy == Busy.Listening
+    val starting = mine && vm.busy == Busy.MicStarting
+    val enabled = vm.busy == Busy.Idle || listening || starting
     val currentStart by rememberUpdatedState(onStart)
     Column(
         modifier
             .height(72.dp)
             .card(
                 background = when {
-                    held -> if (fill == Pastel.Cta) Pastel.CtaPressed else Pastel.PrimarySoft
+                    listening -> if (fill == Pastel.Cta) Pastel.CtaPressed else Pastel.PrimarySoft
                     enabled -> fill
                     else -> Pastel.White
                 },
@@ -1821,29 +1846,29 @@ private fun HoldToTalk(label: String, fill: Color, ink: Color, vm: AppViewModel,
                 shape = RoundedCornerShape(22.dp),
                 borderWidth = 2.dp,
             )
-            .pointerInput(enabled) {
-                detectTapGestures(onPress = {
-                    val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                        PackageManager.PERMISSION_GRANTED
-                    if (!granted) {
-                        permission.launch(Manifest.permission.RECORD_AUDIO)
-                        return@detectTapGestures
+            .clickable(enabled = enabled) {
+                if (askPermission()) {
+                    vm.tapTalk {
+                        mine = true
+                        currentStart()
                     }
-                    if (!enabled) return@detectTapGestures
-                    held = true
-                    currentStart()
-                    tryAwaitRelease()
-                    held = false
-                    vm.stopTalking()
-                })
+                }
             },
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         val content = if (enabled) ink else Pastel.Outline
-        MicIcon(content, Modifier.size(22.dp))
+        if (starting) {
+            CircularProgressIndicator(Modifier.size(20.dp), color = content, strokeWidth = 2.5.dp)
+        } else {
+            MicIcon(content, Modifier.size(22.dp))
+        }
         Text(
-            if (held) "Release" else label,
+            when {
+                starting -> "Wait…"
+                listening -> "Tap to stop"
+                else -> label
+            },
             color = content,
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
@@ -2425,7 +2450,7 @@ internal fun QuizScreen(vm: AppViewModel, q: Quiz) {
                 )
                 question is SpeakQuestion -> {
                     Text(
-                        if (idle) "Hold the button and say it" else vm.busy.label,
+                        if (idle) "Tap the button and say it" else vm.busy.label,
                         fontSize = 12.sp,
                         color = Pastel.InkSoft,
                         modifier = Modifier.padding(top = 6.dp, bottom = 6.dp),
