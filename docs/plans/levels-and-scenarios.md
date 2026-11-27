@@ -164,11 +164,8 @@ Investigation only. Output: `docs/research/bands.md`.
    - **The card:** the chosen scenario's card stays above the conversation, where `scenario.scene` is
      now.
    - **Saving:** the scenario is saved with the conversation, for Continue and the quiz.
-10. **Gemma asks for the scene.** The interview with the topic left to the learner: Gemma asks the
-    learner to fill it in, and the answer becomes the scene. At Basic it asks in the learner's own
-    language; at Independent, in the language being learned. Undecided whether it stays.
-11. **Your own scenarios.** The learner describes a situation, and Gemma builds the scene at the band.
-    Undecided whether it stays.
+10. **Gemma asks for the scene.** Dropped: replaced by each band's fixed scenarios.
+11. **Your own scenarios.** Dropped: replaced by each band's fixed scenarios.
 12. **No Scenario** in every band: no scene, today's Default with the band applied.
 13. **New conversation.** The page is already reworked (Level, Mode, Style, Scenario, Language,
     Start); the Scenario dropdown changes to No Scenario, Random, 2 Card and the band's list, and 2

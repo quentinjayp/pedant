@@ -118,14 +118,6 @@ The band setting (Basic or Independent) is built (see DECISIONS.md); each band's
   picks one, as the exams do. The app's random numbers draw them, never Gemma. The chosen scenario's
   card stays above the conversation.
 - **No Scenario.** Kept in every band, as the option with no scene (today's Default).
-- **Gemma asks for the scene.** For the kind of situation picked, Gemma asks the learner to fill it
-  in ("Where do you usually get food or drinks?"), and the answer becomes the scene, so the
-  conversation is about the learner's own life. At Basic it's asked in the learner's own language;
-  at Independent in the language being learned, as the conversation's first exchange. Whether it
-  stays beside the fixed lists is undecided.
-- **Your own scenarios.** The learner describes a situation ("my landlord is late fixing the
-  heating") and Gemma builds the scene around it at the chosen band. Whether it stays beside the
-  fixed lists is undecided.
 - **Openings.** Since the scenarios are fixed, each one's openings are written ahead by Claude and
   shipped, for each band, register and language.
 
