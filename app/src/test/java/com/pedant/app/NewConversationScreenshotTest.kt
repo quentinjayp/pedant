@@ -60,8 +60,23 @@ class NewConversationScreenshotTest {
     @Test
     fun scenarios() {
         show("fr")
-        compose.onNodeWithText("Default").performClick()
+        compose.onNodeWithText("No Scenario").performClick()
         capture("03-scenarios")
+    }
+
+    @Test
+    fun twoCards() {
+        val vm = show("fr")
+        compose.runOnIdle { vm.chooseScenario(ScenarioChoice.TwoCard) }
+        compose.runOnIdle { vm.cards.firstOrNull()?.let(vm::pickCard) }
+        capture("06-two-cards")
+    }
+
+    @Test
+    fun oneScenario() {
+        val vm = show("fr")
+        compose.runOnIdle { Scenario.forBand(Band.Basic).firstOrNull { it.id == "shop" }?.let { vm.chooseScenario(ScenarioChoice.One(it)) } }
+        capture("07-one-scenario")
     }
 
     @Test

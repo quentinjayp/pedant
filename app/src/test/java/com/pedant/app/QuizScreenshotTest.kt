@@ -73,7 +73,7 @@ class QuizScreenshotTest {
     fun offer() {
         val vm = AppViewModel(RuntimeEnvironment.getApplication())
         val saved = SavedConversation(
-            "fr", Scenario.Coffee, Register.Casual, QuizSamples.chat(QuizSamples.phrases), emptyList(), null, emptyList(), 0, null,
+            "fr", Scenario.byId("meal"), Register.Casual, QuizSamples.chat(QuizSamples.phrases), emptyList(), null, emptyList(), 0, null,
         )
         vm.showQuizForTest(french, null, offer = AppViewModel.QuizOffer(saved, fromConversation = false))
         compose.setContent {

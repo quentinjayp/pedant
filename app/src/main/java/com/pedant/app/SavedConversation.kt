@@ -53,7 +53,7 @@ data class SavedConversation(
 
         private fun fromJson(o: JSONObject) = SavedConversation(
             languageCode = o.getString("language"),
-            scenario = Scenario.valueOf(o.getString("scenario")),
+            scenario = Scenario.byId(o.getString("scenario")),
             register = Register.valueOf(o.getString("register")),
             band = o.optString("band").let { b -> Band.entries.firstOrNull { it.name == b } } ?: Band.Basic,
             chat = o.getJSONArray("chat").objects().map(::chatItem),
@@ -112,7 +112,7 @@ data class SavedConversation(
         val o = JSONObject()
             .put("version", VERSION)
             .put("language", languageCode)
-            .put("scenario", scenario.name)
+            .put("scenario", scenario.id)
             .put("register", register.name)
             .put("band", band.name)
             .put("chat", JSONArray(chat.map { json(it) }))

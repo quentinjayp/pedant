@@ -75,7 +75,7 @@ class Tutor(context: Context, modelFile: File) {
             turns += kept
         }
         // The instructions don't depend on formal or casual (each message carries it), so neither does this.
-        val key = "${language.code}|${own.code}|${scenario.name}|${band.name}|${kept.hashCode()}"
+        val key = "${language.code}|${own.code}|${scenario.id}|${band.name}|${kept.hashCode()}"
         val base = ready?.takeIf { it.first == key }?.second ?: run {
             ready?.second?.close()
             ready = null
@@ -234,14 +234,12 @@ class Tutor(context: Context, modelFile: File) {
         private const val HISTORY_CHARS = 2500
 
         /**
-         * Names the opening for these choices; it changes whenever the instructions change, and
-         * differs for each own language (the openings that ship with the app are for English).
-         * tools/build_openings.py names the openings that ship with the app the same way.
+         * Names the opening for these choices. The openings for English speakers ship with the app
+         * (assets/openings.json, written by Claude); any other is written on the phone the first time
+         * and saved under the same name.
          */
-        fun openingKey(language: Language, scenario: Scenario, register: Register, own: Language, band: Band): String {
-            val hash = (Instructions.system(language, scenario, own, band) + Instructions.start(register)).hashCode()
-            return "${language.code}-${scenario.name}-${register.name}-${band.name}-${Integer.toHexString(hash)}"
-        }
+        fun openingKey(language: Language, scenario: Scenario, register: Register, own: Language, band: Band): String =
+            "${language.code}-${own.code}-${scenario.id}-${register.name}-${band.name}"
 
         /** Splits a sentence lookup into word (lower case) → meaning. */
         fun parseSentenceLookup(raw: String): Map<String, String> =

@@ -149,7 +149,7 @@ class QuizTest {
         val quiz = Quiz(Mode.Intermediate, QuizSamples.phrases, listOf(0, 1, 2, 3), QuizSamples.all, position = 3, band = Band.Independent)
         assertEquals(quiz, Quiz.fromJson(quiz.toJson()))
         val saved = SavedConversation(
-            "fr", Scenario.Default, Register.Formal, QuizSamples.chat(QuizSamples.phrases), emptyList(), null, emptyList(), 0, null,
+            "fr", Scenario.None, Register.Formal, QuizSamples.chat(QuizSamples.phrases), emptyList(), null, emptyList(), 0, null,
             quiz = quiz, quizOfferedAt = 2, band = Band.Independent,
         )
         val dir = kotlin.io.path.createTempDirectory().toFile()

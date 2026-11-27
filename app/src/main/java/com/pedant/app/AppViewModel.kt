@@ -105,6 +105,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         Instructions.load(app)
+        Scenario.load(app)
         loadLanguages(app)
     }
 
@@ -130,7 +131,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var busy by mutableStateOf(Busy.Idle)
         private set
-    var scenario by mutableStateOf(Scenario.Default)
+    /** The conversation's scenario: chosen in New conversation (see [scenarioChoice]), or the saved one's. */
+    var scenario by mutableStateOf(Scenario.None)
     /** Formal or casual: what Gemma is told with each phrase and translation, so a change applies to the next one. */
     var register by mutableStateOf(Register.Formal)
 
@@ -143,10 +145,51 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var band by mutableStateOf(Band.entries.firstOrNull { it.name == uiPrefs.getString("band", null) } ?: Band.Basic)
         private set
 
-    /** Chooses the band for a new conversation. */
+    /** Chooses the band for a new conversation. The scenario chosen is kept only if the band offers it. */
     fun chooseBand(chosen: Band) {
         band = chosen
         uiPrefs.edit().putString("band", chosen.name).apply()
+        when (val c = scenarioChoice) {
+            is ScenarioChoice.One -> if (chosen !in c.scenario.bands) scenarioChoice = ScenarioChoice.None
+            ScenarioChoice.TwoCard -> drawCards()
+            else -> {}
+        }
+    }
+
+    /** What's chosen in New conversation's Scenario dropdown. */
+    var scenarioChoice by mutableStateOf<ScenarioChoice>(ScenarioChoice.None)
+        private set
+
+    /** For 2 Card: the two scenarios drawn, and the one picked of them, if any. */
+    var cards by mutableStateOf<List<Scenario>>(emptyList())
+        private set
+    var pickedCard by mutableStateOf<Scenario?>(null)
+        private set
+
+    fun chooseScenario(choice: ScenarioChoice) {
+        scenarioChoice = choice
+        if (choice == ScenarioChoice.TwoCard) drawCards()
+    }
+
+    fun pickCard(card: Scenario) {
+        if (card in cards) pickedCard = card
+    }
+
+    /** Draws two of the band's scenarios with the app's random numbers (never Gemma's choice). */
+    private fun drawCards() {
+        cards = Scenario.forBand(band).shuffled().take(2)
+        pickedCard = null
+    }
+
+    /** Whether New conversation's choices are complete enough to start: 2 Card needs a card picked. */
+    val scenarioReady: Boolean get() = scenarioChoice != ScenarioChoice.TwoCard || pickedCard != null
+
+    /** The scenario a new conversation starts with, from [scenarioChoice]; Random draws one now. */
+    private fun chosenScenario(): Scenario = when (val c = scenarioChoice) {
+        ScenarioChoice.None -> Scenario.None
+        ScenarioChoice.Random -> Scenario.forBand(band).randomOrNull() ?: Scenario.None
+        ScenarioChoice.TwoCard -> pickedCard ?: Scenario.None
+        is ScenarioChoice.One -> c.scenario
     }
 
     /**
@@ -447,7 +490,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Starts a new conversation in [lang]; the saved one is replaced once this one is under way. */
-    fun pickLanguage(lang: Language) = startSession(lang, resume = null)
+    fun pickLanguage(lang: Language) {
+        if (!scenarioReady) return
+        scenario = chosenScenario()
+        startSession(lang, resume = null)
+    }
 
     /**
      * What the saved conversation is, for the home page ("French · Coffee with a friend · Casual"),
@@ -460,7 +507,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val canContinue: Boolean get() = continueSummary != null
 
     private fun summary(lang: Language?, scenario: Scenario, register: Register): String? = lang?.let {
-        listOfNotNull(it.englishName, scenario.title.takeIf { scenario != Scenario.Default }, register.title).joinToString(" · ")
+        listOfNotNull(it.englishName, scenario.title.takeIf { scenario != Scenario.None }, register.title).joinToString(" · ")
     }
 
     /** [saved]'s summary; "Quiz: …" while its quiz is under way, since continuing goes back to the quiz. */
@@ -1945,7 +1992,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         /** How many questions it has (left, for one under way). */
         val questions: Int = saved.quiz?.let { it.plan.size - it.position } ?: Quiz.length(saved.chat)
         val summary: String? = LANGUAGES.firstOrNull { it.code == saved.languageCode }?.let { lang ->
-            listOfNotNull(lang.englishName, saved.scenario.title.takeIf { saved.scenario != Scenario.Default }).joinToString(" · ")
+            listOfNotNull(lang.englishName, saved.scenario.title.takeIf { saved.scenario != Scenario.None }).joinToString(" · ")
         }
     }
 

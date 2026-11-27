@@ -924,6 +924,35 @@ private fun ConversationSettings(vm: AppViewModel, onClose: () -> Unit) {
     }
 }
 
+/**
+ * The conversation's scenario, above it: its title and where it takes place, which opens to the
+ * whole card (the situation and what the learner does).
+ */
+@Composable
+private fun ScenarioHeader(scenario: Scenario, language: Language?) {
+    var open by remember(scenario) { mutableStateOf(false) }
+    Column(
+        Modifier
+            .padding(top = 8.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Pastel.White.copy(alpha = 0.8f))
+            .clickable { open = !open }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(scenario.title, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text(if (open) "▴" else "▾", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Pastel.InkSoft)
+        }
+        language?.let { scenario.setting(it) }?.let { Text("Where: $it", fontSize = 12.sp, color = Pastel.InkSoft) }
+        if (open) {
+            Text(scenario.situation, fontSize = 12.sp, color = Pastel.Ink)
+            scenario.prompts.forEach { Text("• $it", fontSize = 12.sp, color = Pastel.InkSoft) }
+        }
+    }
+}
+
 /** A round white button with a gear. */
 @Composable
 private fun GearButton(onClick: () -> Unit) {
@@ -975,24 +1004,41 @@ internal fun LanguageScreen(vm: AppViewModel) {
             SmallLabel("Scenario", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(6.dp))
             SearchDropdown(
-                Scenario.entries,
-                vm.scenario,
+                listOf(ScenarioChoice.None, ScenarioChoice.Random, ScenarioChoice.TwoCard) +
+                    Scenario.forBand(vm.band).map { ScenarioChoice.One(it) },
+                vm.scenarioChoice,
                 placeholder = "Choose a scenario",
                 title = { it.title },
-                searchText = { it.title + " " + it.scene },
-                onChoose = { vm.scenario = it },
+                searchText = { if (it is ScenarioChoice.One) it.title + " " + it.scenario.situation else it.title },
+                onChoose = vm::chooseScenario,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
+            val language = vm.newLanguage
+            val note = when (val c = vm.scenarioChoice) {
+                ScenarioChoice.None -> Scenario.None.situation
+                ScenarioChoice.Random -> "One of the ${vm.band.title} scenarios, drawn at random when you start."
+                ScenarioChoice.TwoCard -> "Two of the ${vm.band.title} scenarios, drawn at random. Pick one."
+                is ScenarioChoice.One -> c.scenario.situation
+            }
             Text(
-                vm.scenario.scene,
+                note,
                 fontSize = 12.sp,
                 color = Pastel.InkSoft,
                 modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 6.dp),
             )
+            if (vm.scenarioChoice == ScenarioChoice.TwoCard) {
+                Column(
+                    Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    vm.cards.forEach { card ->
+                        ScenarioCard(card, language, selected = card == vm.pickedCard, onClick = { vm.pickCard(card) })
+                    }
+                }
+            }
             Spacer(Modifier.height(12.dp))
             SmallLabel("Language", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(6.dp))
-            val language = vm.newLanguage
             SearchDropdown(
                 LANGUAGES.filter { it.code != vm.ownSetting.code },
                 language,
@@ -1009,7 +1055,7 @@ internal fun LanguageScreen(vm: AppViewModel) {
                 "Start",
                 onClick = { language?.let(vm::pickLanguage) },
                 modifier = Modifier.padding(horizontal = 16.dp),
-                enabled = language != null && vm.progress == null,
+                enabled = language != null && vm.scenarioReady && vm.progress == null,
             )
             vm.progress?.let {
                 BackHandler(onBack = vm::cancelVoiceDownload)
@@ -1028,6 +1074,38 @@ internal fun LanguageScreen(vm: AppViewModel) {
             }
             vm.error?.let { PeachNotice(it, Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp)) }
         }
+    }
+}
+
+/**
+ * A scenario's card: its title, the situation, where it takes place in [language] (once one is
+ * chosen) and what the learner does. With [onClick] it's one of 2 Card's two, violet when [selected].
+ */
+@Composable
+private fun ScenarioCard(
+    scenario: Scenario,
+    language: Language?,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    onClick: (() -> Unit)? = null,
+) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .card(
+                if (selected) Pastel.VioletContainer else Pastel.White.copy(alpha = 0.9f),
+                if (selected) Pastel.Violet else Pastel.OutlineSoft,
+                RoundedCornerShape(16.dp),
+                if (selected) 2.dp else 1.dp,
+            )
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(scenario.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (selected) Pastel.VioletInk else Pastel.Ink)
+        Text(scenario.situation, fontSize = 13.sp, color = Pastel.Ink)
+        language?.let { scenario.setting(it) }?.let { Text("Where: $it", fontSize = 12.sp, color = Pastel.InkSoft) }
+        scenario.prompts.forEach { Text("• $it", fontSize = 12.sp, color = Pastel.InkSoft) }
     }
 }
 
@@ -1187,12 +1265,13 @@ private fun ConversationScreen(vm: AppViewModel) {
                             fontWeight = FontWeight.ExtraBold,
                         )
                     }
-                    Text(vm.scenario.scene, fontSize = 12.sp, color = Pastel.InkSoft)
+                    if (vm.scenario == Scenario.None) Text(vm.scenario.situation, fontSize = 12.sp, color = Pastel.InkSoft)
                 }
                 PillButton("New conversation", vm::newConversation, PillStyle.Outline)
                 Spacer(Modifier.width(8.dp))
                 GearButton { settingsOpen = true }
             }
+            if (vm.scenario != Scenario.None) ScenarioHeader(vm.scenario, vm.language)
             DictionaryStatus(vm)
         },
         dockVisible = dockShown,

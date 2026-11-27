@@ -38,8 +38,14 @@ object Instructions {
 
     /** What Gemma is told for a conversation: the learning instructions at [band], then how to open it. */
     fun system(language: Language, scenario: Scenario, own: Language, band: Band): String {
-        val role = json.getJSONObject("roles").let { if (it.isNull(scenario.name)) null else it.getString(scenario.name) }
-        val opening = if (role == null) text("openDefault", language, own) else text("openRole", language, own).replace("{role}", role)
+        val role = scenario.role
+        val setting = scenario.setting(language)
+        val opening = when {
+            role == null -> text("openDefault", language, own)
+            // A retired scenario has no settings: Gemma isn't told where.
+            setting == null -> text("openRole", language, own).replace("Where: {setting}.\n", "").replace("{role}", role)
+            else -> text("openRole", language, own).replace("{role}", role).replace("{setting}", setting)
+        }
         return fill(withBand(json.getString("learning"), band), language, own) + "\n\n" + opening
     }
 
