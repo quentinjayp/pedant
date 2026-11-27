@@ -738,7 +738,7 @@ differs by language: it takes place where the language is spoken (task 9).
 - **Report on an audio source, develop it, debate it** (C2).
 - **Plain exchanges of facts are not Proficient tasks** (see the Companion Volume above).
 
-These shapes are what the scenario ingredient lists (plan task 8) draw on, alongside the can-do tasks
+These shapes are what the scenario lists (plan task 8) draw on, alongside the can-do tasks
 from task 1. Which ones need something new in the app is below.
 
 ### Which shapes can be instructions to Gemma
@@ -748,8 +748,7 @@ from task 1. Which ones need something new in the app is below.
   to "Gemma asks for the scene" on the roadmap.
 - **Information exchange, requests, and simulated everyday dialogue:** what today's scenarios
   already are.
-- **Unusual everyday situation:** a generated scenario with a twist, which the roadmap's ingredient
-  lists already have. DELF B1's criteria (propose solutions, insist, express feelings, tu or vous by
+- **Unusual everyday situation:** a scenario with a twist. DELF B1's criteria (propose solutions, insist, express feelings, tu or vous by
   role) say what the learner's side should include.
 - **Planning together:** Gemma as the friend or colleague, with a few points to settle.
 - **Discussion or debate:** Gemma takes the other side, responds to the learner's arguments, and
@@ -854,7 +853,7 @@ Vocabulary range, pages 130–131).
   an interlocutor, page 72).
 - "emotional, allusive and joking usage" (C1, Conversation, page 73).
 
-### For the ingredient lists (task 8)
+### For the scenario lists (task 8)
 
 - **One list of themes for every band:** the fourteen above. Each band draws from all of them.
 - **The band sets the treatment:**

@@ -1,20 +1,20 @@
 # Plan: Levels and scenarios
 
-The plan for ROADMAP.md's "Levels and scenarios" section, broken into tasks. Nothing here is built
-yet.
+The plan for ROADMAP.md's "Levels and scenarios" section, broken into tasks. Tasks marked Done are
+built; the others aren't.
 
 ## Context
 
 The section adds a second dimension beside the help modes: how hard the language is, on the CEFR's
 first two bands, Basic (A1–A2) and Independent (B1–B2). The Proficient band (C1–C2) is on the roadmap
-only, with models other than the phone's. It replaces the fixed
-scenario list with scenarios made for each band: generated from random ingredients, Gemma asking the
-learner for the scene, the learner's own, or talk about whatever. The roadmap says to research the
-bands first, and to measure whether Gemma can do each band in each language.
+only, with models other than the phone's. It replaces the fixed scenario list with a fixed list for
+each band: the scenarios the oral exams use at the band's levels, chosen from a dropdown (No
+Scenario, Random, 2 Card, or each by name). The roadmap says to research the bands first, and to
+measure whether Gemma can do each band in each language.
 
 ## Order
 
-- **A (research)** comes first. It gates the evals (B) and the ingredient lists (task 8).
+- **A (research)** comes first. It gates the evals (B) and the scenario lists (task 8).
 - **B (measuring the models)** decides which bands each language offers.
 - **C (foundations)** comes before D (scenarios).
 - **E (tests and docs)** runs alongside C and D.
@@ -51,7 +51,7 @@ Investigation only. Output: `docs/research/bands.md`.
      preparation time, or long turns taken in parts (task 9).
 3. **Topics.** **Done.** The CEFR's themes, one list for every language, as with the task shapes. No
    language's courses are researched: the CEFR is the standard. Gemma sets each scene where the
-   language is spoken (task 9). This feeds the ingredient lists (task 8).
+   language is spoken (task 9). This feeds the scenario lists (task 8).
    - Which of the CEFR's themes go with each band?
 
    **Result:** the CEFR's fourteen themes (personal identification, home and environment, daily
@@ -111,41 +111,69 @@ Investigation only. Output: `docs/research/bands.md`.
 
 ## D. Scenarios
 
-8. **Ingredient lists.** A data file in `app/src/main/assets/`, in two layers:
-   - **Shapes:** each band's task shapes, from task 2's generalised list (interview, everyday
-     transaction, plan together, talk then questions, defend a view then debate, and so on). Each
-     shape says who leads, Gemma's role, and what prompts it gives the learner.
-   - **Content:** for each shape, the topics, places, relationships and twists it can be filled
-     with, from tasks 1 and 3.
-9. **Generated scenarios.** Gemma writes the scene, its role and the opening, set where the language
-    is spoken. The ingredients are drawn at random:
-    1. a shape among the band's shapes;
-    2. content for that shape;
-    3. the setting, which Gemma localises.
-    - **A choice of two:** the app draws two scenarios and the learner picks one, as the exams do
-      ("Vous tirez au sort deux sujets. Vous en choisissez un").
-    - **The card:** each draw is shown as a card: the shape, the situation, and the shape's prompts
-      (the words to ask about, the points to plan, the statement to argue). The two cards are the
-      choice. The chosen one stays above the conversation, where `scenario.scene` is now.
-    - **New app pieces:** shapes that need something the app doesn't have yet are only drawn once it
-      exists. That covers pictures, a short text or audio source, preparation time, and long turns
-      taken in parts.
-    - **Replaces:** `Scenario` (Scenarios.kt) and the `roles` in `instructions.json`.
-    - **Saving:** the card is saved with the conversation, for Continue and the quiz.
-10. **Gemma asks for the scene.** This is the interview shape with the topic left to the learner:
-    Gemma asks the learner to fill it in, and the answer becomes the scene. At Basic it asks in the
-    learner's own language; at Independent, in the language being learned.
+8. **Each band's scenario list.** A data file in `app/src/main/assets/`: each band's scenarios, from
+   the oral exams' scenarios in the research (and the CEFR's tasks where the exams give one
+   example), each with its situation, Gemma's role and the card's prompts. For review:
+   - **Basic (A1–A2):**
+     1. Getting to know you: the tutor asks about you, your family, tastes and activities (DELF
+        A1–A2, Goethe A1).
+     2. Getting to know the tutor: you ask the questions, on a theme such as the weekend (DELF A1,
+        Goethe A1).
+     3. Buying something in a shop: the price, the quantities, paying (DELF A1).
+     4. Asking for information at the station (DELF A2).
+     5. Asking someone for things and favours (Goethe A1).
+     6. Talking about an event, an activity, a project or a place, then answering questions (DELF A2).
+     7. Planning something together (Goethe, A2–B1: in both bands).
+     8. Ordering a meal.
+     9. Pointing out that something is wrong ("The food is cold", "There's no light in my room").
+     10. Buying tickets and using public transport.
+     11. Asking for and giving directions.
+     12. Making a doctor's appointment and saying what's wrong.
+     13. Making, accepting and turning down invitations.
+     14. Arranging when and where to meet.
+     15. A short phone call with someone you know.
+   - **Independent (B1–B2):**
+     1. Getting to know you: work, studies, habits, past and plans (DELF B1: in both bands).
+     2. An unusual everyday situation to sort out: propose solutions and insist (DELF B1).
+     3. Planning something together, such as visiting a friend in hospital (Goethe B1: in both bands).
+     4. Presenting a topic, then answering questions (Goethe B1).
+     5. Defending a view, then debating it (DELF B2, Goethe B2).
+     6. Telling a story about something that happened to you.
+     7. The plot of a book or film, and what you thought of it.
+     8. Your plans and ambitions, with reasons.
+     9. Choosing between options: what to do, where to go.
+     10. Sorting out travel arrangements, at a travel agent or a tourist office.
+     11. Returning a faulty purchase, or making a complaint.
+     12. Describing symptoms to a doctor and asking for advice.
+     13. A job interview.
+     14. Phoning about a problem at a hotel or with a hire car.
+     15. Explaining how to do something.
+   - **Left out until the app can do them:** a prepared talk (preparation time), an opinion on a
+     short document (a text to read), describing a picture (pictures).
+9. **Scenarios in the app.** The band's list replaces `Scenario` (Scenarios.kt) and the `roles` in
+   `instructions.json`. Gemma sets each scene where the language is spoken.
+   - **Choosing:** the Scenario dropdown in New conversation: No Scenario, Random, 2 Card, then each
+     of the band's scenarios by name. Random and 2 Card are drawn with the app's random numbers,
+     never by Gemma.
+   - **2 Card:** two scenarios drawn as cards (the situation and its prompts), and the learner picks
+     one, as the exams do ("Vous tirez au sort deux sujets. Vous en choisissez un").
+   - **The card:** the chosen scenario's card stays above the conversation, where `scenario.scene` is
+     now.
+   - **Saving:** the scenario is saved with the conversation, for Continue and the quiz.
+10. **Gemma asks for the scene.** The interview with the topic left to the learner: Gemma asks the
+    learner to fill it in, and the answer becomes the scene. At Basic it asks in the learner's own
+    language; at Independent, in the language being learned. Undecided whether it stays.
 11. **Your own scenarios.** The learner describes a situation, and Gemma builds the scene at the band.
-12. **Talk about whatever** in every band: the conversation shape with no topic, today's Default with
-    the band applied.
-13. **New conversation flow.** Language → band → two drawn cards, your own, or talk about whatever →
-    Gemma's question, if the shape has one → the scene. This changes `LanguageScreen` in
-    `MainActivity.kt` and `startSession` in `AppViewModel.kt`.
-14. **Openings.** The shipped openings are removed (`openings.json`, `OpeningCache.kt`,
-    `tools/build_openings.py`, `.github/workflows/openings.yml`): Gemma writes each opening on the
-    phone.
-15. **Generated-scene evals.** A sample of generated scenes per band and language, checked for sense
-    and level. This extends task 4.
+    Undecided whether it stays.
+12. **No Scenario** in every band: no scene, today's Default with the band applied.
+13. **New conversation.** The page is already reworked (Level, Mode, Style, Scenario, Language,
+    Start); the Scenario dropdown changes to No Scenario, Random, 2 Card and the band's list, and 2
+    Card shows its two cards. This changes `LanguageScreen` in `MainActivity.kt` and `startSession`
+    in `AppViewModel.kt`.
+14. **Openings.** Written ahead for each band's scenarios and shipped, as now
+    (`tools/build_openings.py`, `.github/workflows/openings.yml`).
+15. **Scenario evals.** Was: generated scenes checked for sense and level. With fixed scenarios, what
+    to check is undecided.
 
 ## E. Tests and docs
 

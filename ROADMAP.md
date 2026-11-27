@@ -92,9 +92,9 @@ separate from the language level (see Levels and scenarios), and every mode work
 ## Levels and scenarios
 
 A second dimension beside the help modes: how hard the language is, on the scale the international
-proficiency tests use. The fixed list of scenarios is replaced by scenarios made for each level.
+proficiency tests use. The fixed list of scenarios is replaced by scenarios for each level.
 The plan, broken into tasks, is [docs/plans/levels-and-scenarios.md](docs/plans/levels-and-scenarios.md).
-The two bands, Basic and Independent, are built (see DECISIONS.md); the scenarios aren't yet.
+The band setting (Basic or Independent) is built (see DECISIONS.md); each band's scenarios aren't yet.
 
 - **Research the bands first.** The band descriptors, the oral exams' task shapes and the topics
   (the CEFR's themes, one list for every language) are done; see
@@ -107,36 +107,26 @@ The two bands, Basic and Independent, are built (see DECISIONS.md); the scenario
   Gemma E4B's language reached C1 (idiom, register, structured turns), but it agreed with every
   point the learner made instead of challenging them, and it had little of C2's humour, irony and
   allusion. See "Investigate models other than the phone's" under Models.
-- **Generated scenarios.** The app draws a scenario's ingredients at random from lists in a data
-  file, in two layers:
-  - **Shape:** one of the band's task shapes, the same for every language, generalised from the oral
-    exams. Basic: an interview about you, an everyday transaction, planning together. Independent: an
-    unusual everyday situation, defending a view then debating it. The shape decides who leads and
-    Gemma's role.
-  - **Content:** a topic, a place or relationship, and sometimes a twist.
-
-  Gemma writes the scene from them, set where the language is spoken (a warung, not a Parisian café,
-  for Indonesian). Random ingredients stop Gemma drifting back to the same few scenes, and the band's
-  shapes keep the level right.
-- **Cards, and a choice of two.** Each draw is shown as a card: the shape, the situation, and the
-  shape's prompts (words to ask about, points to plan, a statement to argue). The app draws two cards
-  and the learner picks one, as the exams do. The chosen card stays above the conversation.
+- **Each band's scenarios.** A fixed list for each band: the scenarios the oral exams use at its
+  levels (A1–A2 for Basic, B1–B2 for Independent), from the research. The exams are only the source;
+  nothing is tested. A scenario at a level both bands cover is in both lists. Gemma sets each scene
+  where the language is spoken (a warung, not a Parisian café, for Indonesian). The lists are in the
+  plan, for review.
+- **Choosing a scenario.** A dropdown in New conversation: No Scenario, Random, 2 Card, then each of
+  the band's scenarios by name. Random picks one; 2 Card draws two, shown as cards, and the learner
+  picks one, as the exams do. The app's random numbers draw them, never Gemma. The chosen scenario's
+  card stays above the conversation.
+- **No Scenario.** Kept in every band, as the option with no scene (today's Default).
 - **Gemma asks for the scene.** For the kind of situation picked, Gemma asks the learner to fill it
   in ("Where do you usually get food or drinks?"), and the answer becomes the scene, so the
   conversation is about the learner's own life. At Basic it's asked in the learner's own language;
-  at Independent in the language being learned, as the conversation's first exchange.
+  at Independent in the language being learned, as the conversation's first exchange. Whether it
+  stays beside the fixed lists is undecided.
 - **Your own scenarios.** The learner describes a situation ("my landlord is late fixing the
-  heating") and Gemma builds the scene around it at the chosen band.
-- **Talk about whatever.** Kept in every band, as the option with no scene. It and "Gemma asks for
-  the scene" are the interview and conversation shapes, with no topic or with the learner's.
-- **The flow.** Pick a language and band; then one of two drawn cards, your own scenario, or talk
-  about whatever; Gemma asks its question if the shape has one; the scene starts.
-- **What it costs.** Openings are no longer written ahead and shipped, so a conversation no longer
-  opens instantly: Gemma writes the scene and opening on the phone (a few seconds with E2B, more
-  with E4B). Its question to the learner covers part of that. The saved conversation stores the
-  scene itself, for Continue and the quiz. The evals pipeline would check a sample of generated
-  scenes per band and language for sense and level, and whether Gemma holds each band's level at
-  all.
+  heating") and Gemma builds the scene around it at the chosen band. Whether it stays beside the
+  fixed lists is undecided.
+- **Openings.** Since the scenarios are fixed, each one's openings can still be written ahead and
+  shipped, for each band.
 
 ## Models
 
