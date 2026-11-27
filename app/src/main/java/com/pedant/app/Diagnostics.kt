@@ -11,6 +11,8 @@ import java.io.StringWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /**
  * Records what the app was doing so a crash can be explained on the next launch.
@@ -39,13 +41,17 @@ class Diagnostics(private val context: Context) {
     /**
      * Adds a timestamped line to a short rolling log that is included in crash reports, with the
      * memory in use at that moment, so a report shows what grew before the phone ran short.
+     * Written on a thread of its own, since it's often called from the main thread and reading the
+     * memory and writing the file can be slow when the phone is short of memory.
      */
     fun log(event: String) {
-        runCatching {
-            val time = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
-            eventLog.appendText("$time $event · ${appMemory()}, ${phoneMemory()}\n")
-            // Trim now and then rather than rewriting the file on every event.
-            if (eventLog.length() > 32_768) eventLog.writeText(eventLog.readLines().takeLast(60).joinToString("\n") + "\n")
+        val time = SimpleDateFormat("HH:mm:ss", Locale.US).format(Date())
+        writer.execute {
+            runCatching {
+                eventLog.appendText("$time $event · ${appMemory()}, ${phoneMemory()}\n")
+                // Trim now and then rather than rewriting the file on every event.
+                if (eventLog.length() > 32_768) eventLog.writeText(eventLog.readLines().takeLast(60).joinToString("\n") + "\n")
+            }
         }
     }
 
@@ -155,5 +161,10 @@ class Diagnostics(private val context: Context) {
         ApplicationExitInfo.REASON_PACKAGE_UPDATED -> "app was updated"
         ApplicationExitInfo.REASON_OTHER -> "closed by the system (other)"
         else -> "code $reason"
+    }
+
+    private companion object {
+        /** Writes the event log's lines in order, one at a time, off the caller's thread. */
+        val writer: ExecutorService = Executors.newSingleThreadExecutor { Thread(it, "diagnostics").apply { isDaemon = true } }
     }
 }

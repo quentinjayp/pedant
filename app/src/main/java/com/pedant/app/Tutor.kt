@@ -10,9 +10,15 @@ import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
 import com.google.ai.edge.litertlm.SamplerConfig
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /** One tutor answer, split into its labelled parts: the reply, its translation into the learner's own language, or a phrase to say. */
@@ -120,6 +126,8 @@ class Tutor(context: Context, modelFile: File) {
                     turns += Turn(false, compact(sb.toString()))
                 }
             }
+            // Gemma's work stays off the main thread; only the collector sees each step on it.
+            .flowOn(Dispatchers.Default)
     }
 
     /**
@@ -173,16 +181,22 @@ class Tutor(context: Context, modelFile: File) {
      * Stops early if the coroutine is cancelled.
      */
     private suspend fun ask(instruction: String, question: String, onText: (String) -> Unit = {}): String {
-        val conv = engine.createConversation(
-            ConversationConfig(
-                systemInstruction = Contents.of(instruction),
-                samplerConfig = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0),
-            ),
-        )
+        // Setting up and closing a conversation reserves and frees memory, which can take seconds when
+        // the phone is short of it, so neither is done on the main thread, where it would hold up the
+        // screen and touches (Hold to talk). Not cancellable, so a conversation made is always closed.
+        val conv = withContext(NonCancellable + Dispatchers.Default) {
+            engine.createConversation(
+                ConversationConfig(
+                    systemInstruction = Contents.of(instruction),
+                    samplerConfig = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0),
+                ),
+            )
+        }
         lookupConversation = conv
         try {
+            currentCoroutineContext().ensureActive()
             val answer = StringBuilder()
-            conv.sendMessageAsync(Message.user(question)).collect {
+            conv.sendMessageAsync(Message.user(question)).flowOn(Dispatchers.Default).collect {
                 answer.append(it.toString())
                 onText(answer.toString())
             }
@@ -192,7 +206,7 @@ class Tutor(context: Context, modelFile: File) {
             throw e
         } finally {
             lookupConversation = null
-            conv.close()
+            withContext(NonCancellable + Dispatchers.Default) { conv.close() }
         }
     }
 

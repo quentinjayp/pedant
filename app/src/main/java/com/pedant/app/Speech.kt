@@ -33,20 +33,22 @@ class MicRecorder {
     private var thread: Thread? = null
     private val buffer = ByteArrayOutputStream()
 
+    /** Starts recording. The microphone is set up on the recording's own thread, not the caller's (the main thread). */
     @SuppressLint("MissingPermission")
     fun start() {
         if (recording) return
-        buffer.reset()
-        val minSize = AudioRecord.getMinBufferSize(
-            SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
-        )
-        val record = AudioRecord(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION, SAMPLE_RATE,
-            AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minSize * 4,
-        )
+        synchronized(buffer) { buffer.reset() }
         recording = true
         thread = Thread {
+            var record: AudioRecord? = null
             try {
+                val minSize = AudioRecord.getMinBufferSize(
+                    SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
+                )
+                record = AudioRecord(
+                    MediaRecorder.AudioSource.VOICE_RECOGNITION, SAMPLE_RATE,
+                    AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, minSize * 4,
+                )
                 val chunk = ByteArray(minSize)
                 record.startRecording()
                 while (recording) {
@@ -57,7 +59,7 @@ class MicRecorder {
             } catch (_: Exception) {
                 // The microphone was unavailable; an empty recording is returned.
             } finally {
-                record.release()
+                record?.release()
             }
         }.also { it.start() }
     }
