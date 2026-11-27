@@ -189,6 +189,13 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   from the oral exams' shapes, generalised once and applied to every language, not taken from each
   language's own exam. Only the setting of each scene differs by language. See
   [docs/research/bands.md](docs/research/bands.md).
+- **Each band's scenarios are the exams' scenarios.** A fixed list for each band, of the situations
+  the oral exams use at its levels (A1–A2 for Basic, B1–B2 for Independent), from the research. The
+  exams are only the source: nothing is tested or graded. A scenario at a level both bands cover is
+  in both lists. The lists are still to be reviewed.
+- **Choosing a scenario:** a dropdown of No Scenario, Random, 2 Card, then each of the band's
+  scenarios by name. Random picks one; 2 Card draws two as cards and the learner picks one. The app's
+  random numbers draw them, never Gemma: Gemma picking "at random" isn't random.
 
 ## Development
 
