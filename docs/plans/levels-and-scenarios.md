@@ -113,7 +113,9 @@ Investigation only. Output: `docs/research/bands.md`.
 
 8. **Each band's scenario list.** A data file in `app/src/main/assets/`: each band's scenarios, from
    the oral exams' scenarios in the research (and the CEFR's tasks where the exams give one
-   example), each with its situation, Gemma's role and the card's prompts. For review:
+   example), each with its situation, Gemma's role and the card's prompts, and its setting for each
+   of the 25 languages, where the language is spoken. Written by Claude in a session, not by Gemma.
+   For review:
    - **Basic (A1–A2):**
      1. Getting to know you: the tutor asks about you, your family, tastes and activities (DELF
         A1–A2, Goethe A1).
@@ -151,7 +153,7 @@ Investigation only. Output: `docs/research/bands.md`.
    - **Left out until the app can do them:** a prepared talk (preparation time), an opinion on a
      short document (a text to read), describing a picture (pictures).
 9. **Scenarios in the app.** The band's list replaces `Scenario` (Scenarios.kt) and the `roles` in
-   `instructions.json`. Gemma sets each scene where the language is spoken.
+   `instructions.json`. Gemma is given the scene with its setting for the language.
    - **Choosing:** the Scenario dropdown in New conversation: No Scenario, Random, 2 Card, then each
      of the band's scenarios by name. Random and 2 Card are drawn with the app's random numbers,
      never by Gemma.
@@ -170,8 +172,10 @@ Investigation only. Output: `docs/research/bands.md`.
     Start); the Scenario dropdown changes to No Scenario, Random, 2 Card and the band's list, and 2
     Card shows its two cards. This changes `LanguageScreen` in `MainActivity.kt` and `startSession`
     in `AppViewModel.kt`.
-14. **Openings.** Written ahead for each band's scenarios and shipped, as now
-    (`tools/build_openings.py`, `.github/workflows/openings.yml`).
+14. **Openings.** Written ahead by Claude in a session, for each scenario, band, register and
+    language (about 1,500), and shipped. They replace the openings E4B writes in CI
+    (`tools/build_openings.py`, `.github/workflows/openings.yml`); how they're kept in step when the
+    instructions change is to be worked out.
 15. **Scenario evals.** Was: generated scenes checked for sense and level. With fixed scenarios, what
     to check is undecided.
 
