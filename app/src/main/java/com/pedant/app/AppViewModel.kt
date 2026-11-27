@@ -842,8 +842,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * A tap on a talk button: the microphone is set up, a beep says it's listening, and it listens
-     * until the button is tapped again ([stopTalking]) or there's been no speech for a while.
+     * A tap on a talk button: the microphone is set up, and it listens until the button is tapped
+     * again ([stopTalking]) or there's been no speech for a while.
      */
     fun startTalking() {
         if (busy != Busy.Idle) return

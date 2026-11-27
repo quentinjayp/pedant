@@ -4,11 +4,9 @@ import android.annotation.SuppressLint
 import android.content.res.AssetManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
-import android.media.ToneGenerator
 import com.k2fsa.sherpa.onnx.GeneratedAudio
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineOmnilingualAsrCtcModelConfig
@@ -45,9 +43,8 @@ class MicRecorder(private val assets: AssetManager) {
 
     /**
      * Starts recording on a thread of its own, where the microphone is set up. Once it's recording,
-     * a short beep plays (and isn't kept in the recording), then [onListening] is called; [onSilence]
-     * is called once, after [SILENCE_SECONDS] with no speech since the beep or since the last speech.
-     * Both are called on the recording's thread.
+     * [onListening] is called; [onSilence] is called once, after [SILENCE_SECONDS] with no speech
+     * since then or since the last speech. Both are called on the recording's thread.
      */
     @SuppressLint("MissingPermission")
     fun start(onListening: () -> Unit, onSilence: () -> Unit) {
@@ -57,7 +54,6 @@ class MicRecorder(private val assets: AssetManager) {
         thread = Thread {
             var record: AudioRecord? = null
             var vad: Vad? = null
-            var beep: ToneGenerator? = null
             try {
                 val minSize = AudioRecord.getMinBufferSize(
                     SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
@@ -69,15 +65,6 @@ class MicRecorder(private val assets: AssetManager) {
                 vad = runCatching { speechDetector() }.getOrNull()
                 val chunk = ByteArray(minSize)
                 record.startRecording()
-                beep = runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, BEEP_VOLUME) }.getOrNull()
-                beep?.startTone(ToneGenerator.TONE_PROP_BEEP, BEEP_MS)
-                // The beep is left out of the recording.
-                var skipped = 0
-                while (recording && skipped < BEEP_SKIP_BYTES) {
-                    val n = record.read(chunk, 0, chunk.size)
-                    if (n > 0) skipped += n
-                }
-                if (!recording) return@Thread
                 onListening()
                 var lastSpeech = System.nanoTime()
                 var silenceTold = false
@@ -100,7 +87,6 @@ class MicRecorder(private val assets: AssetManager) {
             } catch (_: Exception) {
                 // The microphone was unavailable; an empty recording is returned.
             } finally {
-                beep?.release()
                 vad?.release()
                 record?.release()
             }
@@ -139,12 +125,6 @@ class MicRecorder(private val assets: AssetManager) {
     companion object {
         /** How long without speech stops the recording, in seconds. */
         const val SILENCE_SECONDS = 5
-
-        private const val BEEP_MS = 120
-        private const val BEEP_VOLUME = 60
-
-        /** How much is left out of the recording at its start, for the beep: 0.2 s of 16-bit samples. */
-        private const val BEEP_SKIP_BYTES = SAMPLE_RATE / 5 * 2
     }
 }
 

@@ -161,8 +161,8 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
 - **Battery:** a notice asks for unrestricted battery use and opens that setting.
 - **Footer:** the conversation footer folds away with a chevron, leaving the talk button.
 - **Talk buttons:** a tap starts listening and a second tap stops it, on every talk button (the conversation's, the practice window's, the word-by-word page's and the quiz's).
-  - **Getting ready:** a spinner shows from the tap until the microphone is recording, then a short beep says it's listening. The beep isn't kept in the recording.
-  - **Stopping on its own:** after 5 seconds with no speech, since the beep or since the learner last spoke. Silero VAD tells speech from silence.
+  - **Getting ready:** a spinner shows from the tap until the microphone is recording, then the button says "Tap to stop". There's no beep: it was removed after English speech came out in Arabic letters, suspected to be the beep ending up in the recording.
+  - **Stopping on its own:** after 5 seconds with no speech, since the microphone started recording or since the learner last spoke. Silero VAD tells speech from silence.
 
 ## Levels and scenarios
 
