@@ -43,6 +43,12 @@ separate from the language level (see Levels and scenarios), and every mode work
   question's. Then bring back Mandarin and Vietnamese, removed because the app couldn't tell when a
   tone was wrong.
 
+- **Investigate bringing back Slovak, Slovenian, Hungarian and Romanian, and Czech at Independent.**
+  Disabled as languages to learn after the band evals (evals/bands/judgments.md): Gemma E4B held the
+  bands and scenarios in them, but wrote them with errors in nearly every reply (made-up words,
+  broken grammar, Croatian words in Slovenian). Whether another model, or a later Gemma, writes them
+  well enough.
+
 - **Investigate dialects, such as Québécois French.** Whether the models can handle one: Gemma may
   hold a dialect's vocabulary, and no Québécois Piper voice has been found, without which expected
   sounds would be France French.

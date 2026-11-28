@@ -40,6 +40,7 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
 - **25 languages.** The list started at 28: languages well supported by Gemma, Omnilingual, ZIPA and Piper together.
   - **Arabic removed:** it's written without most vowels, so its expected sounds are guesses.
   - **Mandarin and Vietnamese removed:** the app doesn't hear tones. Bringing them back is on the roadmap.
+  - **Slovak, Slovenian, Hungarian and Romanian disabled, and Czech at Independent:** as languages to learn, after the band evals showed Gemma writes them with errors in nearly every reply. They stay in the app's data, so a saved conversation in one can be continued. Bringing them back is on the roadmap.
 - **Serbian:** written in Latin script, and named "Srpski".
 - **Learner's own language:** chosen in Settings on the home page. English is the default.
   - Dictionary meanings stay in English for now.

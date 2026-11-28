@@ -1040,7 +1040,7 @@ internal fun LanguageScreen(vm: AppViewModel) {
             SmallLabel("Language", Pastel.InkSoft, Modifier.padding(horizontal = 20.dp))
             Spacer(Modifier.height(6.dp))
             SearchDropdown(
-                LANGUAGES.filter { it.code != vm.ownSetting.code },
+                vm.languagesToLearn,
                 language,
                 placeholder = "Choose a language",
                 title = { it.englishName },

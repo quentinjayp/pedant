@@ -209,10 +209,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /**
      * The language chosen in New conversation, remembered for the next one: null until one is
-     * chosen, or when it's now the learner's own language.
+     * chosen, when it's now the learner's own language, or when it isn't offered at the band.
      */
     private var newLanguageSetting by mutableStateOf(LANGUAGES.firstOrNull { it.code == uiPrefs.getString("newLanguage", null) })
-    val newLanguage: Language? get() = newLanguageSetting?.takeIf { it.code != ownSetting.code }
+    val newLanguage: Language? get() = newLanguageSetting?.takeIf { it.code != ownSetting.code && band in it.bands }
+
+    /** The languages New conversation offers at the band: every one offered at it but the learner's own. */
+    val languagesToLearn: List<Language> get() = LANGUAGES.filter { it.code != ownSetting.code && band in it.bands }
 
     fun chooseNewLanguage(lang: Language) {
         newLanguageSetting = lang
