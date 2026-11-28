@@ -1066,12 +1066,12 @@
    "english": "Hi there. What can I do for you?"
   },
   "en-en-debate-Formal-Independent": {
-   "reply": "So, here is the statement: cities should ban cars from their centres. What do you think?",
-   "english": "So, here is the statement: cities should ban cars from their centres. What do you think?"
+   "reply": "So, here is the statement: cities should ban cars from their centers. What do you think?",
+   "english": "So, here is the statement: cities should ban cars from their centers. What do you think?"
   },
   "en-en-debate-Casual-Independent": {
-   "reply": "So, here's the statement: cities should ban cars from their centres. What do you reckon?",
-   "english": "So, here's the statement: cities should ban cars from their centres. What do you reckon?"
+   "reply": "So, here's the statement: cities should ban cars from their centers. What do you think?",
+   "english": "So, here's the statement: cities should ban cars from their centers. What do you think?"
   },
   "en-en-directions-Formal-Basic": {
    "reply": "Excuse me, are you lost? Can I help you?",
@@ -1082,12 +1082,12 @@
    "english": "Hey, are you lost? Can I help?"
   },
   "en-en-doctor-appointment-Formal-Basic": {
-   "reply": "Doctor's surgery, good morning. How can I help you?",
-   "english": "Doctor's surgery, good morning. How can I help you?"
+   "reply": "Doctor's office, good morning. How can I help you?",
+   "english": "Doctor's office, good morning. How can I help you?"
   },
   "en-en-doctor-appointment-Casual-Basic": {
-   "reply": "Doctor's surgery, hi. How can I help?",
-   "english": "Doctor's surgery, hi. How can I help?"
+   "reply": "Doctor's office, hi. How can I help?",
+   "english": "Doctor's office, hi. How can I help?"
   },
   "en-en-doctor-symptoms-Formal-Independent": {
    "reply": "Good morning, please come in and sit down. What brings you here today?",
@@ -1186,20 +1186,20 @@
    "english": "Hi, it's me! I'm on the train."
   },
   "en-en-plan-together-Formal-Basic": {
-   "reply": "Did you hear? Ryan is in hospital. Shall we visit him?",
-   "english": "Did you hear? Ryan is in hospital. Shall we visit him?"
+   "reply": "Did you hear? Ryan is in the hospital. Shall we visit him?",
+   "english": "Did you hear? Ryan is in the hospital. Shall we visit him?"
   },
   "en-en-plan-together-Casual-Basic": {
-   "reply": "Did you hear? Ryan is in hospital. Shall we go and see him?",
-   "english": "Did you hear? Ryan is in hospital. Shall we go and see him?"
+   "reply": "Did you hear? Ryan is in the hospital. Should we go see him?",
+   "english": "Did you hear? Ryan is in the hospital. Should we go see him?"
   },
   "en-en-plan-together-Formal-Independent": {
-   "reply": "Have you heard that Ryan is in hospital? We should visit him. When would suit you?",
-   "english": "Have you heard that Ryan is in hospital? We should visit him. When would suit you?"
+   "reply": "Have you heard that Ryan is in the hospital? We should visit him. When would suit you?",
+   "english": "Have you heard that Ryan is in the hospital? We should visit him. When would suit you?"
   },
   "en-en-plan-together-Casual-Independent": {
-   "reply": "Have you heard Ryan's in hospital? We should go and see him. When are you free?",
-   "english": "Have you heard Ryan's in hospital? We should go and see him. When are you free?"
+   "reply": "Have you heard Ryan's in the hospital? We should go see him. When are you free?",
+   "english": "Have you heard Ryan's in the hospital? We should go see him. When are you free?"
   },
   "en-en-plans-Formal-Independent": {
    "reply": "Is that really you? I haven't seen you in years! So, what are you planning these days?",
@@ -1714,7 +1714,7 @@
    "english": "Have you heard Juho's in hospital? We should go and see him. When are you free?"
   },
   "fi-en-plans-Formal-Independent": {
-   "reply": "Oletteko se todella te? En ole nähnyt teitä vuosiin! No, mitä suunnitelmia teillä on nykyään?",
+   "reply": "Tekö se todella olette? En ole nähnyt teitä vuosiin! No, mitä suunnitelmia teillä on nykyään?",
    "english": "Is that really you? I haven't seen you in years! So, what are you planning these days?"
   },
   "fi-en-plans-Casual-Independent": {
@@ -1754,7 +1754,7 @@
    "english": "Hi. How can I help?"
   },
   "fi-en-story-Formal-Independent": {
-   "reply": "Siitä on niin kauan! No, mitä teille on tapahtunut viime aikoina?",
+   "reply": "Siitä on niin kauan aikaa! No, mitä teille on tapahtunut viime aikoina?",
    "english": "It's been such a long time! So, what has happened to you lately?"
   },
   "fi-en-story-Casual-Independent": {
@@ -2090,11 +2090,11 @@
    "english": "Hi there. What can I do for you?"
   },
   "hi-en-debate-Formal-Independent": {
-   "reply": "तो, कथन यह है: शहरों को अपने बीच के इलाक़ों में गाड़ियों पर रोक लगा देनी चाहिए। आपकी क्या राय है?",
+   "reply": "तो, कथन यह है: शहरों को अपने केंद्र में गाड़ियों पर रोक लगा देनी चाहिए। आपकी क्या राय है?",
    "english": "So, here is the statement: cities should ban cars from their centres. What do you think?"
   },
   "hi-en-debate-Casual-Independent": {
-   "reply": "तो, कथन यह है: शहरों को अपने बीच के इलाक़ों में गाड़ियों पर रोक लगा देनी चाहिए। तुम क्या सोचते हो?",
+   "reply": "तो, कथन यह है: शहरों को अपने केंद्र में गाड़ियों पर रोक लगा देनी चाहिए। तुम क्या सोचते हो?",
    "english": "So, here's the statement: cities should ban cars from their centres. What do you reckon?"
   },
   "hi-en-directions-Formal-Basic": {
@@ -2586,7 +2586,7 @@
    "english": "Hi, nice to meet you, I'm Dewi! So tell me a bit about yourself: where are you from, and what do you do?"
   },
   "id-en-choosing-Formal-Independent": {
-   "reply": "Jadi, kita punya libur panjang akhir pekan. Kita pergi ke mana?",
+   "reply": "Jadi, kita dapat libur akhir pekan yang panjang. Kita pergi ke mana?",
    "english": "So, we have a long weekend. Where shall we go?"
   },
   "id-en-choosing-Casual-Independent": {
@@ -2682,7 +2682,7 @@
    "english": "Hi, have a seat. Thanks for coming! Why don't you start by telling me a bit about yourself?"
   },
   "id-en-meal-Formal-Basic": {
-   "reply": "Selamat malam! Ini menunya. Mau minum apa?",
+   "reply": "Selamat malam! Ini menunya. Anda mau minum apa?",
    "english": "Good evening! Here is the menu. What would you like to drink?"
   },
   "id-en-meal-Casual-Basic": {
@@ -2754,7 +2754,7 @@
    "english": "OK, your turn! Your topic is living in the city or in the country. Go ahead."
   },
   "id-en-shop-Formal-Basic": {
-   "reply": "Selamat pagi! Mau beli apa?",
+   "reply": "Selamat pagi! Anda mau beli apa?",
    "english": "Good morning! What would you like?"
   },
   "id-en-shop-Casual-Basic": {
@@ -3138,11 +3138,11 @@
    "english": "Doctor's surgery, hi. How can I help?"
   },
   "nl-en-doctor-symptoms-Formal-Independent": {
-   "reply": "Goedemorgen, komt u binnen en neemt u plaats. Wat brengt u hier vandaag?",
+   "reply": "Goedemorgen, komt u binnen en neemt u plaats. Waarvoor komt u vandaag?",
    "english": "Good morning, please come in and sit down. What brings you here today?"
   },
   "nl-en-doctor-symptoms-Casual-Independent": {
-   "reply": "Hallo, kom binnen en ga zitten. Wat brengt je hier vandaag?",
+   "reply": "Hallo, kom binnen en ga zitten. Waarvoor kom je vandaag?",
    "english": "Hi, come in and have a seat. What brings you in today?"
   },
   "nl-en-favours-Formal-Basic": {
@@ -3262,7 +3262,7 @@
    "english": "Right, it's your turn. Your topic is living in the city or in the country. Please go ahead."
   },
   "nl-en-present-Casual-Independent": {
-   "reply": "Oké, jij bent! Je onderwerp is wonen in de stad of op het platteland. Ga je gang.",
+   "reply": "Oké, jij bent aan de beurt! Je onderwerp is wonen in de stad of op het platteland. Ga je gang.",
    "english": "OK, your turn! Your topic is living in the city or in the country. Go ahead."
   },
   "nl-en-shop-Formal-Basic": {
@@ -4546,7 +4546,7 @@
    "english": "OK, your turn! Your topic is living in the city or in the country. Go ahead."
   },
   "ru-en-shop-Formal-Basic": {
-   "reply": "Доброе утро! Что вы хотите?",
+   "reply": "Доброе утро! Что желаете?",
    "english": "Good morning! What would you like?"
   },
   "ru-en-shop-Casual-Basic": {
@@ -5338,7 +5338,7 @@
    "english": "Hi. How can I help?"
   },
   "sr-en-story-Formal-Independent": {
-   "reply": "Ima li vremena kako se nismo videli! Šta vam se dešavalo u poslednje vreme?",
+   "reply": "Koliko se dugo nismo videli! Šta vam se dešavalo u poslednje vreme?",
    "english": "It's been such a long time! So, what has happened to you lately?"
   },
   "sr-en-story-Casual-Independent": {
@@ -5594,7 +5594,7 @@
    "english": "Hi. How can I help?"
   },
   "sv-en-story-Formal-Independent": {
-   "reply": "Det var så länge sedan! Nå, vad har hänt er på sistone?",
+   "reply": "Det var så länge sedan! Nå, vad har hänt med er på sistone?",
    "english": "It's been such a long time! So, what has happened to you lately?"
   },
   "sv-en-story-Casual-Independent": {
