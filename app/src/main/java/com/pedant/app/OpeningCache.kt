@@ -16,8 +16,9 @@ data class Opening(val reply: String, val english: String?)
  * Gemma's opening line for each language and scenario, with Piper's audio of it, so a new
  * conversation can start without waiting for Gemma. The same choices always open the same way.
  *
- * The openings for the built-in scenarios ship with the app (assets/openings.json, written by
- * tools/build_openings.py). Any other opening is written on the phone the first time and saved.
+ * The openings for English speakers ship with the app (assets/openings.json, written by Claude for
+ * each language, scenario, register and band). Any other opening is written on the phone the first
+ * time and saved.
  */
 class OpeningCache(parent: File, private val assets: AssetManager) {
 

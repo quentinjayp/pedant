@@ -4,8 +4,7 @@ import android.content.Context
 import org.json.JSONObject
 
 /**
- * Gemma's instructions, from assets/instructions.json. The same file is read by
- * tools/build_openings.py, which writes the openings that ship with the app, so the two can't drift.
+ * Gemma's instructions, from assets/instructions.json (also read by the evals, tools/evals.py).
  * Each takes the language being learned and the learner's own language ([own]).
  */
 object Instructions {

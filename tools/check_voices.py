@@ -35,7 +35,7 @@ for code, name, native, voice, _ in languages():
     tts = sherpa_onnx.OfflineTts(sherpa_onnx.OfflineTtsConfig(model=sherpa_onnx.OfflineTtsModelConfig(
         vits=sherpa_onnx.OfflineTtsVitsModelConfig(model=f"{d}/{voice}.onnx", tokens=f"{d}/tokens.txt", data_dir=f"{d}/espeak-ng-data"),
         num_threads=2)))
-    text = next((v["reply"] for k, v in openings.items() if k.startswith(f"{code}-Default-Formal-")), native)
+    text = next((v["reply"] for k, v in openings.items() if k.startswith(f"{code}-en-none-Formal-")), native)
     audio = tts.generate(text, sid=0, speed=1.0)
     samples = list(audio.samples)
     seconds = len(samples) / audio.sample_rate if audio.sample_rate else 0.0
