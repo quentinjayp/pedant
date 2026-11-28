@@ -74,22 +74,16 @@ class Tutor(context: Context, modelFile: File) {
             turns.clear()
             turns += kept
         }
-        // The instructions don't depend on formal or casual (each message carries it), so neither does this.
-        val key = "${language.code}|${own.code}|${scenario.id}|${band.name}|${kept.hashCode()}"
-        val base = ready?.takeIf { it.first == key }?.second ?: run {
-            ready?.second?.close()
-            ready = null
-            // Gemma reads the instructions (and what was said before) now, not on the first message.
-            engine.createConversation(
-                ConversationConfig(
-                    systemInstruction = Contents.of(Instructions.system(language, scenario, own, band)),
-                    initialMessages = kept.map { if (it.fromLearner) Message.user(it.text) else Message.model(it.text) },
-                    samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.7),
-                    prefillPrefaceOnInit = true,
-                ),
-            ).also { ready = key to it }
-        }
-        conversation = base.clone()
+        // Gemma reads the instructions (and what was said before) now, not on the first message. The
+        // conversation is used as it is, not copied, so no second copy of its memory is kept.
+        conversation = engine.createConversation(
+            ConversationConfig(
+                systemInstruction = Contents.of(Instructions.system(language, scenario, own, band)),
+                initialMessages = kept.map { if (it.fromLearner) Message.user(it.text) else Message.model(it.text) },
+                samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.7),
+                prefillPrefaceOnInit = true,
+            ),
+        )
     }
 
     /** The most recent [turns] that fit Gemma's memory, starting with one of the learner's. */
@@ -101,12 +95,6 @@ class Tutor(context: Context, modelFile: File) {
 
     /** Gemma's answer reduced to its reply in the language being learned. */
     private fun compact(raw: String): String = "REPLY: ${parse(raw).reply}"
-
-    /**
-     * The last conversation's start, with the instructions already read, kept so starting the same
-     * choices again skips that step. Only one is kept: each holds memory.
-     */
-    private var ready: Pair<String, Conversation>? = null
 
     /**
      * Streams the tutor's raw answer to [userText] as it is generated (cumulative text). Once the
@@ -134,8 +122,29 @@ class Tutor(context: Context, modelFile: File) {
      * Translates what the learner wants to say, in its own short conversation so the main one only
      * ever holds the language being learned. [onText] gets the answer as it is written.
      */
-    suspend fun translate(language: Language, register: Register, said: String, onText: (String) -> Unit): String =
-        ask(Instructions.translate(language, register, own, band), said, onText)
+    suspend fun translate(language: Language, register: Register, said: String, onText: (String) -> Unit): String {
+        val instruction = Instructions.translate(language, register, own, band)
+        return askIn(said, onText) { translation(instruction).clone() }
+    }
+
+    /**
+     * The translation instructions, already read by Gemma, copied for each translation so it doesn't
+     * read them again each time (they're long, with their examples). One is kept: a new language,
+     * register or band replaces it.
+     */
+    private var translating: Pair<String, Conversation>? = null
+
+    @Synchronized
+    private fun translation(instruction: String): Conversation =
+        translating?.takeIf { it.first == instruction }?.second ?: run {
+            translating?.second?.close()
+            engine.createConversation(oneOff(instruction, prefill = true)).also { translating = instruction to it }
+        }
+
+    /** Has Gemma read the translation instructions ahead, so the first translation doesn't wait for them. */
+    fun prepareTranslation(language: Language, register: Register) {
+        translation(Instructions.translate(language, register, own, band))
+    }
 
     /**
      * Translates Gemma's [reply] into the learner's own language, in its own short conversation: the
@@ -180,18 +189,22 @@ class Tutor(context: Context, modelFile: File) {
      * Asks a one-off question in its own short conversation, so the main one is left untouched.
      * Stops early if the coroutine is cancelled.
      */
-    private suspend fun ask(instruction: String, question: String, onText: (String) -> Unit = {}): String {
+    private suspend fun ask(instruction: String, question: String, onText: (String) -> Unit = {}): String =
+        askIn(question, onText) { engine.createConversation(oneOff(instruction)) }
+
+    /** A one-off conversation's setup: [instruction], always the likeliest next word, read now if [prefill]. */
+    private fun oneOff(instruction: String, prefill: Boolean = false) = ConversationConfig(
+        systemInstruction = Contents.of(instruction),
+        samplerConfig = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0),
+        prefillPrefaceOnInit = prefill,
+    )
+
+    /** Asks [question] in the one-off conversation [make] sets up, which is closed afterwards. */
+    private suspend fun askIn(question: String, onText: (String) -> Unit = {}, make: () -> Conversation): String {
         // Setting up and closing a conversation reserves and frees memory, which can take seconds when
         // the phone is short of it, so neither is done on the main thread, where it would hold up the
         // screen and touches (the talk button). Not cancellable, so a conversation made is always closed.
-        val conv = withContext(NonCancellable + Dispatchers.Default) {
-            engine.createConversation(
-                ConversationConfig(
-                    systemInstruction = Contents.of(instruction),
-                    samplerConfig = SamplerConfig(topK = 1, topP = 1.0, temperature = 0.0),
-                ),
-            )
-        }
+        val conv = withContext(NonCancellable + Dispatchers.Default) { make() }
         lookupConversation = conv
         try {
             currentCoroutineContext().ensureActive()
@@ -222,7 +235,7 @@ class Tutor(context: Context, modelFile: File) {
 
     fun close() {
         conversation?.close()
-        ready?.second?.close()
+        translating?.second?.close()
         engine.close()
     }
 

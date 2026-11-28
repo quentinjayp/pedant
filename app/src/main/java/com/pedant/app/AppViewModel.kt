@@ -655,6 +655,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             }
                             checkNotNull(tutor).startConversation(lang, scenario, own, band, earlier)
                             diagnostics.log("Gemma ready for the ${lang.englishName} session")
+                            // The learner's lines are translated (not in Free talk): Gemma reads how,
+                            // once, now, so the first translation doesn't wait for it.
+                            if (mode != Mode.FreeTalk) {
+                                runCatching { checkNotNull(tutor).prepareTranslation(lang, register) }
+                                    .onFailure { diagnostics.log("Couldn't prepare translating: ${it.message}") }
+                            }
                         }
                         loadVoice(lang, voice)
                         when (start) {

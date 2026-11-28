@@ -29,6 +29,9 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
 - **Memory:**
   - The speech recognizer loads only while the learner talks.
   - ZIPA is released after long audio.
+  - Gemma keeps no spare copy of the conversation: it used to keep the conversation's start, so starting the same choices again was faster.
+  - Gemma keeps the translation instructions read, once, and copies them for each translation, so it doesn't read them (and their examples) again each time. Not in Free talk, which doesn't translate.
+  - Gemma's working memory stays at 2,048 tokens.
 - **Rejected:** Gemini Nano. It can't be tested without a supported phone or measured in CI.
 - **In the evals:**
   - Qwen3.5-4B and Ministral 3 3B were removed.
