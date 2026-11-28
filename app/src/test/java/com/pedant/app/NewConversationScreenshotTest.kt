@@ -43,7 +43,10 @@ class NewConversationScreenshotTest {
         return vm
     }
 
-    private fun capture(name: String) = captureScreenRoboImage("build/outputs/roborazzi/new-conversation/$name.png")
+    private fun capture(name: String) {
+        compose.waitForIdle()
+        captureScreenRoboImage("build/outputs/roborazzi/new-conversation/$name.png")
+    }
 
     @Test
     fun noLanguage() {
