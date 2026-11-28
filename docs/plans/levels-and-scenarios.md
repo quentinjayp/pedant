@@ -182,7 +182,7 @@ Investigation only. Output: `docs/research/bands.md`.
     Start); the Scenario dropdown changes to No Scenario, Random, 2 Card and the band's list, and 2
     Card shows its two cards. This changes `LanguageScreen` in `MainActivity.kt` and `startSession`
     in `AppViewModel.kt`.
-14. **Openings.** **Done.** Written by Claude in a session: 1,600, for each scenario, band, register
+14. **Openings.** **Done.** Written by Claude in a session: 1,600, now 1,312 without the disabled languages and bands, for each scenario, band, register
     and language, in `assets/openings.json`, named language-own-scenario-register-band. They replace
     the openings E4B wrote in CI (`tools/build_openings.py` and `.github/workflows/openings.yml` are
     removed). They no longer change name when the instructions change: a scenario whose role changes
