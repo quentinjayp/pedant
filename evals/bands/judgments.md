@@ -24,7 +24,7 @@ What was judged, from docs/research/bands.md and each scenario in scenarios.json
 | Repeating more simply when asked (Basic) | 5 of 8 (Czech, English, Hindi, Norwegian, Ukrainian) | Finnish (a sentence that means nothing), Slovak (didn't repeat, said "What I want to say:"), Serbian (asked the same wrong question again) |
 | Role and setting | 48 of 50 | Hungarian Basic (the friend on the train said they were at the station waiting), Czech Independent (the neighbour talked of asking "the neighbour") |
 | Understanding the learner | 49 of 50 | Turkish Basic (asked "Are you from America?" after the learner said they were Canadian) |
-| Register | 44 of 50 | Formal became casual (tu) in Spanish, Italian, Romanian and Polish Basic; casual became formal (आप, Ви) in Hindi and Ukrainian Independent |
+| Register | 44 of 50 | Formal became casual (tú, tu, Ty) in Spanish and Italian Independent and Romanian and Polish Basic; casual became formal (आप, Ви) in Hindi and Ukrainian Independent |
 | Correct language | about 35 of 50 | see below |
 
 **Level:** Gemma held both bands in every language. Basic replies were one or two short sentences
