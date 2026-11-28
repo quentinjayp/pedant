@@ -198,7 +198,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * A new conversation takes it; one under way keeps the own language it started with ([own]).
      */
     var ownSetting by mutableStateOf(
-        LANGUAGES.firstOrNull { it.code == uiPrefs.getString("ownLanguage", DEFAULT_OWN) } ?: LANGUAGES.first { it.code == DEFAULT_OWN },
+        LANGUAGES.firstOrNull { it.code == uiPrefs.getString("ownLanguage", DEFAULT_OWN) && it.ownOffered }
+            ?: LANGUAGES.first { it.code == DEFAULT_OWN },
     )
         private set
 

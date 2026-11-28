@@ -1,5 +1,5 @@
 {
-  "_about": "The languages the app can hold a conversation in: those supported by Gemma 4, Omnilingual ASR, ZIPA and Piper together. Read by the app (Languages.kt) and by the tools (tools/app_languages.py). piperVoice is the voice that speaks the language; espeakVoice is the espeak-ng voice it reads text with (its .onnx.json's espeak.voice); ttsRewrites fix text espeak-ng misreads, applied before it reads any. articles are the articles a singular noun takes, one per gender, for the quiz's article question (only for languages whose articles show a noun's gender). finalConsonants marks a language that drops most final consonants by rules a learner has to know (French), for the quiz's said-or-silent question. capitalNouns marks a language whose nouns are written with a capital wherever they are (German), so the quiz doesn't lower-case a sentence's first word. Arabic was removed: it's written without most vowels, so its expected sounds (espeak-ng's) are often guesses, and the app teaches and judges by sounds. Mandarin and Vietnamese were removed: their tones are part of saying a word right, and the app doesn't hear pitch, so it can't tell when a tone is wrong. bands lists the bands the language is offered at, to learn; without it, every band. Slovak, Slovenian, Hungarian and Romanian are offered at none, and Czech only at Basic: in the band evals (evals/bands/judgments.md) Gemma wrote them with errors in nearly every reply. They stay here for saved conversations.",
+  "_about": "The languages the app can hold a conversation in: those supported by Gemma 4, Omnilingual ASR, ZIPA and Piper together. Read by the app (Languages.kt) and by the tools (tools/app_languages.py). piperVoice is the voice that speaks the language; espeakVoice is the espeak-ng voice it reads text with (its .onnx.json's espeak.voice); ttsRewrites fix text espeak-ng misreads, applied before it reads any. articles are the articles a singular noun takes, one per gender, for the quiz's article question (only for languages whose articles show a noun's gender). finalConsonants marks a language that drops most final consonants by rules a learner has to know (French), for the quiz's said-or-silent question. capitalNouns marks a language whose nouns are written with a capital wherever they are (German), so the quiz doesn't lower-case a sentence's first word. Arabic was removed: it's written without most vowels, so its expected sounds (espeak-ng's) are often guesses, and the app teaches and judges by sounds. Mandarin and Vietnamese were removed: their tones are part of saying a word right, and the app doesn't hear pitch, so it can't tell when a tone is wrong. bands lists the bands the language is offered at, to learn; without it, every band. Slovak, Slovenian, Hungarian and Romanian are offered at none, and Czech only at Basic: in the band evals (evals/bands/judgments.md) Gemma wrote them with errors in nearly every reply. They stay here for saved conversations. own false marks a language not offered as the learner's own (Gemma would write its translations and notes in it): the same five, Czech included, since translations and notes run as long as Independent's replies.",
   "languages": [
     {
       "code": "cs",
@@ -9,7 +9,8 @@
       "espeakVoice": "cs",
       "bands": [
         "Basic"
-      ]
+      ],
+      "own": false
     },
     {
       "code": "da",
@@ -104,7 +105,8 @@
       "nativeName": "Magyar",
       "piperVoice": "hu_HU-anna-medium",
       "espeakVoice": "hu",
-      "bands": []
+      "bands": [],
+      "own": false
     },
     {
       "code": "id",
@@ -175,7 +177,8 @@
         "o"
       ],
       "espeakVoice": "ro",
-      "bands": []
+      "bands": [],
+      "own": false
     },
     {
       "code": "ru",
@@ -190,7 +193,8 @@
       "nativeName": "Slovenčina",
       "piperVoice": "sk_SK-lili-medium",
       "espeakVoice": "sk",
-      "bands": []
+      "bands": [],
+      "own": false
     },
     {
       "code": "sl",
@@ -198,7 +202,8 @@
       "nativeName": "Slovenščina",
       "piperVoice": "sl_SI-artur-medium",
       "espeakVoice": "sl",
-      "bands": []
+      "bands": [],
+      "own": false
     },
     {
       "code": "sr",

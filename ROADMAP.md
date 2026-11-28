@@ -44,7 +44,7 @@ separate from the language level (see Levels and scenarios), and every mode work
   tone was wrong.
 
 - **Investigate bringing back Slovak, Slovenian, Hungarian and Romanian, and Czech at Independent.**
-  Disabled as languages to learn after the band evals (evals/bands/judgments.md): Gemma E4B held the
+  Disabled as languages to learn, and all five as own languages, after the band evals (evals/bands/judgments.md): Gemma E4B held the
   bands and scenarios in them, but wrote them with errors in nearly every reply (made-up words,
   broken grammar, Croatian words in Slovenian). Whether another model, or a later Gemma, writes them
   well enough.

@@ -26,6 +26,8 @@ data class Language(
     val capitalNouns: Boolean = false,
     /** The bands it's offered at, to learn: none for a language Gemma writes too poorly (languages.json). */
     val bands: Set<Band> = Band.entries.toSet(),
+    /** Whether it's offered as the learner's own language (languages.json's own). */
+    val ownOffered: Boolean = true,
 ) {
     /** The language's English name after "a" or "an", as Gemma's instructions put it ("an English", "a French"). */
     val withArticle: String get() = (if (englishName.first() in "AEIO") "an " else "a ") + englishName
@@ -68,6 +70,7 @@ fun loadLanguages(context: Context) {
             bands = o.optJSONArray("bands")?.let { a ->
                 (0 until a.length()).mapNotNull { i -> Band.entries.firstOrNull { it.name == a.getString(i) } }.toSet()
             } ?: Band.entries.toSet(),
+            ownOffered = o.optBoolean("own", true),
         )
     }
 }

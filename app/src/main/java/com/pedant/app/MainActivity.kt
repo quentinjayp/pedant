@@ -638,7 +638,7 @@ private fun OwnLanguageSetting(vm: AppViewModel) {
     }
     if (choosing) {
         PopupCard("Your language", onClose = { choosing = false }, closeStyle = PillStyle.Outline) {
-            LANGUAGES.forEach { lang ->
+            LANGUAGES.filter { it.ownOffered }.forEach { lang ->
                 val chosen = lang == vm.ownSetting
                 Row(
                     Modifier
