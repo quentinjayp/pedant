@@ -1,8 +1,9 @@
 name: Evals
 
 # Compares models at the app's translation step (tools/evals.py): each model in evals/models.json
-# translates the same English sentences into the app's languages, told what the app tells Gemma,
-# and the results are scored against translations made by people. It reports only (a table in the
+# translates the same English sentences into the app's languages at each band (Basic and
+# Independent), told what the app tells Gemma, and the results are scored against translations made
+# by people, with the words per translation as a measure of simplicity. It reports only (a table in the
 # run's summary, and promptfoo's side-by-side report to download) and never blocks a build.
 # Runs on demand, or on a push whose commit message contains [evals]. A job that fails never
 # marks the run as failed. Run on demand with an earlier
@@ -36,7 +37,9 @@ jobs:
           python3 - >> "$GITHUB_OUTPUT" <<'PY'
           import json
           models = json.load(open("evals/models.json", encoding="utf-8"))["models"]
-          include = [{"name": m["name"], "repo": m["repo"], "file": m["file"]} for m in models]
+          # Each model at each band (tools/evals.py's BANDS).
+          include = [{"name": m["name"], "repo": m["repo"], "file": m["file"], "band": b}
+                     for m in models for b in ("Basic", "Independent")]
           print("matrix=" + json.dumps({"include": include}))
           PY
 
@@ -49,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.models.outputs.matrix) }}
-    name: translate (${{ matrix.name }})
+    name: translate (${{ matrix.name }}, ${{ matrix.band }})
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -65,7 +68,7 @@ jobs:
       - name: Download the model
         run: curl -fsSL --retry 3 -o "${{ matrix.file }}" "https://huggingface.co/${{ matrix.repo }}/resolve/main/${{ matrix.file }}" && ls -l "${{ matrix.file }}"
       - name: Translate
-        run: python3 tools/evals.py translate --model "${{ matrix.file }}" --name "${{ matrix.name }}" --out outputs/translations.json
+        run: python3 tools/evals.py translate --model "${{ matrix.file }}" --name "${{ matrix.name }}" --band "${{ matrix.band }}" --out outputs/translations.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

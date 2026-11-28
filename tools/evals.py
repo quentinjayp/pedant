@@ -12,7 +12,7 @@ Two kinds of run:
   are filled in with the own language, as the app does.
 
     python3 tools/evals.py references <fleurs dir>            # writes evals/references.json
-    python3 tools/evals.py translate --model m.litertlm --name NAME [--own fr] --out outputs/NAME.json
+    python3 tools/evals.py translate --model m.litertlm --name NAME [--own fr] [--band Independent] --out outputs/NAME.json
     python3 tools/evals.py config <outputs dir> <work dir>     # writes promptfoo's config and tests
     python3 tools/evals.py summary <outputs dir>               # tables of scores, as Markdown
 
@@ -23,6 +23,10 @@ The sentences are in evals/references.json (from FLEURS, Google's read-aloud rec
 FLORES sentences, CC-BY 4.0: the text people translated and read) and evals/own_phrases.json
 (written by hand; the same shape). The models compared are in evals/models.json. The Evals
 workflow runs all of this and never blocks a build; promptfoo makes the side-by-side report.
+
+Each run translates at one band (Basic unless --band says otherwise), told what the app tells Gemma
+at that band; a model's column in the report is named with its band ("Gemma 4 E4B · Basic"). Beside
+the scores, the report gives each column's words per translation, as a measure of simplicity.
 
 Scores are chrF (0 to 100): how many of the reference translation's runs of letters the model's
 translation shares. It suits languages with many word endings, and Chinese, better than counting
@@ -95,14 +99,30 @@ def jobs(own):
     return out
 
 
-def instruction(ins, kind, source, target):
-    """What the app tells Gemma for a translation from [source] into [target] (codes)."""
+BANDS = ("Basic", "Independent")
+
+
+def instruction(ins, kind, source, target, band="Basic"):
+    """What the app tells Gemma for a translation from [source] into [target] (codes) at [band]."""
     n = names()
     own = source if kind == "line" else target
     learned = target if kind == "line" else source
     text = ins["translate"] if kind == "line" else ins["replyTranslate"]
-    # Translations are evaluated at the Basic band until the evals measure each band.
-    return fill(with_band(ins, text, "Basic"), n[learned], n[own]).replace("{register}", "formal")
+    return fill(with_band(ins, text, band), n[learned], n[own]).replace("{register}", "formal")
+
+
+def column(name, band):
+    """A model's column in the report, at [band]."""
+    return f"{name} · {band}"
+
+
+def columns(outputs):
+    """The report's columns that have translations: each model of evals/models.json at each band, in
+    order (and a model's plain name, for runs from before the bands)."""
+    out = []
+    for m in json.load(open(MODELS, encoding="utf-8"))["models"]:
+        out += [c for c in [m["name"]] + [column(m["name"], b) for b in BANDS] if c in outputs]
+    return out
 
 
 def references(fleurs):
@@ -178,12 +198,12 @@ def translate(args):
     todo = [j for i, j in enumerate(jobs(args.own)) if i % args.shards == args.shard]
     if args.limit:
         todo = todo[:args.limit]
-    print(f"{args.name}, own language {args.own}: {len(todo)} translations", flush=True)
+    print(f"{args.name} at {args.band}, own language {args.own}: {len(todo)} translations", flush=True)
     outputs = {}
     ask, close = (gguf_asker if args.model.endswith(".gguf") else litert_asker)(args.model)
     try:
         for key, s, kind, source, target in todo:
-            system = instruction(ins, kind, source, target)
+            system = instruction(ins, kind, source, target, args.band)
             started = time.time()
             try:
                 raw = ask(system, text_in(s, source))
@@ -196,7 +216,7 @@ def translate(args):
     finally:
         close()
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
-    json.dump({"model": args.name, "outputs": outputs}, open(args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    json.dump({"model": column(args.name, args.band), "outputs": outputs}, open(args.out, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
 
 def load_outputs(folder):
@@ -219,8 +239,8 @@ def config(outputs_dir, work):
     merged = os.path.abspath(os.path.join(work, "outputs.json"))
     os.makedirs(work, exist_ok=True)
     outputs = load_outputs(outputs_dir)
-    # A column for each model that translated something in this run.
-    models = [m["name"] for m in json.load(open(MODELS, encoding="utf-8"))["models"] if m["name"] in outputs]
+    # A column for each model and band that translated something in this run.
+    models = columns(outputs)
     json.dump(outputs, open(merged, "w", encoding="utf-8"), ensure_ascii=False)
     n, by_id = names(), {s["id"]: s for s in sentences()}
     keys = sorted({k for found in outputs.values() for k in found})
@@ -250,7 +270,7 @@ def config(outputs_dir, work):
 
 
 def scored(outputs):
-    """Every translation's score: [(model, kind, from, to, chrF, seconds, whether it had its label)]."""
+    """Every translation's score: [(column, kind, from, to, chrF, seconds, whether it had its label, words)]."""
     by_id = {s["id"]: s for s in sentences()}
     rows = []
     for model, found in outputs.items():
@@ -261,7 +281,8 @@ def scored(outputs):
             if reference is None:
                 continue
             had_label = bool(labelled(out["raw"]) if kind == "line" else replied_labelled(out["raw"]))
-            rows.append((model, kind, source, target, score(answer(kind, out["raw"]), reference, target), out["seconds"], had_label))
+            got = answer(kind, out["raw"])
+            rows.append((model, kind, source, target, score(got, reference, target), out["seconds"], had_label, len(got.split())))
     return rows
 
 
@@ -273,7 +294,7 @@ def summary(outputs_dir):
     """Prints, as Markdown, each model's average scores: for English, by language learned; for the
     other own languages, by own language and kind, then by pair of languages."""
     outputs = load_outputs(outputs_dir)
-    models = [m["name"] for m in json.load(open(MODELS, encoding="utf-8"))["models"] if m["name"] in outputs]
+    models = columns(outputs)
     if not models:
         print("No translations to score.")
         return
@@ -291,6 +312,9 @@ def summary(outputs_dir):
         print("| **All languages** | " + " | ".join(f"**{mean([r[4] for r in english if r[0] == m])}**" for m in models) + " |")
         for code, name in targets():
             print(f"| {name} | " + " | ".join(mean([r[4] for r in english if r[0] == m and r[3] == code]) for m in models) + " |")
+        people = [len(t.split()) for s in sentences() for c, _ in targets() if (t := text_in(s, c))]
+        print(f"| Words per translation (fewer is simpler; people's translations: {mean(people)}) | "
+              + " | ".join(mean([r[7] for r in english if r[0] == m]) for m in models) + " |")
         print("| Seconds per translation (on the CI machine) | " + " | ".join(mean([r[5] for r in english if r[0] == m]) for m in models) + " |")
         print("| Answers without the SAY: label (the app takes the whole answer as the phrase) | "
               + " | ".join(str(sum(1 for r in english if r[0] == m and not r[6])) for m in models) + " |")
@@ -342,6 +366,7 @@ if __name__ == "__main__":
     t.add_argument("--shards", type=int, default=1)
     t.add_argument("--limit", type=int, default=0, help="only the first N translations, to try a model out")
     t.add_argument("--own", default="en", help="the learner's own language: en (as today), or another app language's code")
+    t.add_argument("--band", default="Basic", choices=BANDS, help="the band the app tells Gemma to translate at")
     c = sub.add_parser("config")
     c.add_argument("outputs")
     c.add_argument("work")

@@ -92,7 +92,10 @@ Investigation only. Output: `docs/research/bands.md`.
    - **The translation instructions** gained each band's guide, with five examples shown in English:
      at Basic, 16 of 20 at the level against 9, but a detail lost in 12 against 5.
    - **Gemma as judge failed** (see DECISIONS.md), so by 4b the CI eval keeps only what can be
-     counted. Not built yet: translating at both bands in CI, and the simplicity measures.
+     counted.
+   - **Done:** the Evals workflow translates with each model at both bands (`--band` in
+     `tools/evals.py`), and the report gives chrF and the words per translation for each. Not built:
+     a word-commonness measure (which frequency list is undecided).
 
 ## C. Foundations in the app
 
@@ -154,7 +157,7 @@ Investigation only. Output: `docs/research/bands.md`.
      15. Explaining how to do something.
    - **Left out until the app can do them:** a prepared talk (preparation time), an opinion on a
      short document (a text to read), describing a picture (pictures).
-9. **Scenarios in the app.** The band's list replaces `Scenario` (Scenarios.kt) and the `roles` in
+9. **Scenarios in the app.** **Done.** The band's list replaces `Scenario` (Scenarios.kt) and the `roles` in
    `instructions.json`. Gemma is given the scene with its setting for the language.
    - **Choosing:** the Scenario dropdown in New conversation: No Scenario, Random, 2 Card, then each
      of the band's scenarios by name. Random and 2 Card are drawn with the app's random numbers,
@@ -166,15 +169,16 @@ Investigation only. Output: `docs/research/bands.md`.
    - **Saving:** the scenario is saved with the conversation, for Continue and the quiz.
 10. **Gemma asks for the scene.** Dropped: replaced by each band's fixed scenarios.
 11. **Your own scenarios.** Dropped: replaced by each band's fixed scenarios.
-12. **No Scenario** in every band: no scene, today's Default with the band applied.
-13. **New conversation.** The page is already reworked (Level, Mode, Style, Scenario, Language,
+12. **No Scenario** in every band: **Done.** no scene, today's Default with the band applied.
+13. **New conversation.** **Done.** The page is already reworked (Level, Mode, Style, Scenario, Language,
     Start); the Scenario dropdown changes to No Scenario, Random, 2 Card and the band's list, and 2
     Card shows its two cards. This changes `LanguageScreen` in `MainActivity.kt` and `startSession`
     in `AppViewModel.kt`.
-14. **Openings.** Written ahead by Claude in a session, for each scenario, band, register and
-    language (about 1,500), and shipped. They replace the openings E4B writes in CI
-    (`tools/build_openings.py`, `.github/workflows/openings.yml`); how they're kept in step when the
-    instructions change is to be worked out.
+14. **Openings.** **Done.** Written by Claude in a session: 1,600, for each scenario, band, register
+    and language, in `assets/openings.json`, named language-own-scenario-register-band. They replace
+    the openings E4B wrote in CI (`tools/build_openings.py` and `.github/workflows/openings.yml` are
+    removed). They no longer change name when the instructions change: a scenario whose role changes
+    has its openings edited in the file.
 15. **Scenario evals.** Was: generated scenes checked for sense and level. With fixed scenarios, what
     to check is undecided.
 
@@ -182,3 +186,5 @@ Investigation only. Output: `docs/research/bands.md`.
 
 16. **Tests and docs.** Unit tests and screenshots for the new screens, like `QuizScreenshotTest`;
     DECISIONS.md and ROADMAP.md updated as decisions are made.
+    - **Done so far:** screenshots of New conversation (`NewConversationScreenshotTest`: no language,
+      a language chosen, the menus, 2 Card, one scenario), and the docs for each task.

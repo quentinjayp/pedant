@@ -69,11 +69,12 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   - A better whole-phrase score replaces the one in the conversation.
   - Getting a failed phrase right there closes the window and marks the phrase as right.
   - Only the latest try keeps its recording.
-- **Formal / Casual:** a per-conversation setting, in the conversation settings (the gear). Casual has its own opening, written by E4B.
+- **Formal / Casual:** a per-conversation setting, in the conversation settings (the gear). Casual has its own opening.
 - **How the phrase is given:** voice and text, voice only, or text only (never neither), set in the conversation settings.
-- **Scenarios:** Default plus five role-plays.
-  - The role-plays: asking for recommendations, coffee with a friend, a first date at a restaurant, the bus stop, the airport.
-  - Each opens with the same line every time. The openings are written ahead by E4B and ship with the app.
+- **Scenarios:** each band's own (see Levels and scenarios), or No Scenario.
+  - The chosen scenario's card is above the conversation: its title and where it takes place, opening to the situation and what the learner does.
+  - Each opens with the same line every time. For English speakers the openings ship with the app (written by Claude); for other own languages Gemma writes one on the phone the first time and it's saved.
+  - The five scenarios from before the bands (recommendations, coffee, first date, bus stop, airport) are retired, kept so a conversation saved with one can be continued.
   - Gemma's own limits apply to content; no extra restrictions are added.
 - **Gemma's memory:** the main conversation holds only the language being learned. Translations are separate one-off steps, made when needed.
 - **Your own line:** while its phrase is being practised, it can be edited or deleted from its three-dot menu (no long press).
@@ -184,7 +185,7 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   - **Tested in French** (the 20 eval sentences, judged by Claude in a session): at Basic, 16 of 20 translations were at the level with the examples, against 9 without. But a detail was lost in 12 of 20, against 5 without, even though the instructions say not to leave anything out.
   - **French examples** did no better than the English ones. Telling Gemma to say it "as simply as you would explain it to a child, but as an adult speaking to adults" added little, with or without the examples.
 - **Gemma isn't the judge of translations at a band.** Gemma E4B judged the same French translations as Claude, against the same criteria from the CEFR descriptors, with and without examples of judgments. It missed most of the meaning lost and the unnatural French that Claude found, marked Basic translations down for what A1–A2 allows (the passé composé), and sometimes judged the English instead of the French.
-- **Openings:** the shipped openings are written for each band.
+- **Openings:** the shipped openings are written for each band, by Claude (see the scenarios below).
 - **One set of task shapes per band, for every language.** The conversation tasks for each band come
   from the oral exams' shapes, generalised once and applied to every language, not taken from each
   language's own exam. Only the setting of each scene differs by language. See
@@ -210,6 +211,7 @@ The decisions made about Pedant, grouped by area. Ideas not yet built are in [RO
   - The environment's hook asking for the Anthropic address is ignored.
 - **Builds:** GitHub Actions builds the APK and publishes it as a release. https://github.com/quentinjayp/pedant/releases/latest/download/pedant.apk is always the latest.
 - **Evals:** translation evals run as non-blocking CI jobs and never mark a run as failed.
+  - Each model translates at both bands; the report gives chrF and the words per translation for each.
   - Scored against human reference translations (chrF), with a promptfoo report. Langfuse isn't used.
   - Cross-language evals cover own languages other than English.
 - **Quiz tests:** unit tests and screenshots of the quiz screens run as a non-blocking CI job, published on the "screenshots" pre-release.
