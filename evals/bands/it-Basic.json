@@ -1,0 +1,36 @@
+{
+ "language": "it",
+ "name": "Italian",
+ "band": "Basic",
+ "scenario": "invitations",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Ehi! Sabato è il mio compleanno. Vuoi venire alla mia festa?",
+   "english": "Hey! It's my birthday on Saturday. Do you want to come to my party?"
+  },
+  {
+   "learner": "Sì, grazie! Vengo volentieri. A che ora è la festa?",
+   "sent": "[SAID casual] Sì, grazie! Vengo volentieri. A che ora è la festa?",
+   "raw": "REPLY: La festa è alle otto di sera. Ti piace la pizza?",
+   "reply": "La festa è alle otto di sera. Ti piace la pizza?",
+   "seconds": 4.5
+  },
+  {
+   "learner": "Sì, mi piace molto! Porto qualcosa? Una torta?",
+   "sent": "[SAID casual] Sì, mi piace molto! Porto qualcosa? Una torta?",
+   "raw": "REPLY: No, non devi portare nulla! È tutto pronto. Sei stanco oggi?",
+   "reply": "No, non devi portare nulla! È tutto pronto. Sei stanco oggi?",
+   "seconds": 5.5
+  },
+  {
+   "learner": "Va bene. Sì, oggi sono stanco. Ho lavorato molto.",
+   "sent": "[SAID casual] Va bene. Sì, oggi sono stanco. Ho lavorato molto.",
+   "raw": "REPLY: Capisco. Lavoro anch'io. Il lavoro è difficile?",
+   "reply": "Capisco. Lavoro anch'io. Il lavoro è difficile?",
+   "seconds": 5.4
+  }
+ ]
+}

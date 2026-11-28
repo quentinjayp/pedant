@@ -1,0 +1,36 @@
+{
+ "language": "pl",
+ "name": "Polish",
+ "band": "Basic",
+ "scenario": "about-them",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Dzień dobry! Mam na imię Michał. Jestem tu nowy.",
+   "english": "Hello! I'm Michał. I'm new here."
+  },
+  {
+   "learner": "Dzień dobry! Skąd pan jest?",
+   "sent": "[SAID formal] Dzień dobry! Skąd pan jest?",
+   "raw": "REPLY: Jestem z Krakowa. A Ty?",
+   "reply": "Jestem z Krakowa. A Ty?",
+   "seconds": 4.5
+  },
+  {
+   "learner": "Ja jestem z Kanady. Co pan robi w Krakowie?",
+   "sent": "[SAID formal] Ja jestem z Kanady. Co pan robi w Krakowie?",
+   "raw": "REPLY: Pracuję w biurze. Mieszkam w małym mieszkaniu.",
+   "reply": "Pracuję w biurze. Mieszkam w małym mieszkaniu.",
+   "seconds": 5.8
+  },
+  {
+   "learner": "To dobrze. Lubisz Kraków? Ja lubię stare miasto.",
+   "sent": "[SAID formal] To dobrze. Lubisz Kraków? Ja lubię stare miasto.",
+   "raw": "REPLY: Tak, bardzo lubię. Lubię spacerować po mieście. A Ty co lubisz robić?",
+   "reply": "Tak, bardzo lubię. Lubię spacerować po mieście. A Ty co lubisz robić?",
+   "seconds": 6.3
+  }
+ ]
+}

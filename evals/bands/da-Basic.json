@@ -1,0 +1,36 @@
+{
+ "language": "da",
+ "name": "Danish",
+ "band": "Basic",
+ "scenario": "plan-together",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Har du hørt det? Mads er på hospitalet. Skal vi besøge ham?",
+   "english": "Did you hear? Mads is in hospital. Shall we go and see him?"
+  },
+  {
+   "learner": "Nej! Det er ikke godt. Ja, vi besøge ham. Hvornår?",
+   "sent": "[SAID casual] Nej! Det er ikke godt. Ja, vi besøge ham. Hvornår?",
+   "raw": "REPLY: Det er kedeligt. Jeg tror, tirsdag er godt. Skal vi tage toget?",
+   "reply": "Det er kedeligt. Jeg tror, tirsdag er godt. Skal vi tage toget?",
+   "seconds": 8.1
+  },
+  {
+   "learner": "Ja, tirsdag er godt. Toget er godt. Hvad skal vi købe til ham?",
+   "sent": "[SAID casual] Ja, tirsdag er godt. Toget er godt. Hvad skal vi købe til ham?",
+   "raw": "REPLY: En bog eller blomster er godt. Hvad vil du gerne købe?",
+   "reply": "En bog eller blomster er godt. Hvad vil du gerne købe?",
+   "seconds": 5.7
+  },
+  {
+   "learner": "Jeg køber blomster. Du køber en bog? Han kan lide krimi.",
+   "sent": "[SAID casual] Jeg køber blomster. Du køber en bog? Han kan lide krimi.",
+   "raw": "REPLY: Ja, jeg køber en bog. Skal vi købe den i centrum?",
+   "reply": "Ja, jeg køber en bog. Skal vi købe den i centrum?",
+   "seconds": 6.6
+  }
+ ]
+}

@@ -1,0 +1,36 @@
+{
+ "language": "en",
+ "name": "English",
+ "band": "Independent",
+ "scenario": "how-to",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "OK, I've got everything out. So how do we make this dish of yours?",
+   "english": "OK, I've got everything out. So how do we make this dish of yours?"
+  },
+  {
+   "learner": "Great! It's a stew my grandmother used to make. First you need beef, potatoes, carrots and an onion.",
+   "sent": "[SAID casual] Great! It's a stew my grandmother used to make. First you need beef, potatoes, carrots and an onion.",
+   "raw": "REPLY: Oh, that sounds lovely, and I've always wanted to try a proper stew! How much beef should we use for a pot like this, and what kind of cut of beef works best for a slow cook?",
+   "reply": "Oh, that sounds lovely, and I've always wanted to try a proper stew! How much beef should we use for a pot like this, and what kind of cut of beef works best for a slow cook?",
+   "seconds": 7.9
+  },
+  {
+   "learner": "About a kilo should be enough. You want a cheap cut, like chuck, because it gets really tender if you cook it slowly for two or three hours.",
+   "sent": "[SAID casual] About a kilo should be enough. You want a cheap cut, like chuck, because it gets really tender if you cook it slowly for two or three hours.",
+   "raw": "REPLY: Chuck sounds perfect for that kind of slow cooking. So, just to make sure I get this right, we need about a kilo of chuck beef, and we'll let it simmer in the pot for two or three hours until it's really tender, right?",
+   "reply": "Chuck sounds perfect for that kind of slow cooking. So, just to make sure I get this right, we need about a kilo of chuck beef, and we'll let it simmer in the pot for two or three hours until it's really tender, right?",
+   "seconds": 9.0
+  },
+  {
+   "learner": "Exactly. Then you add the vegetables about an hour before the end, otherwise they get too soft. What do you usually cook when you have friends over?",
+   "sent": "[SAID casual] Exactly. Then you add the vegetables about an hour before the end, otherwise they get too soft. What do you usually cook when you have friends over?",
+   "raw": "REPLY: That makes sense about the veggies so they don't get mushy! I usually just make some simple tacos when my friends come over, but I'm open to trying something new if it's easier to prep. Do you think I could make a smaller version of this stew for a few people?",
+   "reply": "That makes sense about the veggies so they don't get mushy! I usually just make some simple tacos when my friends come over, but I'm open to trying something new if it's easier to prep. Do you think I could make a smaller version of this stew for a few people?",
+   "seconds": 10.3
+  }
+ ]
+}

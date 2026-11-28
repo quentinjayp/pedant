@@ -1,0 +1,36 @@
+{
+ "language": "id",
+ "name": "Indonesian",
+ "band": "Independent",
+ "scenario": "choosing",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Jadi, kita dapat long weekend! Mau pergi ke mana?",
+   "english": "So, we've got a long weekend! Where shall we go?"
+  },
+  {
+   "learner": "Gimana kalau ke Bandung? Udaranya sejuk dan makanannya enak. Tapi aku dengar macetnya parah.",
+   "sent": "[SAID casual] Gimana kalau ke Bandung? Udaranya sejuk dan makanannya enak. Tapi aku dengar macetnya parah.",
+   "raw": "REPLY: Wah, Bandung itu ide bagus! Tapi iya, macetnya memang kadang bikin stres, apalagi kalau musim liburan. Selain Bandung, gimana kalau kita pertimbangkan Yogyakarta? Di sana budaya juga kental banget, dan mungkin lebih santai dari Bandung.",
+   "reply": "Wah, Bandung itu ide bagus! Tapi iya, macetnya memang kadang bikin stres, apalagi kalau musim liburan. Selain Bandung, gimana kalau kita pertimbangkan Yogyakarta? Di sana budaya juga kental banget, dan mungkin lebih santai dari Bandung.",
+   "seconds": 7.8
+  },
+  {
+   "learner": "Yogya juga oke, aku belum pernah ke sana. Tapi naik kereta ke sana berapa lama ya? Kalau terlalu jauh, mending Bandung aja.",
+   "sent": "[SAID casual] Yogya juga oke, aku belum pernah ke sana. Tapi naik kereta ke sana berapa lama ya? Kalau terlalu jauh, mending Bandung aja.",
+   "raw": "REPLY: Kereta ke Yogya sekitar tujuh sampai delapan jam, lumayan lama sih. Tapi kalau kita cari opsi lain, mungkin kita bisa ke Malang? Jaraknya lebih dekat, dan kita bisa cari penginapan yang bagus di sana. Gimana menurutmu, Malang atau Bandung?",
+   "reply": "Kereta ke Yogya sekitar tujuh sampai delapan jam, lumayan lama sih. Tapi kalau kita cari opsi lain, mungkin kita bisa ke Malang? Jaraknya lebih dekat, dan kita bisa cari penginapan yang bagus di sana. Gimana menurutmu, Malang atau Bandung?",
+   "seconds": 8.8
+  },
+  {
+   "learner": "Malang belum pernah juga sih. Tapi kalau tujuh jam ke Yogya, mending Bandung aja deh, cuma tiga jam. Kita nginap di mana enaknya?",
+   "sent": "[SAID casual] Malang belum pernah juga sih. Tapi kalau tujuh jam ke Yogya, mending Bandung aja deh, cuma tiga jam. Kita nginap di mana enaknya?",
+   "raw": "REPLY: Oke deh, kalau begitu Bandung jadi pilihan utama kita! Soal penginapan, aku tahu ada penginapan yang *cozy* di daerah Dago, namanya 'The Green Corner'. Bagaimana kalau kita coba cari yang di sana? Atau kamu punya rekomendasi lain?",
+   "reply": "Oke deh, kalau begitu Bandung jadi pilihan utama kita! Soal penginapan, aku tahu ada penginapan yang *cozy* di daerah Dago, namanya 'The Green Corner'. Bagaimana kalau kita coba cari yang di sana? Atau kamu punya rekomendasi lain?",
+   "seconds": 10.0
+  }
+ ]
+}

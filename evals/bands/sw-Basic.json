@@ -1,0 +1,36 @@
+{
+ "language": "sw",
+ "name": "Swahili",
+ "band": "Basic",
+ "scenario": "tickets",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Habari. Ungependa kwenda wapi?",
+   "english": "Hello. Where would you like to go?"
+  },
+  {
+   "learner": "Habari. Nataka kwenda Mombasa. Tiketi ni bei gani?",
+   "sent": "[SAID formal] Habari. Nataka kwenda Mombasa. Tiketi ni bei gani?",
+   "raw": "REPLY: Mombasa ni mbali sana. Kwa busi la jiji, unataka kwenda eneo gani?",
+   "reply": "Mombasa ni mbali sana. Kwa busi la jiji, unataka kwenda eneo gani?",
+   "seconds": 7.3
+  },
+  {
+   "learner": "Samahani, sielewi. Ninataka treni ya kwenda Mombasa. Tiketi ni bei gani?",
+   "sent": "[SAID formal] Samahani, sielewi. Ninataka treni ya kwenda Mombasa. Tiketi ni bei gani?",
+   "raw": "REPLY: Kwa bahati mbaya, hakuna treni hapa Dar es Salaam. Ungependa kwenda eneo dogo, kama vile Kariakoo au Posta?",
+   "reply": "Kwa bahati mbaya, hakuna treni hapa Dar es Salaam. Ungependa kwenda eneo dogo, kama vile Kariakoo au Posta?",
+   "seconds": 7.2
+  },
+  {
+   "learner": "Lakini niko Nairobi, kwenye stesheni ya SGR. Treni ya Mombasa inaondoka saa ngapi?",
+   "sent": "[SAID formal] Lakini niko Nairobi, kwenye stesheni ya SGR. Treni ya Mombasa inaondoka saa ngapi?",
+   "raw": "REPLY: Samahani, mimi ni katika stesheni ya busi hapa Dar es Salaam. Hapa tunapiga daladala tu. Unataka kwenda eneo gani jirani?",
+   "reply": "Samahani, mimi ni katika stesheni ya busi hapa Dar es Salaam. Hapa tunapiga daladala tu. Unataka kwenda eneo gani jirani?",
+   "seconds": 8.8
+  }
+ ]
+}

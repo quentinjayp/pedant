@@ -1,0 +1,36 @@
+{
+ "language": "de",
+ "name": "German",
+ "band": "Independent",
+ "scenario": "about-you",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Hi, freut mich, ich bin Anna! Erzähl mal ein bisschen von dir: Woher kommst du, und was machst du so?",
+   "english": "Hi, nice to meet you, I'm Anna! So tell me a bit about yourself: where are you from, and what do you do?"
+  },
+  {
+   "learner": "Hi Anna! Ich komme aus Kanada, aus Saskatoon. Ich arbeite als Krankenpfleger, aber gerade mache ich ein Jahr Pause und lerne Deutsch.",
+   "sent": "[SAID casual] Hi Anna! Ich komme aus Kanada, aus Saskatoon. Ich arbeite als Krankenpfleger, aber gerade mache ich ein Jahr Pause und lerne Deutsch.",
+   "raw": "REPLY: Wow, Kanada! Saskatoon, das klingt ja total weit weg von Berlin. Und Krankenpfleger, das ist ein wirklich wichtiger Job – das ist ja eine tolle Sache, dass du gerade Pause machst, um Deutsch zu lernen. Was hat dich denn dazu bewogen, in Deutschland zu bleiben?",
+   "reply": "Wow, Kanada! Saskatoon, das klingt ja total weit weg von Berlin. Und Krankenpfleger, das ist ein wirklich wichtiger Job – das ist ja eine tolle Sache, dass du gerade Pause machst, um Deutsch zu lernen. Was hat dich denn dazu bewogen, in Deutschland zu bleiben?",
+   "seconds": 11.7
+  },
+  {
+   "learner": "Ich bleibe nur ein Jahr. Meine Großmutter kam aus Deutschland, und ich wollte die Sprache endlich richtig lernen. Außerdem finde ich Berlin total spannend.",
+   "sent": "[SAID casual] Ich bleibe nur ein Jahr. Meine Großmutter kam aus Deutschland, und ich wollte die Sprache endlich richtig lernen. Außerdem finde ich Berlin total spannend.",
+   "raw": "REPLY: Ah, das ist ein toller Grund, das ist sehr nachvollziehbar! Ich kann verstehen, dass du die Sprache besser verstehen möchtest, wenn du eine Verbindung zur deutschen Sprache hast. Was genau findest du denn an Berlin so spannend? Gibt es einen bestimmten Ort oder eine Aktivität, die dir besonders gefällt?",
+   "reply": "Ah, das ist ein toller Grund, das ist sehr nachvollziehbar! Ich kann verstehen, dass du die Sprache besser verstehen möchtest, wenn du eine Verbindung zur deutschen Sprache hast. Was genau findest du denn an Berlin so spannend? Gibt es einen bestimmten Ort oder eine Aktivität, die dir besonders gefällt?",
+   "seconds": 10.4
+  },
+  {
+   "learner": "Ich liebe die Museen und die vielen kleinen Cafés in Kreuzberg. Aber was mir nicht so gefällt: Die Wohnungen sind sehr teuer. Wie findest du das Leben hier?",
+   "sent": "[SAID casual] Ich liebe die Museen und die vielen kleinen Cafés in Kreuzberg. Aber was mir nicht so gefällt: Die Wohnungen sind sehr teuer. Wie findest du das Leben hier?",
+   "raw": "REPLY: Kreuzberg ist wirklich ein cooler Stadtteil mit einer tollen Atmosphäre! Aber du hast recht, die Mieten sind hier mittlerweile echt unbezahlbar geworden, das ist ein riesiges Problem in Berlin. Ich finde es schwierig, eine Wohnung zu finden, die auch noch nicht zu einem Vermögen kostet. Wie sieht es denn mit deinem Alltag aus, wenn du hier wohnst?",
+   "reply": "Kreuzberg ist wirklich ein cooler Stadtteil mit einer tollen Atmosphäre! Aber du hast recht, die Mieten sind hier mittlerweile echt unbezahlbar geworden, das ist ein riesiges Problem in Berlin. Ich finde es schwierig, eine Wohnung zu finden, die auch noch nicht zu einem Vermögen kostet. Wie sieht es denn mit deinem Alltag aus, wenn du hier wohnst?",
+   "seconds": 11.6
+  }
+ ]
+}

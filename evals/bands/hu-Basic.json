@@ -1,0 +1,36 @@
+{
+ "language": "hu",
+ "name": "Hungarian",
+ "band": "Basic",
+ "scenario": "phone-friend",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Halló, én vagyok az! A vonaton ülök.",
+   "english": "Hi, it's me! I'm on the train."
+  },
+  {
+   "learner": "Szia! Hol vagy most? Mikor érkezel?",
+   "sent": "[SAID casual] Szia! Hol vagy most? Mikor érkezel?",
+   "raw": "REPLY: Pécsen vagyok, a pályaudvaron. Készen állok, de a vonatom késik.",
+   "reply": "Pécsen vagyok, a pályaudvaron. Készen állok, de a vonatom késik.",
+   "seconds": 6.1
+  },
+  {
+   "learner": "Jaj, késik? Mennyit késik? Én a pályaudvaron várlak.",
+   "sent": "[SAID casual] Jaj, késik? Mennyit késik? Én a pályaudvaron várlak.",
+   "raw": "REPLY: Hasonlóan, nem tudom pontosan. Nagy táskám van.",
+   "reply": "Hasonlóan, nem tudom pontosan. Nagy táskám van.",
+   "seconds": 6.2
+  },
+  {
+   "learner": "Nagy táskád van? Nem probléma. Én segítek. Melyik vágány?",
+   "sent": "[SAID casual] Nagy táskád van? Nem probléma. Én segítek. Melyik vágány?",
+   "raw": "REPLY: A 5-es vágány. Időig találkozunk ott.",
+   "reply": "A 5-es vágány. Időig találkozunk ott.",
+   "seconds": 6.3
+  }
+ ]
+}

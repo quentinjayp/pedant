@@ -1,0 +1,36 @@
+{
+ "language": "en",
+ "name": "English",
+ "band": "Basic",
+ "scenario": "doctor-appointment",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Doctor's surgery, good morning. How can I help you?",
+   "english": "Doctor's surgery, good morning. How can I help you?"
+  },
+  {
+   "learner": "Hello. My name is Sam. I am sick. I have a fever and my head hurts.",
+   "sent": "[SAID formal] Hello. My name is Sam. I am sick. I have a fever and my head hurts.",
+   "raw": "REPLY: Hello Sam. I am sorry to hear that. When are you free to come in?",
+   "reply": "Hello Sam. I am sorry to hear that. When are you free to come in?",
+   "seconds": 5.3
+  },
+  {
+   "learner": "Sorry, I don't understand. Can you say it again, slowly?",
+   "sent": "[SAID formal] Sorry, I don't understand. Can you say it again, slowly?",
+   "raw": "REPLY: No problem. Are you free this morning or tomorrow?",
+   "reply": "No problem. Are you free this morning or tomorrow?",
+   "seconds": 5.2
+  },
+  {
+   "learner": "Tomorrow is good. In the morning, please. What time?",
+   "sent": "[SAID formal] Tomorrow is good. In the morning, please. What time?",
+   "raw": "REPLY: How about 10 AM? That works well for us.",
+   "reply": "How about 10 AM? That works well for us.",
+   "seconds": 5.6
+  }
+ ]
+}

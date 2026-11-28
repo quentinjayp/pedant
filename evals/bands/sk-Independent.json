@@ -1,0 +1,36 @@
+{
+ "language": "sk",
+ "name": "Slovak",
+ "band": "Independent",
+ "scenario": "about-you",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Ahoj, teší ma, ja som Zuzana! Tak povedz niečo o sebe: odkiaľ si a čo robíš?",
+   "english": "Hi, nice to meet you, I'm Zuzana! So tell me a bit about yourself: where are you from, and what do you do?"
+  },
+  {
+   "learner": "Ahoj Zuzana! Som z Kanady, zo Saskatoonu. Pracujem ako učiteľka, ale teraz mám rok voľna a cestujem.",
+   "sent": "[SAID casual] Ahoj Zuzana! Som z Kanady, zo Saskatoonu. Pracujem ako učiteľka, ale teraz mám rok voľna a cestujem.",
+   "raw": "REPLY: Oh, Kanada! To je zatiaľ niečo, čo ma fascinuje. To je skvelá príležitosť, keď si máš rok voľna, hlavne, že cestuješ. Ak by si môchol/a povedať, aké typy miest alebo krajinou preferuješ, keď cestuješ?",
+   "reply": "Oh, Kanada! To je zatiaľ niečo, čo ma fascinuje. To je skvelá príležitosť, keď si máš rok voľna, hlavne, že cestuješ. Ak by si môchol/a povedať, aké typy miest alebo krajinou preferuješ, keď cestuješ?",
+   "seconds": 11.5
+  },
+  {
+   "learner": "Najradšej mám malé mestá a hory. Minulý mesiac som bola v Tatrách a bolo to úžasné, aj keď počasie nebolo veľmi dobré.",
+   "sent": "[SAID casual] Najradšej mám malé mestá a hory. Minulý mesiac som bola v Tatrách a bolo to úžasné, aj keď počasie nebolo veľmi dobré.",
+   "raw": "REPLY: Tatry sú skvelý výber, i keď počasie niebolo ideálne! Aj keď je počasie horú, atmosféra tam je vždy iná. Čo konkrétne v Tatrách robilaš, keď tam bolaš? Vyhľadávala si si niečo konkrétne, alebo len tak bežalaš?",
+   "reply": "Tatry sú skvelý výber, i keď počasie niebolo ideálne! Aj keď je počasie horú, atmosféra tam je vždy iná. Čo konkrétne v Tatrách robilaš, keď tam bolaš? Vyhľadávala si si niečo konkrétne, alebo len tak bežalaš?",
+   "seconds": 10.8
+  },
+  {
+   "learner": "Chodila som po horách a bola som na Štrbskom plese. A ty, kde rád trávíš dovolenku?",
+   "sent": "[SAID casual] Chodila som po horách a bola som na Štrbskom plese. A ty, kde rád trávíš dovolenku?",
+   "raw": "REPLY: Štrbsky Ples, to je pekné miesto! Ja mám rád kombináciu morského vzduchu a hor, takže na Slovensku najradšej chodím do Jizerných alebo na Liptovske hory. Čo by si radšej robila na dovolenke: len relaxovať a čítať, alebo si chcieš vždy nové výzvy?",
+   "reply": "Štrbsky Ples, to je pekné miesto! Ja mám rád kombináciu morského vzduchu a hor, takže na Slovensku najradšej chodím do Jizerných alebo na Liptovske hory. Čo by si radšej robila na dovolenke: len relaxovať a čítať, alebo si chcieš vždy nové výzvy?",
+   "seconds": 13.1
+  }
+ ]
+}

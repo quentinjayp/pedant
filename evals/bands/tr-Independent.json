@@ -1,0 +1,36 @@
+{
+ "language": "tr",
+ "name": "Turkish",
+ "band": "Independent",
+ "scenario": "present",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Evet, sıra sizde. Konunuz şehirde mi yoksa kırsalda mı yaşamak. Buyurun, başlayın.",
+   "english": "Right, it's your turn. Your topic is living in the city or in the country. Please go ahead."
+  },
+  {
+   "learner": "Teşekkür ederim. Ben hep şehirde yaşadım, ama bir yaz köyde dedemlerin yanında kaldım. Bence şehir daha pratik, ama köy daha sakin.",
+   "sent": "[SAID formal] Teşekkür ederim. Ben hep şehirde yaşadım, ama bir yaz köyde dedemlerin yanında kaldım. Bence şehir daha pratik, ama köy daha sakin.",
+   "raw": "REPLY: Bu ilginç bir denge. Şehirdeki pratiklik, ulaşım ve sosyal olanaklar kesinlikle büyük avantajlar sağlıyor. Peki, sizin için köyün o sakinliği, şehirdeki karmaşadan daha değerli mi? Benim fikrim ise, her iki yaşam tarzının da kendine göre avantajları olduğu yönünde.",
+   "reply": "Bu ilginç bir denge. Şehirdeki pratiklik, ulaşım ve sosyal olanaklar kesinlikle büyük avantajlar sağlıyor. Peki, sizin için köyün o sakinliği, şehirdeki karmaşadan daha değerli mi? Benim fikrim ise, her iki yaşam tarzının da kendine göre avantajları olduğu yönünde.",
+   "seconds": 12.0
+  },
+  {
+   "learner": "Evet, benim için sakinlik daha önemli. Ama şehirde iş bulmak daha kolay. Belki ileride, emekli olunca köyde yaşarım.",
+   "sent": "[SAID formal] Evet, benim için sakinlik daha önemli. Ama şehirde iş bulmak daha kolay. Belki ileride, emekli olunca köyde yaşarım.",
+   "raw": "REPLY: Anlıyorum, kariyer hayatında şehir şartlarını tercih etmek mantıklı bir karar. Emeklilik planınız ise oldukça güzel, huzurlu bir yaşam hayal ediyorsunuz galiba. Sizce şehir hayatının getirdiği stres, emeklilik döneminde köyde yaşamanın getireceği huzuru tamamen gölgede bırakır mı?",
+   "reply": "Anlıyorum, kariyer hayatında şehir şartlarını tercih etmek mantıklı bir karar. Emeklilik planınız ise oldukça güzel, huzurlu bir yaşam hayal ediyorsunuz galiba. Sizce şehir hayatının getirdiği stres, emeklilik döneminde köyde yaşamanın getireceği huzuru tamamen gölgede bırakır mı?",
+   "seconds": 10.1
+  },
+  {
+   "learner": "Bence hayır. Emekli olunca stres azalır. Siz nerede yaşamak isterdiniz, şehirde mi köyde mi?",
+   "sent": "[SAID formal] Bence hayır. Emekli olunca stres azalır. Siz nerede yaşamak isterdiniz, şehirde mi köyde mi?",
+   "raw": "REPLY: Ben de bu konuyu düşününce aslında biraz kararsız kalıyorum. İş hayatı gereği şehirde olsam da, hafta sonları mutlaka doğaya kaçıp sakinleşmem gerekiyor. Eğer seçmem gerekseydi, belki İzmir gibi hem şehir olanaklarına sahip hem de doğayla iç içe olabilen bir yer tercih ederdim.",
+   "reply": "Ben de bu konuyu düşününce aslında biraz kararsız kalıyorum. İş hayatı gereği şehirde olsam da, hafta sonları mutlaka doğaya kaçıp sakinleşmem gerekiyor. Eğer seçmem gerekseydi, belki İzmir gibi hem şehir olanaklarına sahip hem de doğayla iç içe olabilen bir yer tercih ederdim.",
+   "seconds": 12.3
+  }
+ ]
+}

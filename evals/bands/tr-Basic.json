@@ -1,0 +1,36 @@
+{
+ "language": "tr",
+ "name": "Turkish",
+ "band": "Basic",
+ "scenario": "about-you",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Selam, memnun oldum! Ben Elif. Senin adın ne?",
+   "english": "Hi, nice to meet you! I'm Elif. What's your name?"
+  },
+  {
+   "learner": "Merhaba Elif! Benim adım Sam. Ben Kanadalıyım.",
+   "sent": "[SAID casual] Merhaba Elif! Benim adım Sam. Ben Kanadalıyım.",
+   "raw": "REPLY: Hoş geldin Sam. Amerika'dan mısın?",
+   "reply": "Hoş geldin Sam. Amerika'dan mısın?",
+   "seconds": 6.1
+  },
+  {
+   "learner": "Hayır, Amerika değil. Kanada'dan geliyorum. Sen nerelisin?",
+   "sent": "[SAID casual] Hayır, Amerika değil. Kanada'dan geliyorum. Sen nerelisin?",
+   "raw": "REPLY: Ben İzmir'liyim. Senin Kanada'daki evinde misin şimdi?",
+   "reply": "Ben İzmir'liyim. Senin Kanada'daki evinde misin şimdi?",
+   "seconds": 5.5
+  },
+  {
+   "learner": "Hayır, Kanada'da değilim. Şimdi İzmir'deyim. İzmir çok güzel!",
+   "sent": "[SAID casual] Hayır, Kanada'da değilim. Şimdi İzmir'deyim. İzmir çok güzel!",
+   "raw": "REPLY: Evet, İzmir çok güzeldir. Burayı sevdin mi?",
+   "reply": "Evet, İzmir çok güzeldir. Burayı sevdin mi?",
+   "seconds": 5.8
+  }
+ ]
+}

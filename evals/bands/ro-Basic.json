@@ -1,0 +1,36 @@
+{
+ "language": "ro",
+ "name": "Romanian",
+ "band": "Basic",
+ "scenario": "none",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Sunteți gata să învățați limba română? Despre ce ați vrea să vorbim astăzi?",
+   "english": "Are you ready to learn some Romanian? What would you like to talk about today?"
+  },
+  {
+   "learner": "Da, sunt gata. Vreau să vorbim despre mâncare. Îmi place mâncarea românească.",
+   "sent": "[SAID formal] Da, sunt gata. Vreau să vorbim despre mâncare. Îmi place mâncarea românească.",
+   "raw": "REPLY: Mâncarea românească este foarte bună. Ce mâncare îți place cel mai mult?",
+   "reply": "Mâncarea românească este foarte bună. Ce mâncare îți place cel mai mult?",
+   "seconds": 6.4
+  },
+  {
+   "learner": "Îmi plac sarmalele. Și mămăliga. Dar nu știu să le fac.",
+   "sent": "[SAID formal] Îmi plac sarmalele. Și mămăliga. Dar nu știu să le fac.",
+   "raw": "REPLY: Sarmalele sunt delicioase! Dar tu îți place să mănânci în restaurant sau acasă?",
+   "reply": "Sarmalele sunt delicioase! Dar tu îți place să mănânci în restaurant sau acasă?",
+   "seconds": 6.0
+  },
+  {
+   "learner": "Acasă. Dar în restaurant e mai ușor. Ce restaurant îmi recomanzi?",
+   "sent": "[SAID formal] Acasă. Dar în restaurant e mai ușor. Ce restaurant îmi recomanzi?",
+   "raw": "REPLY: Îți recomand un restaurant numit \"Bucătăria Bunicii\". E foarte bun. Ce mai îți place să mănânci?",
+   "reply": "Îți recomand un restaurant numit \"Bucătăria Bunicii\". E foarte bun. Ce mai îți place să mănânci?",
+   "seconds": 6.6
+  }
+ ]
+}

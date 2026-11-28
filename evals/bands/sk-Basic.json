@@ -1,0 +1,36 @@
+{
+ "language": "sk",
+ "name": "Slovak",
+ "band": "Basic",
+ "scenario": "meet-up",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Dobrý deň! Chcete sa tento týždeň učiť spolu?",
+   "english": "Hello! Would you like to study together this week?"
+  },
+  {
+   "learner": "Dobrý deň! Áno, chcem. Môžeme v stredu?",
+   "sent": "[SAID formal] Dobrý deň! Áno, chcem. Môžeme v stredu?",
+   "raw": "REPLY: Streda je dobrá, ale mám len čas ráno. Kde sa môžeme stretnúť?",
+   "reply": "Streda je dobrá, ale mám len čas ráno. Kde sa môžeme stretnúť?",
+   "seconds": 5.3
+  },
+  {
+   "learner": "Prepáčte, nerozumiem. Môžete hovoriť pomaly?",
+   "sent": "[SAID formal] Prepáčte, nerozumiem. Môžete hovoriť pomaly?",
+   "raw": "REPLY: Čo chcem povedať: Môžeme sa stretnúť v knižnici na univerzite?",
+   "reply": "Čo chcem povedať: Môžeme sa stretnúť v knižnici na univerzite?",
+   "seconds": 5.8
+  },
+  {
+   "learner": "Áno, v knižnici je dobré. O desiatej?",
+   "sent": "[SAID formal] Áno, v knižnici je dobré. O desiatej?",
+   "raw": "REPLY: Desiatej je super! Aké túto stretnutie?",
+   "reply": "Desiatej je super! Aké túto stretnutie?",
+   "seconds": 5.7
+  }
+ ]
+}

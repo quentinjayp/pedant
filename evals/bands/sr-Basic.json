@@ -1,0 +1,36 @@
+{
+ "language": "sr",
+ "name": "Serbian",
+ "band": "Basic",
+ "scenario": "doctor-appointment",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Dom zdravlja, dobro jutro. Kako mogu da vam pomognem?",
+   "english": "Doctor's surgery, good morning. How can I help you?"
+  },
+  {
+   "learner": "Dobro jutro. Ja sam bolestan. Imam temperaturu. Mogu li doći danas?",
+   "sent": "[SAID formal] Dobro jutro. Ja sam bolestan. Imam temperaturu. Mogu li doći danas?",
+   "raw": "REPLY: Razumem. Kako vas zovem? I kakva je temperatura?",
+   "reply": "Razumem. Kako vas zovem? I kakva je temperatura?",
+   "seconds": 6.2
+  },
+  {
+   "learner": "Izvinite, ne razumem. Možete li ponoviti polako?",
+   "sent": "[SAID formal] Izvinite, ne razumem. Možete li ponoviti polako?",
+   "raw": "REPLY: Izvinite. Kako ste zvali? I imate li temperaturu?",
+   "reply": "Izvinite. Kako ste zvali? I imate li temperaturu?",
+   "seconds": 5.4
+  },
+  {
+   "learner": "Zovem se Sam. Da, imam temperaturu, trideset osam.",
+   "sent": "[SAID formal] Zovem se Sam. Da, imam temperaturu, trideset osam.",
+   "raw": "REPLY: Dobro jutro, Sam. Imamo termine sutra u 10 ili u 14. Koje Vam odgovara?",
+   "reply": "Dobro jutro, Sam. Imamo termine sutra u 10 ili u 14. Koje Vam odgovara?",
+   "seconds": 7.3
+  }
+ ]
+}

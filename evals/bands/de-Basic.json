@@ -1,0 +1,36 @@
+{
+ "language": "de",
+ "name": "German",
+ "band": "Basic",
+ "scenario": "meet-up",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Hallo! Möchten Sie diese Woche zusammen lernen?",
+   "english": "Hello! Would you like to study together this week?"
+  },
+  {
+   "learner": "Ja, gern! Wann haben Sie Zeit? Ich habe Zeit am Dienstag.",
+   "sent": "[SAID formal] Ja, gern! Wann haben Sie Zeit? Ich habe Zeit am Dienstag.",
+   "raw": "REPLY: Dienstag ist gut. Um wie viel Uhr? Wir können in der Mensa lernen.",
+   "reply": "Dienstag ist gut. Um wie viel Uhr? Wir können in der Mensa lernen.",
+   "seconds": 6.4
+  },
+  {
+   "learner": "Um zehn Uhr. Ist die Mensa groß? Ich weiß nicht, wo sie ist.",
+   "sent": "[SAID formal] Um zehn Uhr. Ist die Mensa groß? Ich weiß nicht, wo sie ist.",
+   "raw": "REPLY: Ja, die Mensa ist groß. Sie ist im Erdgeschoss. Kommen Sie um zehn Uhr?",
+   "reply": "Ja, die Mensa ist groß. Sie ist im Erdgeschoss. Kommen Sie um zehn Uhr?",
+   "seconds": 6.1
+  },
+  {
+   "learner": "Ja, ich komme um zehn. Ich bringe meine Bücher mit. Lernen wir Mathe?",
+   "sent": "[SAID formal] Ja, ich komme um zehn. Ich bringe meine Bücher mit. Lernen wir Mathe?",
+   "raw": "REPLY: Ja, das ist eine Idee! Ich habe auch Mathe. Wir können Mathe lernen.",
+   "reply": "Ja, das ist eine Idee! Ich habe auch Mathe. Wir können Mathe lernen.",
+   "seconds": 5.7
+  }
+ ]
+}

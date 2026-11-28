@@ -1,0 +1,36 @@
+{
+ "language": "fr",
+ "name": "French",
+ "band": "Basic",
+ "scenario": "about-you",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Salut, enchantée ! Moi, c'est Claire. Tu t'appelles comment ?",
+   "english": "Hi, nice to meet you! I'm Claire. What's your name?"
+  },
+  {
+   "learner": "Salut Claire ! Je m'appelle Sam. Je suis canadien.",
+   "sent": "[SAID casual] Salut Claire ! Je m'appelle Sam. Je suis canadien.",
+   "raw": "REPLY: Ah, super ! Tu habites où au Canada ?",
+   "reply": "Ah, super ! Tu habites où au Canada ?",
+   "seconds": 5.5
+  },
+  {
+   "learner": "J'habite à Saskatoon. C'est dans l'ouest. Il fait très froid en hiver !",
+   "sent": "[SAID casual] J'habite à Saskatoon. C'est dans l'ouest. Il fait très froid en hiver !",
+   "raw": "REPLY: Oui, je vois. J'aime le chaud. Tu aimes le froid ?",
+   "reply": "Oui, je vois. J'aime le chaud. Tu aimes le froid ?",
+   "seconds": 5.5
+  },
+  {
+   "learner": "Non, je n'aime pas le froid ! J'aime l'été. Et toi, tu habites à Lyon depuis longtemps ?",
+   "sent": "[SAID casual] Non, je n'aime pas le froid ! J'aime l'été. Et toi, tu habites à Lyon depuis longtemps ?",
+   "raw": "REPLY: Oui, j'habite ici depuis trois ans. J'aime Lyon, c'est une belle ville.",
+   "reply": "Oui, j'habite ici depuis trois ans. J'aime Lyon, c'est une belle ville.",
+   "seconds": 6.6
+  }
+ ]
+}

@@ -1,0 +1,36 @@
+{
+ "language": "fi",
+ "name": "Finnish",
+ "band": "Basic",
+ "scenario": "tickets",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Päivää. Minne haluaisitte mennä?",
+   "english": "Hello. Where would you like to go?"
+  },
+  {
+   "learner": "Päivää. Haluan mennä Kamppiin. Mikä lippu?",
+   "sent": "[SAID formal] Päivää. Haluan mennä Kamppiin. Mikä lippu?",
+   "raw": "REPLY: Kamppiin on helppo. Tarvitsette yhdensuuntaisen lipun. Haluatteko päivälippu?",
+   "reply": "Kamppiin on helppo. Tarvitsette yhdensuuntaisen lipun. Haluatteko päivälippu?",
+   "seconds": 6.6
+  },
+  {
+   "learner": "Anteeksi, en ymmärrä. Voitteko sanoa hitaasti?",
+   "sent": "[SAID formal] Anteeksi, en ymmärrä. Voitteko sanoa hitaasti?",
+   "raw": "REPLY: Päivälippu on kaikkia päiviä. Se on hyvä. Halutko päivälipun?",
+   "reply": "Päivälippu on kaikkia päiviä. Se on hyvä. Halutko päivälipun?",
+   "seconds": 6.2
+  },
+  {
+   "learner": "Ei, kertalippu riittää. Paljonko se maksaa?",
+   "sent": "[SAID formal] Ei, kertalippu riittää. Paljonko se maksaa?",
+   "raw": "REPLY: Kertalippu maksaa viisi euroa. Oletteko valmiina maksamaan?",
+   "reply": "Kertalippu maksaa viisi euroa. Oletteko valmiina maksamaan?",
+   "seconds": 5.7
+  }
+ ]
+}

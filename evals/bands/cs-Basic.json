@@ -1,0 +1,36 @@
+{
+ "language": "cs",
+ "name": "Czech",
+ "band": "Basic",
+ "scenario": "none",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Jste připraven(a) učit se česky? O čem byste si dnes chtěl(a) povídat?",
+   "english": "Are you ready to learn some Czech? What would you like to talk about today?"
+  },
+  {
+   "learner": "Ano, jsem připravená. Chci mluvit o moje rodina.",
+   "sent": "[SAID formal] Ano, jsem připravená. Chci mluvit o moje rodina.",
+   "raw": "REPLY: Skvěle. Máte nějakou rodinu v Česku?",
+   "reply": "Skvěle. Máte nějakou rodinu v Česku?",
+   "seconds": 127.3
+  },
+  {
+   "learner": "Promiňte, nerozumím. Můžete to říct pomalu?",
+   "sent": "[SAID formal] Promiňte, nerozumím. Můžete to říct pomalu?",
+   "raw": "REPLY: V pořádku. Máte rodinu v Česku?",
+   "reply": "V pořádku. Máte rodinu v Česku?",
+   "seconds": 5.4
+  },
+  {
+   "learner": "Ne, moje rodina je v Kanadě. Mám dva bratr a jedna sestra.",
+   "sent": "[SAID formal] Ne, moje rodina je v Kanadě. Mám dva bratr a jedna sestra.",
+   "raw": "REPLY: To je hezky. Jmenují se?",
+   "reply": "To je hezky. Jmenují se?",
+   "seconds": 5.6
+  }
+ ]
+}

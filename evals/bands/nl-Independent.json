@@ -1,0 +1,36 @@
+{
+ "language": "nl",
+ "name": "Dutch",
+ "band": "Independent",
+ "scenario": "film",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Dat was leuk! Zeg eens, wat is de beste film of het beste boek dat je de laatste tijd gezien of gelezen hebt?",
+   "english": "That was fun! So tell me, what's the best film or book you've enjoyed lately?"
+  },
+  {
+   "learner": "Ik heb onlangs een boek gelezen over een vrouw die alleen door Afrika fietst. Het was echt spannend, al was het einde een beetje teleurstellend.",
+   "sent": "[SAID casual] Ik heb onlangs een boek gelezen over een vrouw die alleen door Afrika fietst. Het was echt spannend, al was het einde een beetje teleurstellend.",
+   "raw": "REPLY: Oh, dat klinkt erg avontuurlijk! Wat vond je van de hoofdpersoon, de vrouw die door Afrika fietst? Ik vind het altijd zo interessant als iemand iets heel moois en tegelijkertijd zo ontzettend moeilijk doet.",
+   "reply": "Oh, dat klinkt erg avontuurlijk! Wat vond je van de hoofdpersoon, de vrouw die door Afrika fietst? Ik vind het altijd zo interessant als iemand iets heel moois en tegelijkertijd zo ontzettend moeilijk doet.",
+   "seconds": 7.9
+  },
+  {
+   "learner": "Ik vond haar heel moedig, maar soms ook een beetje roekeloos. Ze reisde zonder plan. Zou jij zoiets durven?",
+   "sent": "[SAID casual] Ik vond haar heel moedig, maar soms ook een beetje roekeloos. Ze reisde zonder plan. Zou jij zoiets durven?",
+   "raw": "REPLY: Ik denk dat ik dat zeker niet zou durven; ik ben een beetje te bang om de controle te verliezen! Maar ik kan me voorstellen dat het echt een enorme vrijheid is om zo te reizen. Wat voor soort boeken vind je in het algemeen het leukst om te lezen?",
+   "reply": "Ik denk dat ik dat zeker niet zou durven; ik ben een beetje te bang om de controle te verliezen! Maar ik kan me voorstellen dat het echt een enorme vrijheid is om zo te reizen. Wat voor soort boeken vind je in het algemeen het leukst om te lezen?",
+   "seconds": 9.3
+  },
+  {
+   "learner": "Vooral reisverhalen en detectives. En jij? Lees je liever fictie of non-fictie?",
+   "sent": "[SAID casual] Vooral reisverhalen en detectives. En jij? Lees je liever fictie of non-fictie?",
+   "raw": "REPLY: Ik lees meestal ook wel een beetje van beide, maar ik ben echt een fan van goede thrillers, dus detectives zijn precies wat ik zoek! Ik denk dat reisverhalen ook super boeiend zijn omdat je iets leert over andere culturen. Heb je al een nieuw reisverhaal gelezen?",
+   "reply": "Ik lees meestal ook wel een beetje van beide, maar ik ben echt een fan van goede thrillers, dus detectives zijn precies wat ik zoek! Ik denk dat reisverhalen ook super boeiend zijn omdat je iets leert over andere culturen. Heb je al een nieuw reisverhaal gelezen?",
+   "seconds": 10.4
+  }
+ ]
+}

@@ -1,0 +1,36 @@
+{
+ "language": "sw",
+ "name": "Swahili",
+ "band": "Independent",
+ "scenario": "job-interview",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Mambo, keti. Asante kwa kuja! Vipi uanze kwa kuniambia kidogo kukuhusu?",
+   "english": "Hi, have a seat. Thanks for coming! Why don't you start by telling me a bit about yourself?"
+  },
+  {
+   "learner": "Asante! Mimi ni Alex, natoka Kanada. Nimefanya kazi kwenye mapokezi ya hoteli kwa miaka miwili.",
+   "sent": "[SAID casual] Asante! Mimi ni Alex, natoka Kanada. Nimefanya kazi kwenye mapokezi ya hoteli kwa miaka miwili.",
+   "raw": "REPLY: Ah, Alex, furaha yangu kukufahamu! Miaka miwili ni uzoefu mzuri sana. Na lugha gani nyingine unazungumza zaidi ya Kiingereza?",
+   "reply": "Ah, Alex, furaha yangu kukufahamu! Miaka miwili ni uzoefu mzuri sana. Na lugha gani nyingine unazungumza zaidi ya Kiingereza?",
+   "seconds": 10.1
+  },
+  {
+   "learner": "Ninazungumza Kiingereza na Kifaransa kidogo. Pia ninajifunza Kiswahili sasa, kama unavyosikia!",
+   "sent": "[SAID casual] Ninazungumza Kiingereza na Kifaransa kidogo. Pia ninajifunza Kiswahili sasa, kama unavyosikia!",
+   "raw": "REPLY: Hiyo ni nzuri sana, Kifaransa pia ni faida kubwa hapa Diani! Kiswahili unakisoma haraka sana, na hiyo ni muhimu sana kwa kazi ya hapa. Unadhani unaweza kusaidia wageni kutoka nchi tofauti kwa kutumia lugha hizo?",
+   "reply": "Hiyo ni nzuri sana, Kifaransa pia ni faida kubwa hapa Diani! Kiswahili unakisoma haraka sana, na hiyo ni muhimu sana kwa kazi ya hapa. Unadhani unaweza kusaidia wageni kutoka nchi tofauti kwa kutumia lugha hizo?",
+   "seconds": 9.6
+  },
+  {
+   "learner": "Ndiyo, nadhani naweza. Wageni wengi hapa wanatoka Ufaransa na Ujerumani. Je, mnatoa mafunzo kwa wafanyakazi wapya?",
+   "sent": "[SAID casual] Ndiyo, nadhani naweza. Wageni wengi hapa wanatoka Ufaransa na Ujerumani. Je, mnatoa mafunzo kwa wafanyakazi wapya?",
+   "raw": "REPLY: Ndiyo, tunatoa mafunzo kwa undani, hasa kuhusu utamaduni wa hoteli yetu hapa Mwananchi Beach Resort. Lakini, ninaomba uwe tayari kufanya kazi kwa saa nyingi kidogo, hasa wakati wa msimu wa wageni. Je, uko tayari na hayo?",
+   "reply": "Ndiyo, tunatoa mafunzo kwa undani, hasa kuhusu utamaduni wa hoteli yetu hapa Mwananchi Beach Resort. Lakini, ninaomba uwe tayari kufanya kazi kwa saa nyingi kidogo, hasa wakati wa msimu wa wageni. Je, uko tayari na hayo?",
+   "seconds": 12.1
+  }
+ ]
+}

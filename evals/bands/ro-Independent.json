@@ -1,0 +1,36 @@
+{
+ "language": "ro",
+ "name": "Romanian",
+ "band": "Independent",
+ "scenario": "unusual",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Oh, salut! E totul ok? Pari puțin îngrijorat/îngrijorată.",
+   "english": "Oh, hi! Is everything OK? You look a bit worried."
+  },
+  {
+   "learner": "Nu chiar. Vecinul are un câine care latră toată ziua, iar eu lucrez de acasă. Nu mă pot concentra deloc.",
+   "sent": "[SAID casual] Nu chiar. Vecinul are un câine care latră toată ziua, iar eu lucrez de acasă. Nu mă pot concentra deloc.",
+   "raw": "REPLY: Oh, serios? Nu eram la curent cu asta. De obicei, el este destul de liniștit, dar pot să înțeleg de ce ești deranjat/ă. Ce anume te-a făcut să vin la mine?",
+   "reply": "Oh, serios? Nu eram la curent cu asta. De obicei, el este destul de liniștit, dar pot să înțeleg de ce ești deranjat/ă. Ce anume te-a făcut să vin la mine?",
+   "seconds": 10.0
+  },
+  {
+   "learner": "Am venit pentru că nu mai pot lucra. Am întâlniri online și clienții aud câinele. Poate îl poți lăsa la cineva ziua?",
+   "sent": "[SAID casual] Am venit pentru că nu mai pot lucra. Am întâlniri online și clienții aud câinele. Poate îl poți lăsa la cineva ziua?",
+   "raw": "REPLY: Așa, nu știm chiar că e atât de deranjant. Să-l lăsăm la cineva...? Nu am o soluție rapidă, dar pot încerca să vorbesc cu el și să-i explic situația. Ce zici dacă încerc să-l duc la un parc puțin mai târziu, ca să se distraie?",
+   "reply": "Așa, nu știm chiar că e atât de deranjant. Să-l lăsăm la cineva...? Nu am o soluție rapidă, dar pot încerca să vorbesc cu el și să-i explic situația. Ce zici dacă încerc să-l duc la un parc puțin mai târziu, ca să se distraie?",
+   "seconds": 10.4
+  },
+  {
+   "learner": "Parcul e o idee bună, dar ziua? Poate un vecin poate să-l plimbe la prânz. Eu aș putea să-l plimb uneori, dacă vrei.",
+   "sent": "[SAID casual] Parcul e o idee bună, dar ziua? Poate un vecin poate să-l plimbe la prânz. Eu aș putea să-l plimb uneori, dacă vrei.",
+   "raw": "REPLY: Asta ar fi o idee foarte bună! Vă mulțumesc că ești dispus/ă să te implic, sincer. Să ne aranjăm ceva pentru mâine, poate să ne întâlnim la poartă în jurul orei unu, ca să discutăm detaliile?",
+   "reply": "Asta ar fi o idee foarte bună! Vă mulțumesc că ești dispus/ă să te implic, sincer. Să ne aranjăm ceva pentru mâine, poate să ne întâlnim la poartă în jurul orei unu, ca să discutăm detaliile?",
+   "seconds": 11.1
+  }
+ ]
+}

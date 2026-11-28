@@ -1,0 +1,36 @@
+{
+ "language": "sv",
+ "name": "Swedish",
+ "band": "Independent",
+ "scenario": "story",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Det var så länge sedan! Nå, vad har hänt er på sistone?",
+   "english": "It's been such a long time! So, what has happened to you lately?"
+  },
+  {
+   "learner": "Ja, verkligen! Förra månaden tappade jag mitt pass på flygplatsen, precis innan en resa. Det var ett riktigt kaos.",
+   "sent": "[SAID formal] Ja, verkligen! Förra månaden tappade jag mitt pass på flygplatsen, precis innan en resa. Det var ett riktigt kaos.",
+   "raw": "REPLY: Åh nej, det låter otroligt stressigt! Jag kan verkligen förstå att det blev ett kaos när det hände precis innan en resa. Vad gjorde ni när ni upptäckte att ni hade tappat bort passet?",
+   "reply": "Åh nej, det låter otroligt stressigt! Jag kan verkligen förstå att det blev ett kaos när det hände precis innan en resa. Vad gjorde ni när ni upptäckte att ni hade tappat bort passet?",
+   "seconds": 9.3
+  },
+  {
+   "learner": "Jag gick direkt till polisen på flygplatsen och sedan till ambassaden. De gav mig ett provisoriskt pass, men jag missade flyget.",
+   "sent": "[SAID formal] Jag gick direkt till polisen på flygplatsen och sedan till ambassaden. De gav mig ett provisoriskt pass, men jag missade flyget.",
+   "raw": "REPLY: Men vad tråkigt med missat flyg, det måste ha varit en stor besvikelse! Hur kändes det i det ögonblicket, när ni först insåg att ni inte hann med flyget? Jag minns när jag en gång missade ett tåg på grund av en teknisk störning, och det var helt frustrerande.",
+   "reply": "Men vad tråkigt med missat flyg, det måste ha varit en stor besvikelse! Hur kändes det i det ögonblicket, när ni först insåg att ni inte hann med flyget? Jag minns när jag en gång missade ett tåg på grund av en teknisk störning, och det var helt frustrerande.",
+   "seconds": 10.3
+  },
+  {
+   "learner": "Jag var arg på mig själv, men också lättad att jag fick ett nytt pass så snabbt. Vad gör du för att inte tappa bort dokument?",
+   "sent": "[SAID formal] Jag var arg på mig själv, men också lättad att jag fick ett nytt pass så snabbt. Vad gör du för att inte tappa bort dokument?",
+   "raw": "REPLY: Jag förstår det! Att vara arg på sig själv när man gör ett misstag är så vanligt. Jag är ganska noggrann, men jag har ändå tappat nycklarna i ett par gånger. Jag tror jag har börjat använda ett speciellt tågband på mina väskor för att vara extra säker.",
+   "reply": "Jag förstår det! Att vara arg på sig själv när man gör ett misstag är så vanligt. Jag är ganska noggrann, men jag har ändå tappat nycklarna i ett par gånger. Jag tror jag har börjat använda ett speciellt tågband på mina väskor för att vara extra säker.",
+   "seconds": 11.1
+  }
+ ]
+}

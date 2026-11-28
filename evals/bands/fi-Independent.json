@@ -1,0 +1,36 @@
+{
+ "language": "fi",
+ "name": "Finnish",
+ "band": "Independent",
+ "scenario": "job-interview",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Moi, istu alas. Kiitti, että tulit! Kerro aluksi vähän itsestäsi.",
+   "english": "Hi, have a seat. Thanks for coming! Why don't you start by telling me a bit about yourself?"
+  },
+  {
+   "learner": "Kiitti! Mä oon Alex ja tuun Kanadasta. Oon työskennellyt hotellin vastaanotossa kaksi vuotta.",
+   "sent": "[SAID casual] Kiitti! Mä oon Alex ja tuun Kanadasta. Oon työskennellyt hotellin vastaanotossa kaksi vuotta.",
+   "raw": "REPLY: Hei Alex, mukava tavata! Kaksi vuotta on jo kova kokemus, se on todella hyvää. Mitä juuri sinulla on ollut tehtäviä tuossa vastaanotossa?",
+   "reply": "Hei Alex, mukava tavata! Kaksi vuotta on jo kova kokemus, se on todella hyvää. Mitä juuri sinulla on ollut tehtäviä tuossa vastaanotossa?",
+   "seconds": 8.4
+  },
+  {
+   "learner": "Mä hoidan check-inin ja check-outin, vastaan puhelimeen ja autan asiakkaita, jos niillä on ongelmia. Joskus asiakkaat on tosi vihaisia.",
+   "sent": "[SAID casual] Mä hoidan check-inin ja check-outin, vastaan puhelimeen ja autan asiakkaita, jos niillä on ongelmia. Joskus asiakkaat on tosi vihaisia.",
+   "raw": "REPLY: No, se kuulostaa todella monipuoliselta vastuulta. Miten käsittelet tilanteita, kun joku asiakas on todella ärsytetty? Annaa vähän esimerkki jostain, jos mahdollista.",
+   "reply": "No, se kuulostaa todella monipuoliselta vastuulta. Miten käsittelet tilanteita, kun joku asiakas on todella ärsytetty? Annaa vähän esimerkki jostain, jos mahdollista.",
+   "seconds": 8.5
+  },
+  {
+   "learner": "Kerran yks asiakas huusi, koska sen huone ei ollut valmis. Mä pyysin anteeksi, tarjosin kahvia baarissa ja annoin paremman huoneen. Se oli lopulta tyytyväinen.",
+   "sent": "[SAID casual] Kerran yks asiakas huusi, koska sen huone ei ollut valmis. Mä pyysin anteeksi, tarjosin kahvia baarissa ja annoin paremman huoneen. Se oli lopulta tyytyväinen.",
+   "raw": "REPLY: Se on hyvä tapa käsitellä asiaa, anteeksi pyytäminen ja ratkaisu on aina tärkeää. Meidän hotellissamme Rovaniemiassa on usein kiireisiä kausia, joten asiakaspalvelu on todella avainasemassa. Miten sinulla on suomen kielen taito tässä työssä?",
+   "reply": "Se on hyvä tapa käsitellä asiaa, anteeksi pyytäminen ja ratkaisu on aina tärkeää. Meidän hotellissamme Rovaniemiassa on usein kiireisiä kausia, joten asiakaspalvelu on todella avainasemassa. Miten sinulla on suomen kielen taito tässä työssä?",
+   "seconds": 10.7
+  }
+ ]
+}

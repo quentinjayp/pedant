@@ -1,0 +1,36 @@
+{
+ "language": "da",
+ "name": "Danish",
+ "band": "Independent",
+ "scenario": "travel-agent",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Godmorgen, velkommen til turistkontoret. Hvordan kan jeg hjælpe Dem?",
+   "english": "Good morning, welcome to the tourist office. How can I help you?"
+  },
+  {
+   "learner": "Godmorgen. Jeg vil gerne tage på en dagstur i morgen, måske til en ø eller ud i naturen. Hvad kan De anbefale?",
+   "sent": "[SAID formal] Godmorgen. Jeg vil gerne tage på en dagstur i morgen, måske til en ø eller ud i naturen. Hvad kan De anbefale?",
+   "raw": "REPLY: Det lyder som en fantastisk idé! Der er flere smukke muligheder. Vil De have noget mere afslappende med strand og sol, eller foretrækker De snarere en mere eventyrlig tur i naturen, måske med vandring?",
+   "reply": "Det lyder som en fantastisk idé! Der er flere smukke muligheder. Vil De have noget mere afslappende med strand og sol, eller foretrækker De snarere en mere eventyrlig tur i naturen, måske med vandring?",
+   "seconds": 9.8
+  },
+  {
+   "learner": "Jeg vil helst ud i naturen og vandre lidt. Hvor lang tid tager turen, og er frokost inkluderet?",
+   "sent": "[SAID formal] Jeg vil helst ud i naturen og vandre lidt. Hvor lang tid tager turen, og er frokost inkluderet?",
+   "raw": "REPLY: Jeg vil foreslå \"Jutlandia Naturestien\", som er en utrolig smuk rute i skoven. Turen tager typisk omkring seks timer, men vi kan tilpasse den. Frokost er desværre ikke inkluderet i prisen, men vi kan give Dem en liste over lokale caféer langs ruten. Hvad siger De til det?",
+   "reply": "Jeg vil foreslå \"Jutlandia Naturestien\", som er en utrolig smuk rute i skoven. Turen tager typisk omkring seks timer, men vi kan tilpasse den. Frokost er desværre ikke inkluderet i prisen, men vi kan give Dem en liste over lokale caféer langs ruten. Hvad siger De til det?",
+   "seconds": 11.6
+  },
+  {
+   "learner": "Seks timer er fint. Hvad koster turen? Og hvad gør vi, hvis det regner?",
+   "sent": "[SAID formal] Seks timer er fint. Hvad koster turen? Og hvad gør vi, hvis det regner?",
+   "raw": "REPLY: Selve turens pris er 350 kroner per person, og det inkluderer transporten til og fra Aarhus. Hvis vejret ikke er med til det, har vi altid alternativet \"Aarhus Havneområde Vandretur\", som er en kortere tur langs vandet. Skal jeg tjekke, om vi har plads på den, eller er Jutlandia Naturestien det bedste bud?",
+   "reply": "Selve turens pris er 350 kroner per person, og det inkluderer transporten til og fra Aarhus. Hvis vejret ikke er med til det, har vi altid alternativet \"Aarhus Havneområde Vandretur\", som er en kortere tur langs vandet. Skal jeg tjekke, om vi har plads på den, eller er Jutlandia Naturestien det bedste bud?",
+   "seconds": 14.2
+  }
+ ]
+}

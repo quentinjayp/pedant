@@ -1,0 +1,36 @@
+{
+ "language": "id",
+ "name": "Indonesian",
+ "band": "Basic",
+ "scenario": "tell-about",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Nah, ceritakan tentang tempat yang Anda suka.",
+   "english": "So, tell me about a place you like."
+  },
+  {
+   "learner": "Saya suka pantai di Bali. Pantainya indah dan airnya biru.",
+   "sent": "[SAID formal] Saya suka pantai di Bali. Pantainya indah dan airnya biru.",
+   "raw": "REPLY: Wah, Bali bagus sekali! Di sana, apa Anda suka makan makanan laut?",
+   "reply": "Wah, Bali bagus sekali! Di sana, apa Anda suka makan makanan laut?",
+   "seconds": 5.1
+  },
+  {
+   "learner": "Ya, saya suka ikan bakar. Tapi saya tidak suka udang.",
+   "sent": "[SAID formal] Ya, saya suka ikan bakar. Tapi saya tidak suka udang.",
+   "raw": "REPLY: Oh, begitu. Ikan bakar enak sekali! Di warung kopi, Anda suka minum apa?",
+   "reply": "Oh, begitu. Ikan bakar enak sekali! Di warung kopi, Anda suka minum apa?",
+   "seconds": 5.7
+  },
+  {
+   "learner": "Saya suka kopi susu. Di Bali saya minum kopi Bali. Enak sekali!",
+   "sent": "[SAID formal] Saya suka kopi susu. Di Bali saya minum kopi Bali. Enak sekali!",
+   "raw": "REPLY: Kopi susu enak. Jadi, Anda sering pergi ke Bali?",
+   "reply": "Kopi susu enak. Jadi, Anda sering pergi ke Bali?",
+   "seconds": 5.6
+  }
+ ]
+}

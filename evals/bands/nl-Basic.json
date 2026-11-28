@@ -1,0 +1,36 @@
+{
+ "language": "nl",
+ "name": "Dutch",
+ "band": "Basic",
+ "scenario": "station",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Goedemorgen. Waarmee kan ik u helpen?",
+   "english": "Good morning. How can I help you?"
+  },
+  {
+   "learner": "Goedemorgen. Ik wil naar Brugge. Wanneer gaat de trein?",
+   "sent": "[SAID formal] Goedemorgen. Ik wil naar Brugge. Wanneer gaat de trein?",
+   "raw": "REPLY: De trein naar Brugge is over een half uur. Wilt u een ticket kopen?",
+   "reply": "De trein naar Brugge is over een half uur. Wilt u een ticket kopen?",
+   "seconds": 4.7
+  },
+  {
+   "learner": "Ja, één ticket, alstublieft. Hoeveel kost het?",
+   "sent": "[SAID formal] Ja, één ticket, alstublieft. Hoeveel kost het?",
+   "raw": "REPLY: Een ticket kost vijf euro. Wilt u contant betalen of met kaart?",
+   "reply": "Een ticket kost vijf euro. Wilt u contant betalen of met kaart?",
+   "seconds": 5.5
+  },
+  {
+   "learner": "Met kaart, alstublieft. Van welk perron vertrekt de trein?",
+   "sent": "[SAID formal] Met kaart, alstublieft. Van welk perron vertrekt de trein?",
+   "raw": "REPLY: De trein vertrekt vanaf perron drie. De reis duurt ongeveer een uur.",
+   "reply": "De trein vertrekt vanaf perron drie. De reis duurt ongeveer een uur.",
+   "seconds": 5.5
+  }
+ ]
+}

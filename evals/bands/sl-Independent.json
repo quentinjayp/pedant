@@ -1,0 +1,36 @@
+{
+ "language": "sl",
+ "name": "Slovenian",
+ "band": "Independent",
+ "scenario": "plans",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Ste to res vi? Že leta se nismo videli! Kakšne načrte imate zdaj?",
+   "english": "Is that really you? I haven't seen you in years! So, what are you planning these days?"
+  },
+  {
+   "learner": "Ja, jaz sem! Razmišljam, da bi se preselil na podeželje. V mestu je preveč hrupa, pa tudi stanovanja so zelo draga.",
+   "sent": "[SAID formal] Ja, jaz sem! Razmišljam, da bi se preselil na podeželje. V mestu je preveč hrupa, pa tudi stanovanja so zelo draga.",
+   "raw": "REPLY: To je zelo razumljivo razmišljanje, Predvsem bi si morda želel mirno okolje za življenje. Zakaj pa se preselili na podeželje? Je tam morda bližje pri prirodi, ali pa imate nekatere specifične cilje?",
+   "reply": "To je zelo razumljivo razmišljanje, Predvsem bi si morda želel mirno okolje za življenje. Zakaj pa se preselili na podeželje? Je tam morda bližje pri prirodi, ali pa imate nekatere specifične cilje?",
+   "seconds": 9.8
+  },
+  {
+   "learner": "Ja, rad imam naravo in mir. Rad bi imel vrt in psa. Ampak me skrbi, da bom potreboval avto za vse.",
+   "sent": "[SAID formal] Ja, rad imam naravo in mir. Rad bi imel vrt in psa. Ampak me skrbi, da bom potreboval avto za vse.",
+   "raw": "REPLY: To je zelo prijetno želja, da imate vrt in psa! Razumem vašo skrbi glede avta; to je res pomembna stvar pri izbiri lokacije. Ali ste že razmišljali o nečem, kar bi vam omogočilo, da se premiknete z avtom, morda na mestu z boljše javno prevozo?",
+   "reply": "To je zelo prijetno želja, da imate vrt in psa! Razumem vašo skrbi glede avta; to je res pomembna stvar pri izbiri lokacije. Ali ste že razmišljali o nečem, kar bi vam omogočilo, da se premiknete z avtom, morda na mestu z boljše javno prevozo?",
+   "seconds": 11.5
+  },
+  {
+   "learner": "Morda kraj blizu Ljubljane, z vlakom. Kaj pa vi? Ali bi raje živeli v mestu ali na podeželju?",
+   "sent": "[SAID formal] Morda kraj blizu Ljubljane, z vlakom. Kaj pa vi? Ali bi raje živeli v mestu ali na podeželju?",
+   "raw": "REPLY: V Ljubljani je res sporočljivo, vendar je morda manj tistega miru, ki ga iščete. Ja sem se v zadnjih letih odločil živeti v meste, ker mi je kariera dovolila več možnosti za profesionalno rast. Mnenjam, da je pomembno najprej zgraditi soliden temelj v delu.",
+   "reply": "V Ljubljani je res sporočljivo, vendar je morda manj tistega miru, ki ga iščete. Ja sem se v zadnjih letih odločil živeti v meste, ker mi je kariera dovolila več možnosti za profesionalno rast. Mnenjam, da je pomembno najprej zgraditi soliden temelj v delu.",
+   "seconds": 12.4
+  }
+ ]
+}

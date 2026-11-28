@@ -83,6 +83,11 @@ Investigation only. Output: `docs/research/bands.md`.
    - **Not Gemma:** Gemma can't play the learner or judge, so the band evals are Claude's, in a
      session: Claude plays the learner in each language and judges Gemma's replies. Measuring how
      common the words are is on the roadmap.
+   - **Done for every language** (with task 15), with E4B: 50 conversations, one per band per
+     language, each in a scenario, in `evals/bands/` with Claude's judgments in
+     `evals/bands/judgments.md` and the script in `tools/band_conversations.py`. Gemma held both
+     bands' level and the scenarios in every language; its Slovak, Slovenian, Hungarian, Romanian and
+     Czech (at Independent) had errors in nearly every reply.
    - **4b. Gemma as judge.** Gemma judges the same sample: E4B, judging replies written by E2B and by
      itself, set up to look for what's wrong. Its judgments are compared with Claude's.
      - If they agree closely enough, Gemma becomes the permanent judge in CI.
@@ -182,8 +187,8 @@ Investigation only. Output: `docs/research/bands.md`.
     the openings E4B wrote in CI (`tools/build_openings.py` and `.github/workflows/openings.yml` are
     removed). They no longer change name when the instructions change: a scenario whose role changes
     has its openings edited in the file.
-15. **Scenario evals.** Claude's, in a session, not Gemma's: whether Gemma stays in each scenario's
-    role and setting. Run together with task 4, each conversation in one of the band's scenarios.
+15. **Scenario evals.** **Done**, with task 4: Claude's, in a session, not Gemma's. Gemma stayed in
+    the scenario's role and setting in 48 of 50 conversations.
 
 ## E. Tests and docs
 

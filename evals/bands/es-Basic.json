@@ -1,0 +1,36 @@
+{
+ "language": "es",
+ "name": "Spanish",
+ "band": "Basic",
+ "scenario": "shop",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "¡Hola! ¿Qué quieres?",
+   "english": "Hi! What would you like?"
+  },
+  {
+   "learner": "Hola. Quiero tomates, por favor. ¿Cuánto cuesta?",
+   "sent": "[SAID casual] Hola. Quiero tomates, por favor. ¿Cuánto cuesta?",
+   "raw": "REPLY: Los tomates son dos euros un kilo. ¿Cuántos quieres?",
+   "reply": "Los tomates son dos euros un kilo. ¿Cuántos quieres?",
+   "seconds": 5.0
+  },
+  {
+   "learner": "Un kilo, por favor. Y también quiero naranjas.",
+   "sent": "[SAID casual] Un kilo, por favor. Y también quiero naranjas.",
+   "raw": "REPLY: Bien, un kilo de naranjas son tres euros. ¿Algo más?",
+   "reply": "Bien, un kilo de naranjas son tres euros. ¿Algo más?",
+   "seconds": 5.4
+  },
+  {
+   "learner": "No, gracias. ¿Cuánto es todo?",
+   "sent": "[SAID casual] No, gracias. ¿Cuánto es todo?",
+   "raw": "REPLY: Son cinco euros en total. ¿Pagas con efectivo o tarjeta?",
+   "reply": "Son cinco euros en total. ¿Pagas con efectivo o tarjeta?",
+   "seconds": 5.4
+  }
+ ]
+}

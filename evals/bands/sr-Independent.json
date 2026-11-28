@@ -1,0 +1,36 @@
+{
+ "language": "sr",
+ "name": "Serbian",
+ "band": "Independent",
+ "scenario": "how-to",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Okej, sve sam izvadio/izvadila. Dakle, kako pravimo tvoje jelo?",
+   "english": "OK, I've got everything out. So how do we make this dish of yours?"
+  },
+  {
+   "learner": "Super! To je čorba koju je pravila moja baka. Prvo ti treba meso, krompir, šargarepa i luk.",
+   "sent": "[SAID casual] Super! To je čorba koju je pravila moja baka. Prvo ti treba meso, krompir, šargarepa i luk.",
+   "raw": "REPLY: Zvuči odlično! Mogu li te pitati koliko tačno mesa treba, i kako ga najpre pripremaš, da li ga prvo kuvaš ili se prvo iseče?",
+   "reply": "Zvuči odlično! Mogu li te pitati koliko tačno mesa treba, i kako ga najpre pripremaš, da li ga prvo kuvaš ili se prvo iseče?",
+   "seconds": 8.6
+  },
+  {
+   "learner": "Treba oko pola kila mesa. Prvo ga iseci na kocke i propržiš ga na malo ulja, a onda dodaš luk.",
+   "sent": "[SAID casual] Treba oko pola kila mesa. Prvo ga iseci na kocke i propržiš ga na malo ulja, a onda dodaš luk.",
+   "raw": "REPLY: Razumem, prvo isečemo meso i propržimo ga sa lukom, pa onda dodajemo ostalo. Da li nakon što propržiš meso i luk, tu dodaješ krompir i šargarepu odmah, ili se meso prvo kuva sa vodom?",
+   "reply": "Razumem, prvo isečemo meso i propržimo ga sa lukom, pa onda dodajemo ostalo. Da li nakon što propržiš meso i luk, tu dodaješ krompir i šargarepu odmah, ili se meso prvo kuva sa vodom?",
+   "seconds": 9.6
+  },
+  {
+   "learner": "Kad je meso skoro gotovo, dodaješ krompir i šargarepu i sve kuvaš još pola sata. Šta ti obično kuvaš za goste?",
+   "sent": "[SAID casual] Kad je meso skoro gotovo, dodaješ krompir i šargarepu i sve kuvaš još pola sata. Šta ti obično kuvaš za goste?",
+   "raw": "REPLY: Pola sata zvuči dobro, znači prvo propržiš, pa dodaješ povrće i kuvaš sve zajedno još pola sata. Ja obično kuvam nešto lakše, kao pileće supe ili možda piletinu sa povrćem ako dolaze prijatelji. A ti, voliš da kuvaš nešto komplikovano ili prefereš jednostavnije stvari?",
+   "reply": "Pola sata zvuči dobro, znači prvo propržiš, pa dodaješ povrće i kuvaš sve zajedno još pola sata. Ja obično kuvam nešto lakše, kao pileće supe ili možda piletinu sa povrćem ako dolaze prijatelji. A ti, voliš da kuvaš nešto komplikovano ili prefereš jednostavnije stvari?",
+   "seconds": 12.6
+  }
+ ]
+}

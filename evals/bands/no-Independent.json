@@ -1,0 +1,36 @@
+{
+ "language": "no",
+ "name": "Norwegian",
+ "band": "Independent",
+ "scenario": "hire-car",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "God ettermiddag, veihjelp. Hva kan jeg hjelpe deg med?",
+   "english": "Good afternoon, roadside assistance. How can I help you?"
+  },
+  {
+   "learner": "God ettermiddag. Leiebilen min har stoppet på veien. Motoren lager en rar lyd og nå starter den ikke.",
+   "sent": "[SAID formal] God ettermiddag. Leiebilen min har stoppet på veien. Motoren lager en rar lyd og nå starter den ikke.",
+   "raw": "REPLY: Det høres uheldig ut. Kan du fortelle meg nøyaktig hvor du befinner deg akkurat nå? Jeg trenger også å vite om noen er skadet.",
+   "reply": "Det høres uheldig ut. Kan du fortelle meg nøyaktig hvor du befinner deg akkurat nå? Jeg trenger også å vite om noen er skadet.",
+   "seconds": 7.3
+  },
+  {
+   "learner": "Jeg er på veien mot Geiranger, kanskje ti kilometer fra byen. Nei, ingen er skadet, men jeg står i en sving og det er litt farlig.",
+   "sent": "[SAID formal] Jeg er på veien mot Geiranger, kanskje ti kilometer fra byen. Nei, ingen er skadet, men jeg står i en sving og det er litt farlig.",
+   "raw": "REPLY: Forstår. Du er i nærheten av Geirangerfjorden, i en sving. Jeg sender umiddelbart en bilhjelp til din plassering. Har du kjøretøyets registreringsnummer og modell klar, så jeg kan bekrefte detaljene?",
+   "reply": "Forstår. Du er i nærheten av Geirangerfjorden, i en sving. Jeg sender umiddelbart en bilhjelp til din plassering. Har du kjøretøyets registreringsnummer og modell klar, så jeg kan bekrefte detaljene?",
+   "seconds": 10.1
+  },
+  {
+   "learner": "Ja, det er en hvit Toyota, registreringsnummer EL 12345. Hvor lenge må jeg vente? Og får jeg en ny bil i dag?",
+   "sent": "[SAID formal] Ja, det er en hvit Toyota, registreringsnummer EL 12345. Hvor lenge må jeg vente? Og får jeg en ny bil i dag?",
+   "raw": "REPLY: Takk for informasjonen om Toyotaen, jeg har notert det. Bilen skal være der innen omtrent 30 minutter. Vi kan også arrangere en erstatningsbil for deg så snart vår tekniker vurderer situasjonen.",
+   "reply": "Takk for informasjonen om Toyotaen, jeg har notert det. Bilen skal være der innen omtrent 30 minutter. Vi kan også arrangere en erstatningsbil for deg så snart vår tekniker vurderer situasjonen.",
+   "seconds": 9.5
+  }
+ ]
+}

@@ -1,0 +1,36 @@
+{
+ "language": "pt",
+ "name": "Portuguese",
+ "band": "Basic",
+ "scenario": "something-wrong",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Oi. Posso ajudar?",
+   "english": "Hi there. How can I help?"
+  },
+  {
+   "learner": "Oi. Meu quarto não tem luz. A lâmpada não funciona.",
+   "sent": "[SAID casual] Oi. Meu quarto não tem luz. A lâmpada não funciona.",
+   "raw": "REPLY: Ah, desculpe isso! Onde você está?",
+   "reply": "Ah, desculpe isso! Onde você está?",
+   "seconds": 5.4
+  },
+  {
+   "learner": "Eu estou no quarto doze. Você pode mandar alguém?",
+   "sent": "[SAID casual] Eu estou no quarto doze. Você pode mandar alguém?",
+   "raw": "REPLY: Sim, eu mando alguém já. É um quarto bom?",
+   "reply": "Sim, eu mando alguém já. É um quarto bom?",
+   "seconds": 4.9
+  },
+  {
+   "learner": "Sim, o quarto é bom. Mas o chuveiro também não está quente.",
+   "sent": "[SAID casual] Sim, o quarto é bom. Mas o chuveiro também não está quente.",
+   "raw": "REPLY: Ah, entendi. Chuveiro frio e sem luz. Eu posso te dar outro quarto?",
+   "reply": "Ah, entendi. Chuveiro frio e sem luz. Eu posso te dar outro quarto?",
+   "seconds": 5.9
+  }
+ ]
+}

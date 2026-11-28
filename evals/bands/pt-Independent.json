@@ -1,0 +1,36 @@
+{
+ "language": "pt",
+ "name": "Portuguese",
+ "band": "Independent",
+ "scenario": "doctor-symptoms",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Bom dia, entre, por favor, e sente-se. O que o traz aqui hoje?",
+   "english": "Good morning, please come in and sit down. What brings you here today?"
+  },
+  {
+   "learner": "Bom dia, doutor. Estou com dor de garganta e febre há três dias, e estou muito cansada.",
+   "sent": "[SAID formal] Bom dia, doutor. Estou com dor de garganta e febre há três dias, e estou muito cansada.",
+   "raw": "REPLY: Entendo. Já tomou algum medicamento para a febre ou para a dor? E em que momentos essa dor de garganta fica mais intensa?",
+   "reply": "Entendo. Já tomou algum medicamento para a febre ou para a dor? E em que momentos essa dor de garganta fica mais intensa?",
+   "seconds": 7.0
+  },
+  {
+   "learner": "Tomei paracetamol, mas não ajudou muito. A garganta dói mais de manhã e quando eu engulo.",
+   "sent": "[SAID formal] Tomei paracetamol, mas não ajudou muito. A garganta dói mais de manhã e quando eu engulo.",
+   "raw": "REPLY: De acordo com o que descreveu, parece-me uma faringite viral comum. Você tem tido algum outro sintoma, como tosse ou coriza? É importante manter-se bem hidratada e descansar bastante para que o seu corpo se recupere.",
+   "reply": "De acordo com o que descreveu, parece-me uma faringite viral comum. Você tem tido algum outro sintoma, como tosse ou coriza? É importante manter-se bem hidratada e descansar bastante para que o seu corpo se recupere.",
+   "seconds": 8.7
+  },
+  {
+   "learner": "Não tenho tosse. Preciso de antibiótico? E posso trabalhar amanhã?",
+   "sent": "[SAID formal] Não tenho tosse. Preciso de antibiótico? E posso trabalhar amanhã?",
+   "raw": "REPLY: Não, neste caso, provavelmente não precisaremos de antibióticos, pois parece ser viral. No entanto, recomendo que descanse mais um pouco amanhã, para evitar agravar os sintomas. O Paracetamol ajuda, mas tente beber bastante chá de limão para aliviar a garganta.",
+   "reply": "Não, neste caso, provavelmente não precisaremos de antibióticos, pois parece ser viral. No entanto, recomendo que descanse mais um pouco amanhã, para evitar agravar os sintomas. O Paracetamol ajuda, mas tente beber bastante chá de limão para aliviar a garganta.",
+   "seconds": 10.4
+  }
+ ]
+}

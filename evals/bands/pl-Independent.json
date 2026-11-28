@@ -1,0 +1,36 @@
+{
+ "language": "pl",
+ "name": "Polish",
+ "band": "Independent",
+ "scenario": "debate",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "No to teza brzmi: miasta powinny zakazać samochodów w centrum. Co o tym myślisz?",
+   "english": "So, here's the statement: cities should ban cars from their centres. What do you reckon?"
+  },
+  {
+   "learner": "Szczerze mówiąc, zgadzam się. W centrum jest za dużo samochodów, jest głośno i powietrze jest złe.",
+   "sent": "[SAID casual] Szczerze mówiąc, zgadzam się. W centrum jest za dużo samochodów, jest głośno i powietrze jest złe.",
+   "raw": "REPLY: Rozumiem, zanieczyszczenie i hałas to naprawdę duże problemy w dużych miastach. Ale czy myślisz, że całkowity zakaz byłby idealnym rozwiązaniem? Bo przecież ludzie muszą gdzieś dojeżdżać do pracy czy na zakupy.",
+   "reply": "Rozumiem, zanieczyszczenie i hałas to naprawdę duże problemy w dużych miastach. Ale czy myślisz, że całkowity zakaz byłby idealnym rozwiązaniem? Bo przecież ludzie muszą gdzieś dojeżdżać do pracy czy na zakupy.",
+   "seconds": 11.4
+  },
+  {
+   "learner": "Nie mówię o całkowitym zakazie. Ale można mieć lepszą komunikację miejską i więcej ścieżek rowerowych. Wtedy ludzie nie potrzebują samochodu.",
+   "sent": "[SAID casual] Nie mówię o całkowitym zakazie. Ale można mieć lepszą komunikację miejską i więcej ścieżek rowerowych. Wtedy ludzie nie potrzebują samochodu.",
+   "raw": "REPLY: To jest bardzo logiczne, inwestycje w transport publiczny i infrastrukturę rowerową to klucz do zmiany. Jednak zastanówmy się, czy to wystarczy, zwłaszcza dla osób starszych albo tych, którzy mieszkają na obrzeżach i mają trudniej z dostępem do tych opcji.",
+   "reply": "To jest bardzo logiczne, inwestycje w transport publiczny i infrastrukturę rowerową to klucz do zmiany. Jednak zastanówmy się, czy to wystarczy, zwłaszcza dla osób starszych albo tych, którzy mieszkają na obrzeżach i mają trudniej z dostępem do tych opcji.",
+   "seconds": 10.4
+  },
+  {
+   "learner": "Masz rację, dla starszych osób to trudniejsze. Może samochody mogłyby wjeżdżać tylko dla mieszkańców i osób niepełnosprawnych?",
+   "sent": "[SAID casual] Masz rację, dla starszych osób to trudniejsze. Może samochody mogłyby wjeżdżać tylko dla mieszkańców i osób niepełnosprawnych?",
+   "raw": "REPLY: To jest pewnie kompromis, o którym warto rozważyć, bo uwzględnia potrzeby konkretnych grup. Ale czy te ograniczenia nie sprawią, że centrum stanie się dla wielu ludzi bardziej odcięte i mniej dostępne? Musimy też pomyśleć o handlu, bo wiele firm zależy od łatwego dostępu pojazdów dostawczych.",
+   "reply": "To jest pewnie kompromis, o którym warto rozważyć, bo uwzględnia potrzeby konkretnych grup. Ale czy te ograniczenia nie sprawią, że centrum stanie się dla wielu ludzi bardziej odcięte i mniej dostępne? Musimy też pomyśleć o handlu, bo wiele firm zależy od łatwego dostępu pojazdów dostawczych.",
+   "seconds": 11.7
+  }
+ ]
+}

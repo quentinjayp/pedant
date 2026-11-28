@@ -1,0 +1,36 @@
+{
+ "language": "no",
+ "name": "Norwegian",
+ "band": "Basic",
+ "scenario": "directions",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Hei, har du gått deg bort? Kan jeg hjelpe?",
+   "english": "Hey, are you lost? Can I help?"
+  },
+  {
+   "learner": "Ja, jeg er bortkommen. Hvor er Bryggen?",
+   "sent": "[SAID casual] Ja, jeg er bortkommen. Hvor er Bryggen?",
+   "raw": "REPLY: Bryggen er rett her, du ser den der? Gå rett fram, og sving til høyre.",
+   "reply": "Bryggen er rett her, du ser den der? Gå rett fram, og sving til høyre.",
+   "seconds": 5.0
+  },
+  {
+   "learner": "Unnskyld, jeg forstår ikke. Kan du si det igjen?",
+   "sent": "[SAID casual] Unnskyld, jeg forstår ikke. Kan du si det igjen?",
+   "raw": "REPLY: Okay. Gå rett frem først. Så, sving til høyre. Ser du Bryggen?",
+   "reply": "Okay. Gå rett frem først. Så, sving til høyre. Ser du Bryggen?",
+   "seconds": 6.4
+  },
+  {
+   "learner": "Ja! Jeg ser den. Takk! Er det en god restaurant der?",
+   "sent": "[SAID casual] Ja! Jeg ser den. Takk! Er det en god restaurant der?",
+   "raw": "REPLY: Ja, det er mange god mat der! Skal du spise nå?",
+   "reply": "Ja, det er mange god mat der! Skal du spise nå?",
+   "seconds": 5.5
+  }
+ ]
+}

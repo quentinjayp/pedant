@@ -1,0 +1,36 @@
+{
+ "language": "sl",
+ "name": "Slovenian",
+ "band": "Basic",
+ "scenario": "favours",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Živijo, dobrodošel/dobrodošla! To je tvoja soba. Rabiš kaj?",
+   "english": "Hi, welcome! This is your room. Need anything?"
+  },
+  {
+   "learner": "Hvala! Ja, rabim brisačo. In kje je kuhinja?",
+   "sent": "[SAID casual] Hvala! Ja, rabim brisačo. In kje je kuhinja?",
+   "raw": "REPLY: Brisačo si lahko tukaj. Kuhinja je tam, ob oknu.",
+   "reply": "Brisačo si lahko tukaj. Kuhinja je tam, ob oknu.",
+   "seconds": 6.3
+  },
+  {
+   "learner": "Hvala. Kdaj je zajtrk? Ob osmih?",
+   "sent": "[SAID casual] Hvala. Kdaj je zajtrk? Ob osmih?",
+   "raw": "REPLY: Zajtrk je ob osmih. Ali imaš že svoje stvari?",
+   "reply": "Zajtrk je ob osmih. Ali imaš že svoje stvari?",
+   "seconds": 5.4
+  },
+  {
+   "learner": "Ne, nimam. Moja torba je v avtu. Pomagaš mi?",
+   "sent": "[SAID casual] Ne, nimam. Moja torba je v avtu. Pomagaš mi?",
+   "raw": "REPLY: Seveda, pomagam. Ajde gremo. Kje je tvoj avto?",
+   "reply": "Seveda, pomagam. Ajde gremo. Kje je tvoj avto?",
+   "seconds": 6.1
+  }
+ ]
+}

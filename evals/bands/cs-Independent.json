@@ -1,0 +1,36 @@
+{
+ "language": "cs",
+ "name": "Czech",
+ "band": "Independent",
+ "scenario": "unusual",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Á, ahoj! Je všechno v pohodě? Vypadáš trochu ustaraně.",
+   "english": "Oh, hi! Is everything OK? You look a bit worried."
+  },
+  {
+   "learner": "Ani ne. Soused má psa, který štěká celý den, a já pracuju z domu. Nevím, co mám dělat.",
+   "sent": "[SAID casual] Ani ne. Soused má psa, který štěká celý den, a já pracuju z domu. Nevím, co mám dělat.",
+   "raw": "REPLY: Oho, to je tyflí, když se to děje v práci. U nás má pes, ale on je obvykle ten tichý. A co přesně ty to znamená, že štěká celý den?",
+   "reply": "Oho, to je tyflí, když se to děje v práci. U nás má pes, ale on je obvykle ten tichý. A co přesně ty to znamená, že štěká celý den?",
+   "seconds": 19.5
+  },
+  {
+   "learner": "No, štěká od rána do večera, hlavně když odejdeš do práce. Mám videohovory a klienti to slyší. Mohl bys s tím něco udělat?",
+   "sent": "[SAID casual] No, štěká od rána do večera, hlavně když odejdeš do práce. Mám videohovory a klienti to slyší. Mohl bys s tím něco udělat?",
+   "raw": "REPLY: To je opravdu moc nepříjemné, sorry, že ti to narušuje práci. Vždycky jsem si myslel, že se to jenom náhodně stane. Máš nějaký nápad, co by se mohlo s tímto situací dělat?",
+   "reply": "To je opravdu moc nepříjemné, sorry, že ti to narušuje práci. Vždycky jsem si myslel, že se to jenom náhodně stane. Máš nějaký nápad, co by se mohlo s tímto situací dělat?",
+   "seconds": 9.2
+  },
+  {
+   "learner": "Možná bys mohl psa brát ráno na delší procházku, aby byl unavený. Nebo ho dát na pár hodin k sousedce, která je doma. Co myslíš?",
+   "sent": "[SAID casual] Možná bys mohl psa brát ráno na delší procházku, aby byl unavený. Nebo ho dát na pár hodin k sousedce, která je doma. Co myslíš?",
+   "raw": "REPLY: To jsou v podstatě dobré nápady, ale já se s tím pesem neznám a to je trochu velká zátěž. Můžeme se ale zeptat souseda, zda se nezařídí, aby ho v určitéch doběch vyvézl na procházku, neboť on sám se možná nestěžuje?",
+   "reply": "To jsou v podstatě dobré nápady, ale já se s tím pesem neznám a to je trochu velká zátěž. Můžeme se ale zeptat souseda, zda se nezařídí, aby ho v určitéch doběch vyvézl na procházku, neboť on sám se možná nestěžuje?",
+   "seconds": 11.4
+  }
+ ]
+}

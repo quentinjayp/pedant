@@ -1,0 +1,36 @@
+{
+ "language": "sv",
+ "name": "Swedish",
+ "band": "Basic",
+ "scenario": "shop",
+ "register": "Casual",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START casual]",
+   "reply": "Hej! Vad vill du ha?",
+   "english": "Hi! What would you like?"
+  },
+  {
+   "learner": "Hej! Jag vill ha äpplen, tack. Hur mycket kostar de?",
+   "sent": "[SAID casual] Hej! Jag vill ha äpplen, tack. Hur mycket kostar de?",
+   "raw": "REPLY: De kostar tio kronor. Vill du ha några?",
+   "reply": "De kostar tio kronor. Vill du ha några?",
+   "seconds": 5.4
+  },
+  {
+   "learner": "Jag vill ha fem äpplen. Och bananer, har du bananer?",
+   "sent": "[SAID casual] Jag vill ha fem äpplen. Och bananer, har du bananer?",
+   "raw": "REPLY: Ja, jag har bananer. Bananerna kostar tio kronor också.",
+   "reply": "Ja, jag har bananer. Bananerna kostar tio kronor också.",
+   "seconds": 5.3
+  },
+  {
+   "learner": "Fem äpplen och tre bananer. Vad kostar det?",
+   "sent": "[SAID casual] Fem äpplen och tre bananer. Vad kostar det?",
+   "raw": "REPLY: Det blir tjugotio kronor totalt. Vill du betala med kontanter?",
+   "reply": "Det blir tjugotio kronor totalt. Vill du betala med kontanter?",
+   "seconds": 6.2
+  }
+ ]
+}

@@ -1,0 +1,36 @@
+{
+ "language": "hu",
+ "name": "Hungarian",
+ "band": "Independent",
+ "scenario": "plan-together",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Hallotta, hogy Gábor kórházban van? Meg kellene látogatnunk. Önnek mikor lenne jó?",
+   "english": "Have you heard that Gábor is in hospital? We should visit him. When would suit you?"
+  },
+  {
+   "learner": "Igen, hallottam, nagyon sajnálom. Én csütörtökön délután ráérek. Önnek az megfelel?",
+   "sent": "[SAID formal] Igen, hallottam, nagyon sajnálom. Én csütörtökön délután ráérek. Önnek az megfelel?",
+   "raw": "REPLY: Csütörtök délután szóba jöhet, de érdemes előre megnézni, hogy a kórházban van-e látogatási korlátok. Miután megnéztük ezt, mi gondolja, mit töltsünk be a kórházban, vagy hogyan segíthetünk neki otthoni érkezéskor?",
+   "reply": "Csütörtök délután szóba jöhet, de érdemes előre megnézni, hogy a kórházban van-e látogatási korlátok. Miután megnéztük ezt, mi gondolja, mit töltsünk be a kórházban, vagy hogyan segíthetünk neki otthoni érkezéskor?",
+   "seconds": 10.9
+  },
+  {
+   "learner": "Jó ötlet, megnézem a látogatási időt. Szerintem vigyünk neki gyümölcsöt és egy könyvet. Amikor hazajön, főzhetnénk neki néhány napig.",
+   "sent": "[SAID formal] Jó ötlet, megnézem a látogatási időt. Szerintem vigyünk neki gyümölcsöt és egy könyvet. Amikor hazajön, főzhetnénk neki néhány napig.",
+   "raw": "REPLY: Gyümölcs és könyv jó, de talán valami kicsit praktikusabb, például egy tiszta tualet vagy egy tiszta ruhát is vehetünk. A főzés viszont nagyon nagy segítség lenne nekik, mikor otthon lesz, mert akkor is fáradt lesz. Szerintem egy kisebb, könnyű főzésen alapuló étel lenne ideális.",
+   "reply": "Gyümölcs és könyv jó, de talán valami kicsit praktikusabb, például egy tiszta tualet vagy egy tiszta ruhát is vehetünk. A főzés viszont nagyon nagy segítség lenne nekik, mikor otthon lesz, mert akkor is fáradt lesz. Szerintem egy kisebb, könnyű főzésen alapuló étel lenne ideális.",
+   "seconds": 12.5
+  },
+  {
+   "learner": "Igen, főzhetnénk levest, az könnyű. Ki tudná megcsinálni a bevásárlást neki? Én hétköznap dolgozom.",
+   "sent": "[SAID formal] Igen, főzhetnénk levest, az könnyű. Ki tudná megcsinálni a bevásárlást neki? Én hétköznap dolgozom.",
+   "raw": "REPLY: Leves tökéletes ötlet, és nem kell bonyolultnak lennie. A bevásárlásat akkor én foghatom át, ha csütörtökön van szabadidőm. Aztán, ha ő otthon lesz, akkor is segítek neki a konyhában, hogy ne érezze, hogy egyedül kellene megoldania mindent.",
+   "reply": "Leves tökéletes ötlet, és nem kell bonyolultnak lennie. A bevásárlásat akkor én foghatom át, ha csütörtökön van szabadidőm. Aztán, ha ő otthon lesz, akkor is segítek neki a konyhában, hogy ne érezze, hogy egyedül kellene megoldania mindent.",
+   "seconds": 13.0
+  }
+ ]
+}

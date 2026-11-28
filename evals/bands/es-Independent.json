@@ -1,0 +1,36 @@
+{
+ "language": "es",
+ "name": "Spanish",
+ "band": "Independent",
+ "scenario": "story",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "¡Cuánto tiempo! Cuénteme, ¿qué le ha pasado últimamente?",
+   "english": "It's been such a long time! So, what has happened to you lately?"
+  },
+  {
+   "learner": "¡Sí, cuánto tiempo! Pues el mes pasado perdí mi pasaporte en el aeropuerto, justo antes de un viaje. Fue un desastre, estaba muy nerviosa.",
+   "sent": "[SAID formal] ¡Sí, cuánto tiempo! Pues el mes pasado perdí mi pasaporte en el aeropuerto, justo antes de un viaje. Fue un desastre, estaba muy nerviosa.",
+   "raw": "REPLY: ¡No me lo puedo creer! Eso debe haber sido una situación muy estresante. ¿Cómo lograste solucionarlo? Me pasó algo parecido hace unos años con mi carnet de conducir.",
+   "reply": "¡No me lo puedo creer! Eso debe haber sido una situación muy estresante. ¿Cómo lograste solucionarlo? Me pasó algo parecido hace unos años con mi carnet de conducir.",
+   "seconds": 7.5
+  },
+  {
+   "learner": "Pues fui directamente a la policía del aeropuerto y luego al consulado. Me hicieron un pasaporte de emergencia, pero perdí el vuelo. ¿Y a ti qué te pasó con el carnet?",
+   "sent": "[SAID formal] Pues fui directamente a la policía del aeropuerto y luego al consulado. Me hicieron un pasaporte de emergencia, pero perdí el vuelo. ¿Y a ti qué te pasó con el carnet?",
+   "raw": "REPLY: ¡Vaya, qué locura perder el vuelo después de tanto lío! Yo, en cambio, perdí mi carnet justo antes de un examen importante, así que tuve que estudiar todo de nuevo. ¿Qué tal te fue con el pasaporte de emergencia? ¿Pudiste viajar al final?",
+   "reply": "¡Vaya, qué locura perder el vuelo después de tanto lío! Yo, en cambio, perdí mi carnet justo antes de un examen importante, así que tuve que estudiar todo de nuevo. ¿Qué tal te fue con el pasaporte de emergencia? ¿Pudiste viajar al final?",
+   "seconds": 9.4
+  },
+  {
+   "learner": "Sí, al final viajé al día siguiente. Pero desde entonces siempre llevo una copia del pasaporte en el móvil. ¿Tú qué haces para no perder los documentos?",
+   "sent": "[SAID formal] Sí, al final viajé al día siguiente. Pero desde entonces siempre llevo una copia del pasaporte en el móvil. ¿Tú qué haces para no perder los documentos?",
+   "raw": "REPLY: ¡Qué buena idea llevarlo en el móvil, es una salvación! Yo suelo hacer copias físicas y guardarlas en una caja fuerte en casa, por si acaso. ¿Hay alguna otra cosa que te haya enseñado esa mala experiencia del aeropuerto?",
+   "reply": "¡Qué buena idea llevarlo en el móvil, es una salvación! Yo suelo hacer copias físicas y guardarlas en una caja fuerte en casa, por si acaso. ¿Hay alguna otra cosa que te haya enseñado esa mala experiencia del aeropuerto?",
+   "seconds": 8.9
+  }
+ ]
+}

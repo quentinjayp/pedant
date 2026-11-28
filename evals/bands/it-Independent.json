@@ -1,0 +1,36 @@
+{
+ "language": "it",
+ "name": "Italian",
+ "band": "Independent",
+ "scenario": "none",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "È pronto/a a imparare l'italiano? Di che cosa vorrebbe parlare oggi?",
+   "english": "Are you ready to learn some Italian? What would you like to talk about today?"
+  },
+  {
+   "learner": "Sì, sono pronto. Vorrei parlare dei viaggi. L'anno scorso sono stato in Sicilia e mi è piaciuta moltissimo.",
+   "sent": "[SAID formal] Sì, sono pronto. Vorrei parlare dei viaggi. L'anno scorso sono stato in Sicilia e mi è piaciuta moltissimo.",
+   "raw": "REPLY: La Sicilia è un posto meraviglioso, con tanta storia e paesaggi incredibili. Quale città o zona ti è piaciuta di più durante il tuo viaggio e perché?",
+   "reply": "La Sicilia è un posto meraviglioso, con tanta storia e paesaggi incredibili. Quale città o zona ti è piaciuta di più durante il tuo viaggio e perché?",
+   "seconds": 6.4
+  },
+  {
+   "learner": "Mi è piaciuta molto Siracusa, perché il centro storico è piccolo e si può girare a piedi. E poi il cibo era fantastico, soprattutto il pesce.",
+   "sent": "[SAID formal] Mi è piaciuta molto Siracusa, perché il centro storico è piccolo e si può girare a piedi. E poi il cibo era fantastico, soprattutto il pesce.",
+   "raw": "REPLY: Capisco perfettamente, camminare per un centro storico è un modo bellissimo per scoprire la cultura locale. E il cibo siciliano, specialmente il pesce, è davvero eccezionale, non trovi? Hai provato qualche piatto tipico che ti ha particolarmente colpito?",
+   "reply": "Capisco perfettamente, camminare per un centro storico è un modo bellissimo per scoprire la cultura locale. E il cibo siciliano, specialmente il pesce, è davvero eccezionale, non trovi? Hai provato qualche piatto tipico che ti ha particolarmente colpito?",
+   "seconds": 8.8
+  },
+  {
+   "learner": "Sì, ho mangiato gli arancini e la pasta con le sarde. E tu, quale regione d'Italia consiglieresti a uno straniero che non l'ha mai visitata?",
+   "sent": "[SAID formal] Sì, ho mangiato gli arancini e la pasta con le sarde. E tu, quale regione d'Italia consiglieresti a uno straniero che non l'ha mai visitata?",
+   "raw": "REPLY: Gli arancini e la pasta con le sarde sono dei classici deliziosi! Se dovessi consigliare una regione, penso che la Toscana sia un'ottima scelta, specialmente se gli piace l'arte e il vino. Cosa ne pensi di quel tipo di paesaggio?",
+   "reply": "Gli arancini e la pasta con le sarde sono dei classici deliziosi! Se dovessi consigliare una regione, penso che la Toscana sia un'ottima scelta, specialmente se gli piace l'arte e il vino. Cosa ne pensi di quel tipo di paesaggio?",
+   "seconds": 9.2
+  }
+ ]
+}

@@ -1,0 +1,36 @@
+{
+ "language": "fr",
+ "name": "French",
+ "band": "Independent",
+ "scenario": "present",
+ "register": "Formal",
+ "turns": [
+  {
+   "learner": null,
+   "sent": "[START formal]",
+   "reply": "Bien, c'est à vous. Votre sujet : vivre en ville ou à la campagne. Je vous en prie, allez-y.",
+   "english": "Right, it's your turn. Your topic is living in the city or in the country. Please go ahead."
+  },
+  {
+   "learner": "Merci. Alors, moi, j'ai toujours habité en ville, à Saskatoon, mais j'ai passé un été à la campagne chez mes grands-parents. Je pense que la ville est plus pratique, mais la campagne est plus calme.",
+   "sent": "[SAID formal] Merci. Alors, moi, j'ai toujours habité en ville, à Saskatoon, mais j'ai passé un été à la campagne chez mes grands-parents. Je pense que la ville est plus pratique, mais la campagne est plus calme.",
+   "raw": "REPLY: C'est un bon résumé. Il est vrai que la ville offre beaucoup de commodités, mais le calme de la campagne est aussi très attirant. Qu'est-ce qui, selon vous, rend la vie en ville plus pratique ?",
+   "reply": "C'est un bon résumé. Il est vrai que la ville offre beaucoup de commodités, mais le calme de la campagne est aussi très attirant. Qu'est-ce qui, selon vous, rend la vie en ville plus pratique ?",
+   "seconds": 8.5
+  },
+  {
+   "learner": "En ville, on a tout à côté : les magasins, les médecins, les transports. À la campagne, il faut une voiture pour tout. Mais je dois dire que le bruit de la ville me fatigue de plus en plus.",
+   "sent": "[SAID formal] En ville, on a tout à côté : les magasins, les médecins, les transports. À la campagne, il faut une voiture pour tout. Mais je dois dire que le bruit de la ville me fatigue de plus en plus.",
+   "raw": "REPLY: Je comprends tout à fait, ce bruit constant peut être épuisant. De mon côté, je trouve que le rythme de vie plus lent à la campagne est très ressourçant. Si vous deviez choisir un compromis, préférez-vous un appartement en ville avec un petit jardin, ou une maison à la campagne proche des transports ?",
+   "reply": "Je comprends tout à fait, ce bruit constant peut être épuisant. De mon côté, je trouve que le rythme de vie plus lent à la campagne est très ressourçant. Si vous deviez choisir un compromis, préférez-vous un appartement en ville avec un petit jardin, ou une maison à la campagne proche des transports ?",
+   "seconds": 11.2
+  },
+  {
+   "learner": "Un appartement en ville avec un jardin, ce serait l'idéal, mais c'est très cher. Et vous, si vous aviez le choix, où est-ce que vous habiteriez ?",
+   "sent": "[SAID formal] Un appartement en ville avec un jardin, ce serait l'idéal, mais c'est très cher. Et vous, si vous aviez le choix, où est-ce que vous habiteriez ?",
+   "raw": "REPLY: Ah, le coût du logement, c'est un vrai problème partout ! Personnellement, j'aimerais beaucoup vivre à la campagne, peut-être près d'un petit village, pour profiter de la nature. Et vous, si l'argent n'était pas un facteur, quel type de jardin aimeriez-vous avoir ?",
+   "reply": "Ah, le coût du logement, c'est un vrai problème partout ! Personnellement, j'aimerais beaucoup vivre à la campagne, peut-être près d'un petit village, pour profiter de la nature. Et vous, si l'argent n'était pas un facteur, quel type de jardin aimeriez-vous avoir ?",
+   "seconds": 11.2
+  }
+ ]
+}
