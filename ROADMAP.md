@@ -118,6 +118,9 @@ The band setting (Basic or Independent) is built (see DECISIONS.md); each band's
   picks one, as the exams do. The app's random numbers draw them, never Gemma. The chosen scenario's
   card stays above the conversation.
 - **No Scenario.** Kept in every band, as the option with no scene (today's Default).
+- **Investigate measuring how common the words are, at each band.** For the band evals and the
+  translation evals: the share of a reply's or translation's words that are common in the language.
+  It needs a frequency list for each of the 25 languages.
 - **Openings.** Since the scenarios are fixed, each one's openings are written ahead by Claude and
   shipped, for each band, register and language.
 

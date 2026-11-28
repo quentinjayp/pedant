@@ -80,6 +80,9 @@ Investigation only. Output: `docs/research/bands.md`.
    - **4a. One-time Claude judgment.** In a session, Claude judges a sample of Gemma's replies per
      band and language against the band descriptors from task 1. This isn't a permanent eval: it's a
      one-off reference, saved with the sample, to test other judges against.
+   - **Not Gemma:** Gemma can't play the learner or judge, so the band evals are Claude's, in a
+     session: Claude plays the learner in each language and judges Gemma's replies. Measuring how
+     common the words are is on the roadmap.
    - **4b. Gemma as judge.** Gemma judges the same sample: E4B, judging replies written by E2B and by
      itself, set up to look for what's wrong. Its judgments are compared with Claude's.
      - If they agree closely enough, Gemma becomes the permanent judge in CI.
@@ -94,8 +97,8 @@ Investigation only. Output: `docs/research/bands.md`.
    - **Gemma as judge failed** (see DECISIONS.md), so by 4b the CI eval keeps only what can be
      counted.
    - **Done:** the Evals workflow translates with each model at both bands (`--band` in
-     `tools/evals.py`), and the report gives chrF and the words per translation for each. Not built:
-     a word-commonness measure (which frequency list is undecided).
+     `tools/evals.py`), and the report gives chrF and the words per translation for each. Measuring
+     how common the words are is on the roadmap.
 
 ## C. Foundations in the app
 
@@ -179,8 +182,8 @@ Investigation only. Output: `docs/research/bands.md`.
     the openings E4B wrote in CI (`tools/build_openings.py` and `.github/workflows/openings.yml` are
     removed). They no longer change name when the instructions change: a scenario whose role changes
     has its openings edited in the file.
-15. **Scenario evals.** Was: generated scenes checked for sense and level. With fixed scenarios, what
-    to check is undecided.
+15. **Scenario evals.** Claude's, in a session, not Gemma's: whether Gemma stays in each scenario's
+    role and setting. Run together with task 4, each conversation in one of the band's scenarios.
 
 ## E. Tests and docs
 
