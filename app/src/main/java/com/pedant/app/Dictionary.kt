@@ -64,9 +64,19 @@ class Dictionary(file: File) : Closeable {
         Normalizer.normalize(word, Normalizer.Form.NFD).replace(MARKS, "").map { if (it.isUpperCase()) 'A' else 'a' }
             .joinToString("")
 
-    fun entries(word: String): List<Entry> =
+    /**
+     * The entries under [word]'s key. Turkish "İ" lower-cases to "i" with a combining dot, not to
+     * Turkish "i", so a word with it ("İyi", starting a sentence) is also looked up with a plain "i"
+     * in its place ("iyi"); names spelled with it ("İstanbul") are filed under the dotted key.
+     */
+    fun entries(word: String): List<Entry> {
+        val keys = listOf(key(word)) + if ('İ' in word) listOf(key(word.replace('İ', 'i'))) else emptyList()
+        return keys.distinct().flatMap(::entriesUnder)
+    }
+
+    private fun entriesUnder(key: String): List<Entry> =
         db.rawQuery(
-            "SELECT word, pos, ipa, meanings, form_of FROM entries WHERE key = ? ORDER BY $order", arrayOf(key(word)),
+            "SELECT word, pos, ipa, meanings, form_of FROM entries WHERE key = ? ORDER BY $order", arrayOf(key),
         ).use { c ->
             buildList {
                 while (c.moveToNext()) {
